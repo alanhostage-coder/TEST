@@ -53,6 +53,13 @@ jobs:
           test -s android/app/src/main/assets/www/index.html
           grep -q "PROCEED UNTIL APPREHENDED" android/app/src/main/assets/www/index.html
 
+      - name: Apply build 0.9 chase-world patch
+        shell: bash
+        run: |
+          python3 android/.build/patch_09.py
+          grep -q "build 0.9" android/app/src/main/assets/www/index.html
+          grep -q "CHASE WORLD" android/app/src/main/assets/www/index.html
+
       - name: Build debug APK
         working-directory: android
         run: gradle --no-daemon :app:assembleDebug
@@ -61,12 +68,12 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_8.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_9.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PROCEED-UNTIL-APPREHENDED-0.8-APK
-          path: dist/PROCEED_UNTIL_APPREHENDED_0_8.apk
+          name: PROCEED-UNTIL-APPREHENDED-0.9-APK
+          path: dist/PROCEED_UNTIL_APPREHENDED_0_9.apk
           if-no-files-found: error
           retention-days: 30
