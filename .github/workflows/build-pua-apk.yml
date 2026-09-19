@@ -14,7 +14,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,8 +25,11 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Install Android 35 packages
+        shell: bash
+        run: |
+          yes | sdkmanager --licenses >/dev/null || true
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
@@ -37,7 +40,10 @@ jobs:
         shell: bash
         run: |
           mkdir -p android/app/src/main/assets/www
-          cat android/.build/index.html.gz.b64.00 android/.build/index.html.gz.b64.01 android/.build/index.html.gz.b64.02             | base64 --decode             | gzip --decompress             > android/app/src/main/assets/www/index.html
+          cat android/.build/index.html.gz.b64.00 android/.build/index.html.gz.b64.01 android/.build/index.html.gz.b64.02 \
+            | base64 --decode \
+            | gzip --decompress \
+            > android/app/src/main/assets/www/index.html
           test -s android/app/src/main/assets/www/index.html
           grep -q "PROCEED UNTIL APPREHENDED" android/app/src/main/assets/www/index.html
 
