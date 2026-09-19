@@ -46,7 +46,7 @@ jobs:
         shell: bash
         run: |
           mkdir -p android/app/src/main/assets/www
-          cat android/.build/index.html.gz.b64.00 android/.build/index.html.gz.b64.01 android/.build/index.html.gz.b64.02 \
+          cat android/.build/index.html.gz.b64.00a android/.build/index.html.gz.b64.00b android/.build/index.html.gz.b64.01 android/.build/index.html.gz.b64.02 \
             | base64 --decode \
             | gzip --decompress \
             > android/app/src/main/assets/www/index.html
