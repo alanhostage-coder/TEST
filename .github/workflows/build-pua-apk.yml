@@ -15,9 +15,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 25
-    env:
-      ANDROID_HOME: /usr/local/lib/android/sdk
-      ANDROID_SDK_ROOT: /usr/local/lib/android/sdk
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -28,11 +25,15 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Install Android 35 packages
+      - name: Find Android SDK and install API 35
         shell: bash
         run: |
-          SDKMANAGER="/usr/local/lib/android/sdk/cmdline-tools/16.0/bin/sdkmanager"
-          test -x "$SDKMANAGER"
+          SDKROOT="/usr/local/lib/android/sdk"
+          SDKMANAGER="$(find "$SDKROOT" -type f -name sdkmanager 2>/dev/null | head -n 1)"
+          echo "SDKMANAGER=$SDKMANAGER"
+          test -n "$SDKMANAGER"
+          echo "ANDROID_HOME=$SDKROOT" >> "$GITHUB_ENV"
+          echo "ANDROID_SDK_ROOT=$SDKROOT" >> "$GITHUB_ENV"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
