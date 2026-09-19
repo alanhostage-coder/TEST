@@ -49,8 +49,10 @@ jobs:
           python3 android/.build/patch_09.py
           python3 android/.build/patch_10.py
           python3 android/.build/patch_11.py
-          grep -q "build 0.11" android/app/src/main/assets/www/index.html
-          grep -q "LIVING ROADS" android/app/src/main/assets/www/index.html
+          python3 android/.build/patch_12.py
+          grep -q "build 0.12" android/app/src/main/assets/www/index.html
+          grep -q "WET WORLD" android/app/src/main/assets/www/index.html
+          grep -q "drawWetWorld" android/app/src/main/assets/www/index.html
       - name: Build debug APK
         working-directory: android
         run: gradle --no-daemon :app:assembleDebug
@@ -58,11 +60,11 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_11.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_12.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PROCEED-UNTIL-APPREHENDED-0.11-APK
-          path: dist/PROCEED_UNTIL_APPREHENDED_0_11.apk
+          name: PROCEED-UNTIL-APPREHENDED-0.12-APK
+          path: dist/PROCEED_UNTIL_APPREHENDED_0_12.apk
           if-no-files-found: error
           retention-days: 30
