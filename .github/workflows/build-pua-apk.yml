@@ -18,63 +18,51 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
       - name: Set up Java 17
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-
       - name: Find Android SDK and install API 35
         shell: bash
         run: |
           SDKROOT="/usr/local/lib/android/sdk"
           SDKMANAGER="$(find "$SDKROOT" -type f -name sdkmanager 2>/dev/null | head -n 1)"
-          echo "SDKMANAGER=$SDKMANAGER"
           test -n "$SDKMANAGER"
           echo "ANDROID_HOME=$SDKROOT" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDKROOT" >> "$GITHUB_ENV"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
-
       - name: Set up Gradle 8.9
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
-
       - name: Reconstruct game asset
         shell: bash
         run: |
           mkdir -p android/app/src/main/assets/www
-          cat android/.build/index.html.gz.b64.00a android/.build/index.html.gz.b64.00b android/.build/index.html.gz.b64.01 android/.build/index.html.gz.b64.02 \
-            | base64 --decode \
-            | gzip --decompress \
-            > android/app/src/main/assets/www/index.html
+          cat android/.build/index.html.gz.b64.00a android/.build/index.html.gz.b64.00b android/.build/index.html.gz.b64.01 android/.build/index.html.gz.b64.02 | base64 --decode | gzip --decompress > android/app/src/main/assets/www/index.html
           test -s android/app/src/main/assets/www/index.html
-          grep -q "PROCEED UNTIL APPREHENDED" android/app/src/main/assets/www/index.html
-
-      - name: Apply chase-world patches
+      - name: Apply world patches
         shell: bash
         run: |
           python3 android/.build/patch_09.py
           python3 android/.build/patch_10.py
-          grep -q "build 0.10" android/app/src/main/assets/www/index.html
-          grep -q "COASTAL CHASE" android/app/src/main/assets/www/index.html
-
+          python3 android/.build/patch_11.py
+          grep -q "build 0.11" android/app/src/main/assets/www/index.html
+          grep -q "LIVING ROADS" android/app/src/main/assets/www/index.html
       - name: Build debug APK
         working-directory: android
         run: gradle --no-daemon :app:assembleDebug
-
       - name: Rename APK
         shell: bash
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_10.apk
-
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_11.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PROCEED-UNTIL-APPREHENDED-0.10-APK
-          path: dist/PROCEED_UNTIL_APPREHENDED_0_10.apk
+          name: PROCEED-UNTIL-APPREHENDED-0.11-APK
+          path: dist/PROCEED_UNTIL_APPREHENDED_0_11.apk
           if-no-files-found: error
           retention-days: 30
