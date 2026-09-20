@@ -222,7 +222,10 @@ func _building_from_geometry(tags: Dictionary, geometry: Array) -> Dictionary:
 		"footprint": footprint,
 		"height": height,
 		"levels": levels,
-		"kind": str(tags.get("building", "yes"))
+		"kind": str(tags.get("building", "yes")),
+		"material": str(tags.get("building:material", "")),
+		"roof_shape": str(tags.get("roof:shape", "")),
+		"roof_material": str(tags.get("roof:material", ""))
 	}
 
 func _lat_lon_to_local(lat: float, lon: float) -> Vector2:
