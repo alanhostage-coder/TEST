@@ -19,6 +19,10 @@ var ground_mat
 var garage_mat
 var metal_mat
 var marking_mat
+var glass_mat
+var sandstone_mat
+var soot_stone_mat
+var roof_mat
 
 func _ready():
 	_make_materials()
@@ -55,6 +59,10 @@ func _make_materials():
 	garage_mat = _mat(Color(0.24, 0.25, 0.25), 0.72, 0.02)
 	metal_mat = _mat(Color(0.17, 0.19, 0.20), 0.48, 0.32)
 	marking_mat = _mat(Color(0.72, 0.70, 0.62), 0.74, 0.0)
+	glass_mat = _mat(Color(0.075, 0.10, 0.115), 0.20, 0.28)
+	sandstone_mat = _mat(Color(0.43, 0.40, 0.34), 0.91, 0.0)
+	soot_stone_mat = _mat(Color(0.255, 0.265, 0.26), 0.94, 0.0)
+	roof_mat = _mat(Color(0.11, 0.12, 0.12), 0.86, 0.06)
 
 func _mat(color: Color, roughness: float, metallic: float):
 	var m = StandardMaterial3D.new()
@@ -445,10 +453,11 @@ func _on_map_ready(map_data: Dictionary):
 		var h = clamp(float(building.get("height", 6.0)), 3.0, 48.0)
 		var sx = max(2.0, float(size[0]))
 		var sz = max(2.0, float(size[1]))
-		var tone_seed = fmod(abs(float(center[0]) * 0.013 + float(center[1]) * 0.021), 0.10)
-		var tone = 0.22 + tone_seed
-		var building_mat = _mat(Color(tone, tone * 1.015, tone * 1.025), 0.88, 0.0)
-		_box(map_root, Vector3(float(center[0]), h * 0.5, float(center[1])), Vector3(sx, h, sz), building_mat)
+		var cx = float(center[0])
+		var cz = float(center[1])
+		var seed = int(abs(cx * 17.0 + cz * 31.0 + sx * 11.0 + sz * 7.0))
+		var kind = str(building.get("kind", "yes"))
+		_add_edinburgh_building(map_root, Vector3(cx, 0.0, cz), Vector3(sx, h, sz), seed, kind)
 
 	_add_map_furniture(map_root)
 	_spawn_map_agents()
@@ -604,3 +613,68 @@ func _add_map_furniture(parent: Node3D):
 			lamp.shadow_enabled = false
 			parent.add_child(lamp)
 		placed += 1
+
+
+func _add_edinburgh_building(parent: Node3D, base: Vector3, size: Vector3, seed: int, kind: String):
+	var sx = size.x
+	var h = size.y
+	var sz = size.z
+	var industrial = kind in ["industrial", "warehouse", "commercial", "retail"] or sx > 28.0 or sz > 28.0
+	var stone = soot_stone_mat if seed % 3 != 0 else sandstone_mat
+	if industrial:
+		stone = _mat(Color(0.27, 0.285, 0.29), 0.84, 0.03)
+	var body = _box(parent, base + Vector3(0, h * 0.5, 0), Vector3(sx, h, sz), stone)
+
+	# Dark plinths make terraces and warehouses sit on wet streets rather than float.
+	var plinth_h = min(1.25, h * 0.18)
+	_visual_box(parent, base + Vector3(0, plinth_h * 0.5, -sz * 0.505), Vector3(sx * 0.96, plinth_h, 0.10), roof_mat)
+	_visual_box(parent, base + Vector3(0, plinth_h * 0.5, sz * 0.505), Vector3(sx * 0.96, plinth_h, 0.10), roof_mat)
+
+	var storeys = max(1, int(round(h / 3.1)))
+	var front_slots = clamp(int(sx / (4.4 if industrial else 3.2)), 1, 12)
+	var side_slots = clamp(int(sz / (5.0 if industrial else 3.6)), 1, 10)
+	var window_w = 1.65 if industrial else 1.05
+	var window_h = 1.15 if industrial else 1.32
+
+	for floor in range(storeys):
+		var y = min(h - 0.9, 1.8 + float(floor) * 3.0)
+		if y > h - 0.45:
+			continue
+		for slot in range(front_slots):
+			if (slot + floor + seed) % 9 == 0:
+				continue
+			var x = -sx * 0.5 + sx * (float(slot) + 0.5) / float(front_slots)
+			_visual_box(parent, base + Vector3(x, y, -sz * 0.505), Vector3(window_w, window_h, 0.08), glass_mat)
+			_visual_box(parent, base + Vector3(x, y, sz * 0.505), Vector3(window_w, window_h, 0.08), glass_mat)
+		for slot in range(side_slots):
+			if (slot * 3 + floor + seed) % 8 == 0:
+				continue
+			var z = -sz * 0.5 + sz * (float(slot) + 0.5) / float(side_slots)
+			_visual_box(parent, base + Vector3(-sx * 0.505, y, z), Vector3(0.08, window_h, window_w), glass_mat)
+			_visual_box(parent, base + Vector3(sx * 0.505, y, z), Vector3(0.08, window_h, window_w), glass_mat)
+
+	# Horizontal sandstone courses and lintel rhythm, deliberately restrained.
+	if not industrial and h > 7.0:
+		for floor in range(1, storeys):
+			var course_y = min(h - 0.25, float(floor) * 3.0)
+			_visual_box(parent, base + Vector3(0, course_y, -sz * 0.512), Vector3(sx, 0.10, 0.08), sandstone_mat)
+
+	# Ground floor variety: close-set garages/shops for industrial edges; recessed doors for tenements.
+	if industrial:
+		var bays = clamp(int(sx / 7.5), 1, 6)
+		for i in range(bays):
+			var x = -sx * 0.5 + sx * (float(i) + 0.5) / float(bays)
+			_visual_box(parent, base + Vector3(x, 1.45, -sz * 0.518), Vector3(min(5.0, sx / bays * 0.70), 2.45, 0.12), metal_mat)
+	else:
+		var door_x = -sx * 0.5 + min(1.8, sx * 0.22) if seed % 2 == 0 else sx * 0.5 - min(1.8, sx * 0.22)
+		_visual_box(parent, base + Vector3(door_x, 1.15, -sz * 0.52), Vector3(1.25, 2.25, 0.12), roof_mat)
+
+	# Roofline clutter gives distance cues from the chase and bay cameras.
+	if h > 6.0:
+		var chimney_count = clamp(int(sx / 12.0), 1, 4)
+		for i in range(chimney_count):
+			var x = -sx * 0.35 + sx * 0.70 * (float(i) / max(1.0, float(chimney_count - 1)))
+			var z = (-0.22 if (i + seed) % 2 == 0 else 0.22) * sz
+			_visual_box(parent, base + Vector3(x, h + 0.85, z), Vector3(0.55, 1.7, 0.55), roof_mat)
+	if industrial and seed % 3 == 0:
+		_visual_box(parent, base + Vector3(sx * 0.22, h + 0.7, -sz * 0.12), Vector3(3.6, 1.4, 2.6), metal_mat)
