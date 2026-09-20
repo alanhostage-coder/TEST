@@ -12,6 +12,7 @@ func _ready():
 
 func _process(_delta):
 	var car=$Car
+	_update_atmosphere(car)
 	var c=Vector2i(floor(car.global_position.x/CELL),floor(car.global_position.z/CELL))
 	for x in range(c.x-1,c.x+2):
 		for y in range(c.y-1,c.y+2):
@@ -71,3 +72,11 @@ func _make_landmarks():
 	var mast=Node3D.new(); mast.name="Transmitter"; mast.position=Vector3(185,0,110); add_child(mast)
 	_box(mast,Vector3(0,24,0),Vector3(1.2,48,1.2))
 	_box(mast,Vector3(0,45,0),Vector3(9,0.5,0.5))
+
+func _update_atmosphere(car):
+	# Spatial radio reception: the transmitter is a place, not a menu.
+	var mast=Vector3(185,0,110)
+	var distance=car.global_position.distance_to(mast)
+	var signal=clamp(1.0-distance/430.0,0.0,1.0)
+	# Light breathes very slightly with distance/weather, keeping the world readable.
+	$Sun.light_energy=0.58+signal*0.18
