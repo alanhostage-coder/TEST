@@ -9,6 +9,7 @@ window/stretch/mode="canvas_items"
 renderer/rendering_method="mobile"
 renderer/rendering_method.mobile="mobile"
 textures/default_filters/use_nearest_mipmap_filter=false
+textures/vram_compression/import_etc2_astc=true
 [physics]
 common/physics_ticks_per_second=60
 [input]
