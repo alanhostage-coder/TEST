@@ -19,46 +19,34 @@ jobs:
       image: barichello/godot-ci:4.5.1
     steps:
       - uses: actions/checkout@v4
-
       - name: Prepare Godot CI environment
         run: |
-          mkdir -p "$HOME/.config/godot"
-          mkdir -p "$HOME/.local/share/godot/export_templates"
-          if [ -d /root/.config/godot ]; then
-            cp -a /root/.config/godot/. "$HOME/.config/godot/"
-          fi
-          if [ -d /root/.local/share/godot/export_templates/4.5.1.stable ]; then
-            cp -a /root/.local/share/godot/export_templates/4.5.1.stable "$HOME/.local/share/godot/export_templates/"
-          fi
+          mkdir -p "$HOME/.config/godot" "$HOME/.local/share/godot/export_templates"
+          if [ -d /root/.config/godot ]; then cp -a /root/.config/godot/. "$HOME/.config/godot/"; fi
+          if [ -d /root/.local/share/godot/export_templates/4.5.1.stable ]; then cp -a /root/.local/share/godot/export_templates/4.5.1.stable "$HOME/.local/share/godot/export_templates/"; fi
           godot --version
           test -d "$HOME/.local/share/godot/export_templates/4.5.1.stable"
-
       - name: Strict project parse
         run: |
           godot --headless --verbose --path godot --editor --quit > /tmp/pua-godot.log 2>&1
           cat /tmp/pua-godot.log
-          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/pua-godot.log; then
-            exit 1
-          fi
-
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/pua-godot.log; then exit 1; fi
       - name: PUA headless soak gate
         run: |
           timeout 30s godot --headless --path godot res://pua_soak_test.tscn > /tmp/pua-soak.log 2>&1
           cat /tmp/pua-soak.log
           grep -q 'PUA_SOAK_OK' /tmp/pua-soak.log
-
       - name: Export Android debug APK
         run: |
           mkdir -p build/android
           EXPORT_DIR="$(readlink -f build/android)"
-          godot --headless --verbose --path godot --export-debug "Android" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_54.apk"
-          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_54.apk"
-          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_54.apk"
-
+          godot --headless --verbose --path godot --export-debug "Android" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_55.apk"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_55.apk"
+          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_55.apk"
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.54-MAPPED-CONTEXT-ANDROID
-          path: build/android/PROCEED_UNTIL_APPREHENDED_0_54.apk
+          name: PUA-0.55-VELOCITY-CHASE-ANDROID
+          path: build/android/PROCEED_UNTIL_APPREHENDED_0_55.apk
           if-no-files-found: error
           retention-days: 30
