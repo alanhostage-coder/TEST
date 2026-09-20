@@ -1,0 +1,48 @@
+name: Build PUA Godot APK
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'godot/**'
+      - '.github/workflows/build-godot-apk.yml'
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v5
+      - name: Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Install Android packages
+        run: sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - name: Install Godot and export templates
+        run: |
+          wget -q https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_linux.x86_64.zip
+          wget -q https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_export_templates.tpz
+          unzip -q Godot_v4.5.1-stable_linux.x86_64.zip
+          sudo mv Godot_v4.5.1-stable_linux.x86_64 /usr/local/bin/godot
+          mkdir -p ~/.local/share/godot/export_templates/4.5.1.stable
+          unzip -q Godot_v4.5.1-stable_export_templates.tpz -d /tmp/templates
+          cp -r /tmp/templates/templates/* ~/.local/share/godot/export_templates/4.5.1.stable/
+      - name: Parse project
+        run: |
+          godot --headless --path godot --editor --quit
+          godot --headless --path godot --quit-after 2
+      - name: Export Android APK
+        run: |
+          mkdir -p dist
+          godot --headless --path godot --export-debug Android ../dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_26.apk
+          test -s dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_26.apk
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: PUA-0.26-GREYBEARD-ANDROID
+          path: dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_26.apk
+          if-no-files-found: error
+          retention-days: 30
