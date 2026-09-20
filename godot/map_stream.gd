@@ -2,36 +2,48 @@ extends Node
 
 signal map_ready(data)
 
-# Low-bandwidth OSM slice centred on Leith/Forth. Geometry is simplified locally
-# and cached, so the live service is a seed rather than a runtime dependency.
+# Low-bandwidth OSM slice centred on a UK postcode. The postcode is resolved once,
+# then the resulting road/building geometry is simplified and cached locally.
 const OVERPASS_URL := "https://overpass-api.de/api/interpreter"
-const CACHE_PATH := "user://pua_map_stream.json"
+const POSTCODES_URL := "https://api.postcodes.io/postcodes/"
+const START_POSTCODE := "RH15 2BZ"
+const CACHE_PATH := "user://pua_map_stream_rh15_2bz.json"
 const CACHE_MAX_AGE_SECONDS := 604800
-const CENTER_LAT := 55.9777
-const CENTER_LON := -3.1712
+# Burgess Hill fallback only matters if postcode resolution is unavailable.
+const FALLBACK_LAT := 50.9570
+const FALLBACK_LON := -0.1320
 const HALF_LAT := 0.0060
 const HALF_LON := 0.0100
 const MIN_POINT_GAP_METERS := 14.0
 const MAX_ROADS := 110
 const MAX_BUILDINGS := 140
 
+var center_lat := FALLBACK_LAT
+var center_lon := FALLBACK_LON
+var resolved_postcode := START_POSTCODE
+
 var data := {
 	"source": "offline",
-	"center_lat": CENTER_LAT,
-	"center_lon": CENTER_LON,
+	"start_postcode": START_POSTCODE,
+	"center_lat": FALLBACK_LAT,
+	"center_lon": FALLBACK_LON,
 	"roads": [],
 	"buildings": [],
 	"updated_unix": 0
 }
 
 var _request: HTTPRequest
+var _postcode_request: HTTPRequest
 
 func _ready():
 	var cache_fresh = _load_cache()
 	if data["roads"].size() > 0 or data["buildings"].size() > 0:
+		center_lat = float(data.get("center_lat", FALLBACK_LAT))
+		center_lon = float(data.get("center_lon", FALLBACK_LON))
+		resolved_postcode = str(data.get("start_postcode", START_POSTCODE))
 		map_ready.emit(data)
 	if not cache_fresh:
-		_fetch_osm()
+		_resolve_start_postcode()
 
 func _load_cache() -> bool:
 	if not FileAccess.file_exists(CACHE_PATH):
@@ -44,10 +56,47 @@ func _load_cache() -> bool:
 		return false
 	if not cached.has("roads") or not cached.has("buildings"):
 		return false
+	if str(cached.get("start_postcode", "")).to_upper() != START_POSTCODE:
+		return false
 	data = cached
 	data["source"] = "cache"
 	var age = int(Time.get_unix_time_from_system()) - int(data.get("updated_unix", 0))
 	return age >= 0 and age < CACHE_MAX_AGE_SECONDS
+
+func _resolve_start_postcode():
+	if _postcode_request:
+		return
+	_postcode_request = HTTPRequest.new()
+	_postcode_request.timeout = 10.0
+	add_child(_postcode_request)
+	_postcode_request.request_completed.connect(_on_postcode_resolved)
+	var compact = START_POSTCODE.replace(" ", "").uri_encode()
+	var headers = PackedStringArray([
+		"Accept: application/json",
+		"User-Agent: ProceedUntilApprehended/0.53 (Godot Android; postcode-seeded OSM)"
+	])
+	var err = _postcode_request.request(POSTCODES_URL + compact, headers, HTTPClient.METHOD_GET)
+	if err != OK:
+		_postcode_request.queue_free()
+		_postcode_request = null
+		_fetch_osm()
+
+func _on_postcode_resolved(result: int, response_code: int, _headers, body: PackedByteArray):
+	if _postcode_request:
+		_postcode_request.queue_free()
+		_postcode_request = null
+	if result == HTTPRequest.RESULT_SUCCESS and response_code >= 200 and response_code < 300:
+		var parsed = JSON.parse_string(body.get_string_from_utf8())
+		if parsed is Dictionary:
+			var postcode_result = parsed.get("result", {})
+			if postcode_result is Dictionary:
+				var lat = float(postcode_result.get("latitude", FALLBACK_LAT))
+				var lon = float(postcode_result.get("longitude", FALLBACK_LON))
+				if lat > 40.0 and lat < 65.0 and lon > -12.0 and lon < 5.0:
+					center_lat = lat
+					center_lon = lon
+					resolved_postcode = str(postcode_result.get("postcode", START_POSTCODE))
+	_fetch_osm()
 
 func _fetch_osm():
 	if _request:
@@ -56,16 +105,16 @@ func _fetch_osm():
 	_request.timeout = 18.0
 	add_child(_request)
 	_request.request_completed.connect(_on_request_completed)
-	var south = CENTER_LAT - HALF_LAT
-	var west = CENTER_LON - HALF_LON
-	var north = CENTER_LAT + HALF_LAT
-	var east = CENTER_LON + HALF_LON
+	var south = center_lat - HALF_LAT
+	var west = center_lon - HALF_LON
+	var north = center_lat + HALF_LAT
+	var east = center_lon + HALF_LON
 	var bbox = "%.6f,%.6f,%.6f,%.6f" % [south, west, north, east]
 	var query = '[out:json][timeout:15];(way[highway~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|service|track)$"](%s);way[building](%s););out tags geom qt;' % [bbox, bbox]
 	var url = OVERPASS_URL + "?data=" + query.uri_encode()
 	var headers = PackedStringArray([
 		"Accept: application/json",
-		"User-Agent: ProceedUntilApprehended/0.43 (Godot Android; cached OSM geometry)"
+		"User-Agent: ProceedUntilApprehended/0.53 (Godot Android; postcode-seeded cached OSM geometry)"
 	])
 	var err = _request.request(url, headers, HTTPClient.METHOD_GET)
 	if err != OK:
@@ -108,8 +157,9 @@ func _on_request_completed(result: int, response_code: int, _headers, body: Pack
 				buildings.append(building)
 	data = {
 		"source": "live",
-		"center_lat": CENTER_LAT,
-		"center_lon": CENTER_LON,
+		"start_postcode": resolved_postcode,
+		"center_lat": center_lat,
+		"center_lon": center_lon,
 		"roads": roads,
 		"buildings": buildings,
 		"updated_unix": int(Time.get_unix_time_from_system())
@@ -123,7 +173,7 @@ func _geometry_to_points(geometry: Array, min_gap: float) -> Array:
 	for entry in geometry:
 		if not entry is Dictionary:
 			continue
-		var p = _lat_lon_to_local(float(entry.get("lat", CENTER_LAT)), float(entry.get("lon", CENTER_LON)))
+		var p = _lat_lon_to_local(float(entry.get("lat", center_lat)), float(entry.get("lon", center_lon)))
 		if points.is_empty() or last.distance_to(p) >= min_gap:
 			points.append([p.x, p.y])
 			last = p
@@ -143,7 +193,7 @@ func _building_from_geometry(tags: Dictionary, geometry: Array) -> Dictionary:
 	for entry in geometry:
 		if not entry is Dictionary:
 			continue
-		var p = _lat_lon_to_local(float(entry.get("lat", CENTER_LAT)), float(entry.get("lon", CENTER_LON)))
+		var p = _lat_lon_to_local(float(entry.get("lat", center_lat)), float(entry.get("lon", center_lon)))
 		min_x = min(min_x, p.x)
 		max_x = max(max_x, p.x)
 		min_z = min(min_z, p.y)
@@ -168,9 +218,9 @@ func _building_from_geometry(tags: Dictionary, geometry: Array) -> Dictionary:
 	}
 
 func _lat_lon_to_local(lat: float, lon: float) -> Vector2:
-	var meters_per_lon = 111320.0 * cos(deg_to_rad(CENTER_LAT))
-	var x = (lon - CENTER_LON) * meters_per_lon
-	var z = -(lat - CENTER_LAT) * 111320.0
+	var meters_per_lon = 111320.0 * cos(deg_to_rad(center_lat))
+	var x = (lon - center_lon) * meters_per_lon
+	var z = -(lat - center_lat) * 111320.0
 	return Vector2(x, z)
 
 func _road_width(kind: String) -> float:
