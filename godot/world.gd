@@ -206,9 +206,9 @@ func _update_traffic(delta):
 func _update_atmosphere(car):
 	var mast = Vector3(185, 0, 110)
 	var distance = car.global_position.distance_to(mast)
-	var signal = clamp(1.0 - distance / 430.0, 0.0, 1.0)
-	car.set_meta("radio_signal", signal)
-	$Sun.light_energy = 0.60 + signal * 0.10
+	var radio_strength = clamp(1.0 - distance / 430.0, 0.0, 1.0)
+	car.set_meta("radio_signal", radio_strength)
+	$Sun.light_energy = 0.60 + radio_strength * 0.10
 	var beacon = get_node_or_null("Transmitter/Beacon")
 	if beacon:
 		beacon.light_energy = 1.4 + 1.6 * (0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.006))
