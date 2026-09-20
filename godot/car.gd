@@ -12,6 +12,11 @@ var steer_smoothed := 0.0
 var touch_origin := Vector2.ZERO
 var touch_now := Vector2.ZERO
 var touching := false
+var look_touching := false
+var look_last := Vector2.ZERO
+var camera_yaw := 0.0
+var camera_pitch := 0.0
+var camera_idle := 0.0
 var impact_kick := 0.0
 var distance_driven := 0.0
 var on_road := true
@@ -27,12 +32,24 @@ func _exit_tree():
 	_save_state()
 
 func _input(event):
-	if event is InputEventScreenTouch and event.position.x < get_viewport().get_visible_rect().size.x * 0.58:
-		touching = event.pressed
-		touch_origin = event.position
-		touch_now = event.position
-	elif event is InputEventScreenDrag and touching:
-		touch_now = event.position
+	var screen_width = get_viewport().get_visible_rect().size.x
+	if event is InputEventScreenTouch:
+		if event.position.x < screen_width * 0.58:
+			touching = event.pressed
+			touch_origin = event.position
+			touch_now = event.position
+		elif event.position.x > screen_width * 0.64:
+			look_touching = event.pressed
+			look_last = event.position
+	elif event is InputEventScreenDrag:
+		if touching and event.position.x < screen_width * 0.64:
+			touch_now = event.position
+		elif look_touching:
+			var look_delta = event.position - look_last
+			camera_yaw = clamp(camera_yaw - look_delta.x * 0.0045, -1.05, 1.05)
+			camera_pitch = clamp(camera_pitch - look_delta.y * 0.0035, -0.18, 0.22)
+			camera_idle = 0.0
+			look_last = event.position
 
 func _physics_process(delta):
 	var input_throttle = Input.get_action_strength("throttle") - Input.get_action_strength("brake")
@@ -44,10 +61,10 @@ func _physics_process(delta):
 
 	on_road = _is_near_road()
 	steer_smoothed = move_toward(steer_smoothed, input_steer, delta * 4.2)
-	var speed_limit = max_speed if on_road else max_speed * 0.56
+	var speed_limit = max_speed if on_road else max_speed * 0.72
 	var reversing_limit = speed_limit * 0.38
 	var target_speed = 0.0
-	var rate = drag * (1.0 if on_road else 1.7)
+	var rate = drag * (1.0 if on_road else 1.38)
 	if input_throttle > 0.04:
 		if speed < -0.7: target_speed = 0.0; rate = braking
 		else: target_speed = speed_limit; rate = acceleration
@@ -62,7 +79,7 @@ func _physics_process(delta):
 	rotate_y(-steer_smoothed * steer_rate * steering_at_speed * steering_authority * delta * travel_sign)
 	var desired_velocity = -global_transform.basis.z * speed
 	var wetness = clamp(float(get_meta("world_wetness", 0.0)), 0.0, 1.0)
-	var grip = (lerp(10.5, 7.2, wetness)) if on_road else lerp(4.6, 3.5, wetness)
+	var grip = (lerp(10.5, 7.2, wetness)) if on_road else lerp(5.4, 4.1, wetness)
 	velocity = velocity.lerp(desired_velocity, 1.0 - exp(-delta * grip))
 	var before = global_position
 	move_and_slide()
@@ -117,17 +134,24 @@ func _update_camera(delta, speed_ratio):
 	var local_motion = global_transform.basis.inverse() * world_motion
 	var lag_target = Vector3(clamp(-local_motion.x * 0.060, -1.5, 1.5), 0.0, clamp(local_motion.z * 0.038, -0.8, 0.8))
 	camera_lag = camera_lag.lerp(lag_target, 1.0 - exp(-delta * 2.2))
+	if look_touching:
+		camera_idle = 0.0
+	else:
+		camera_idle += delta
+		if camera_idle > 0.65:
+			camera_yaw = lerp(camera_yaw, 0.0, 1.0 - exp(-delta * 1.55))
+			camera_pitch = lerp(camera_pitch, 0.0, 1.0 - exp(-delta * 1.8))
 	var shake = sin(Time.get_ticks_msec() * 0.04) * impact_kick * 0.14
-	var lateral = steer_smoothed * 1.28 + camera_lag.x
-	var chase_height = 2.42 + speed_ratio * 0.52 + shake
-	var chase_distance = 7.1 + speed_ratio * 3.25 + camera_lag.z
+	var lateral = steer_smoothed * 1.10 + camera_lag.x
+	var chase_height = 2.48 + speed_ratio * 0.50 + shake
+	var chase_distance = 7.35 + speed_ratio * 3.15 + camera_lag.z
 	rig.position.x = lerp(rig.position.x, lateral, 1.0 - exp(-delta * 3.0))
 	rig.position.y = lerp(rig.position.y, chase_height, 1.0 - exp(-delta * 2.2))
 	rig.position.z = lerp(rig.position.z, chase_distance, 1.0 - exp(-delta * 1.7))
-	rig.rotation.x = lerp_angle(rig.rotation.x, deg_to_rad(-5.8 + speed_ratio * 1.2), 1.0 - exp(-delta * 2.5))
-	rig.rotation.y = lerp_angle(rig.rotation.y, -steer_smoothed * 0.145 - camera_lag.x * 0.028, 1.0 - exp(-delta * 2.4))
-	rig.rotation.z = lerp_angle(rig.rotation.z, -steer_smoothed * speed_ratio * 0.016, 1.0 - exp(-delta * 4.0))
-	$CameraRig/Camera3D.fov = lerp($CameraRig/Camera3D.fov, 61.5 + speed_ratio * 11.0, 1.0 - exp(-delta * 1.65))
+	rig.rotation.x = lerp_angle(rig.rotation.x, deg_to_rad(-5.6 + speed_ratio * 1.1) + camera_pitch, 1.0 - exp(-delta * 3.0))
+	rig.rotation.y = lerp_angle(rig.rotation.y, camera_yaw - steer_smoothed * 0.12 - camera_lag.x * 0.025, 1.0 - exp(-delta * 3.1))
+	rig.rotation.z = lerp_angle(rig.rotation.z, -steer_smoothed * speed_ratio * 0.014, 1.0 - exp(-delta * 4.0))
+	$CameraRig/Camera3D.fov = lerp($CameraRig/Camera3D.fov, 61.0 + speed_ratio * 11.5, 1.0 - exp(-delta * 1.65))
 
 func _save_state():
 	var cfg = ConfigFile.new()
