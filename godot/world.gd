@@ -21,6 +21,7 @@ func _ready():
 	_make_landmarks()
 	_spawn_traffic()
 	_spawn_patrol()
+	_bind_world_state()
 	for x in range(-1, 2):
 		for y in range(-2, 1):
 			_build_cell(Vector2i(x, y))
@@ -336,3 +337,35 @@ func _update_atmosphere(car):
 	var beacon = get_node_or_null("Transmitter/Beacon")
 	if beacon:
 		beacon.light_energy = 1.4 + 1.6 * (0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.006))
+
+
+func _bind_world_state():
+	var world_state = get_node_or_null("WorldState")
+	if world_state:
+		world_state.changed.connect(_on_world_state_changed)
+		_on_world_state_changed(world_state.state)
+
+func _on_world_state_changed(state: Dictionary):
+	var rain = clamp(float(state.get("rain", 0.0)) + float(state.get("precipitation", 0.0)), 0.0, 6.0)
+	var wetness = clamp(rain / 2.5, 0.0, 1.0)
+	var cloud = clamp(float(state.get("cloud", 60.0)) / 100.0, 0.0, 1.0)
+	var visibility = clamp(float(state.get("visibility", 12000.0)), 800.0, 30000.0)
+	var aqi = clamp(float(state.get("aqi", 25.0)), 0.0, 150.0)
+	var wind = max(0.0, float(state.get("wind_speed", 12.0)))
+	var wave = max(0.0, float(state.get("wave_height", 0.5)))
+	asphalt_mat.roughness = lerp(0.34, 0.12, wetness)
+	asphalt_mat.metallic = lerp(0.05, 0.18, wetness)
+	$Sun.light_energy = lerp(0.72, 0.34, cloud) * lerp(1.0, 0.84, wetness)
+	var env = $WorldEnvironment.environment
+	if env:
+		env.fog_enabled = true
+		var visibility_fog = clamp(1.0 - visibility / 22000.0, 0.0, 0.92)
+		env.fog_density = 0.0045 + visibility_fog * 0.018 + clamp(aqi / 150.0, 0.0, 1.0) * 0.004
+		env.fog_light_color = Color(0.39, 0.42, 0.42).lerp(Color(0.31, 0.34, 0.35), cloud)
+	var car = get_node_or_null("Car")
+	if car:
+		car.set_meta("world_wetness", wetness)
+		car.set_meta("world_wind_kph", wind)
+		car.set_meta("world_wave_height", wave)
+		car.set_meta("world_temperature", float(state.get("temperature", 8.0)))
+		car.set_meta("world_data_source", state.get("source", "offline"))
