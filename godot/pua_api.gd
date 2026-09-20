@@ -210,8 +210,8 @@ func _start_moment():
 	var seed = abs(int(directive.get("world_seed", 1))) + int(session.get("moments_seen", 0)) * 3571
 	var candidates = ["traffic_wave", "quiet_patch", "sodium_bloom", "radio_bleed"]
 	_active_moment = candidates[seed % candidates.size()]
-	_active_moment_strength = 0.55 + float((seed / 11) as int % 40) / 100.0
-	_moment_duration = 18.0 + float((seed / 23) as int % 28)
+	_active_moment_strength = 0.55 + float(int(seed / 11) % 40) / 100.0
+	_moment_duration = 18.0 + float(int(seed / 23) % 28)
 	session["moments_seen"] = int(session.get("moments_seen", 0)) + 1
 	session["last_moment"] = _active_moment
 	_moment_clock = 0.0
