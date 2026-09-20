@@ -45,22 +45,22 @@ jobs:
         run: |
           mkdir -p build/thinkpad
           EXPORT_DIR="$(readlink -f build/thinkpad)"
-          godot --headless --verbose --path godot --export-release "Windows Desktop" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_53_THINKPAD.exe"
-          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_53_THINKPAD.exe"
-          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_53_THINKPAD.exe"
+          godot --headless --verbose --path godot --export-release "Windows Desktop" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_54_THINKPAD.exe"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_54_THINKPAD.exe"
+          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_54_THINKPAD.exe"
           cd "$EXPORT_DIR"
           cat > PLAY_PUA_THINKPAD.cmd <<'EOF'
           @echo off
           cd /d "%~dp0"
-          PROCEED_UNTIL_APPREHENDED_0_53_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 960x540
+          PROCEED_UNTIL_APPREHENDED_0_54_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 960x540
           EOF
           cat > PLAY_PUA_POTATO.cmd <<'EOF'
           @echo off
           cd /d "%~dp0"
-          PROCEED_UNTIL_APPREHENDED_0_53_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 800x450
+          PROCEED_UNTIL_APPREHENDED_0_54_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 800x450
           EOF
           cat > README-THINKPAD.txt <<'EOF'
-          PROCEED UNTIL APPREHENDED 0.53 - THINKPAD LOW SPEC
+          PROCEED UNTIL APPREHENDED 0.54 - THINKPAD LOW SPEC
 
           Double-click PLAY_PUA_THINKPAD.cmd first.
           If it struggles, use PLAY_PUA_POTATO.cmd.
@@ -68,19 +68,19 @@ jobs:
           ThinkPad mode intentionally uses simpler world budgets and lower-resolution
           Bay Window rendering while keeping the live postcode map, driving and PUA systems.
           EOF
-          sha256sum PROCEED_UNTIL_APPREHENDED_0_53_THINKPAD.exe > SHA256.txt
-          zip -9 PUA-0.53-THINKPAD-LOW-SPEC.zip PROCEED_UNTIL_APPREHENDED_0_53_THINKPAD.exe PLAY_PUA_THINKPAD.cmd PLAY_PUA_POTATO.cmd README-THINKPAD.txt SHA256.txt
+          sha256sum PROCEED_UNTIL_APPREHENDED_0_54_THINKPAD.exe > SHA256.txt
+          zip -9 PUA-0.54-MAPPED-CONTEXT-THINKPAD.zip PROCEED_UNTIL_APPREHENDED_0_54_THINKPAD.exe PLAY_PUA_THINKPAD.cmd PLAY_PUA_POTATO.cmd README-THINKPAD.txt SHA256.txt
 
       - name: Upload portable ThinkPad build
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.53-THINKPAD-LOW-SPEC
+          name: PUA-0.54-MAPPED-CONTEXT-THINKPAD
           path: |
-            build/thinkpad/PROCEED_UNTIL_APPREHENDED_0_53_THINKPAD.exe
+            build/thinkpad/PROCEED_UNTIL_APPREHENDED_0_54_THINKPAD.exe
             build/thinkpad/PLAY_PUA_THINKPAD.cmd
             build/thinkpad/PLAY_PUA_POTATO.cmd
             build/thinkpad/README-THINKPAD.txt
             build/thinkpad/SHA256.txt
-            build/thinkpad/PUA-0.53-THINKPAD-LOW-SPEC.zip
+            build/thinkpad/PUA-0.54-MAPPED-CONTEXT-THINKPAD.zip
           if-no-files-found: error
           retention-days: 30
