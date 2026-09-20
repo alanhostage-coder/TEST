@@ -52,9 +52,13 @@ jobs:
           python3 android/.build/patch_12.py
           python3 android/.build/patch_13.py
           python3 android/.build/patch_14.py
-          grep -q "build 0.14" android/app/src/main/assets/www/index.html
-          grep -q "JUNCTION LIFE" android/app/src/main/assets/www/index.html
-          grep -q "drawJunctionLife" android/app/src/main/assets/www/index.html
+          python3 android/.build/patch_15.py
+          python3 android/.build/patch_16.py
+          grep -q "build 0.16" android/app/src/main/assets/www/index.html
+          grep -q "FORTH WEATHER" android/app/src/main/assets/www/index.html
+          grep -q "drawEstateStreets" android/app/src/main/assets/www/index.html
+          grep -q "drawForthWeather" android/app/src/main/assets/www/index.html
+          grep -q "versionName '0.16'" android/app/build.gradle
       - name: Build debug APK
         working-directory: android
         run: gradle --no-daemon :app:assembleDebug
@@ -62,11 +66,11 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_14.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_16.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PROCEED-UNTIL-APPREHENDED-0.14-APK
-          path: dist/PROCEED_UNTIL_APPREHENDED_0_14.apk
+          name: PROCEED-UNTIL-APPREHENDED-0.16-APK
+          path: dist/PROCEED_UNTIL_APPREHENDED_0_16.apk
           if-no-files-found: error
           retention-days: 30
