@@ -5,6 +5,8 @@ extends Node
 const MAX_PARKED := 28
 const MAX_ROAMERS := 9
 const MAX_PUDDLES := 30
+const MAX_SITUATIONS := 7
+const SITUATION_RADIUS := 145.0
 const REBUILD_INTERVAL := 3.0
 
 var world: Node3D
@@ -14,6 +16,9 @@ var built_signature := ""
 var clock := 0.0
 var vapour_clock := 0.0
 var vapour_nodes: Array = []
+var situation_root: Node3D
+var situation_signature := ""
+var active_situations: Array = []
 
 func _ready():
 	call_deferred("_bind_scene")
@@ -40,6 +45,7 @@ func _process(delta):
 		clock = 0.0
 		_try_build_from_live_roads()
 	_update_vapour(delta)
+	_update_situations(delta)
 
 func _try_build_from_live_roads():
 	if not car.has_meta("map_road_segments"):
@@ -56,6 +62,7 @@ func _try_build_from_live_roads():
 	_build_roaming_life(segments)
 	_build_wet_ground_memory(segments)
 	_build_industrial_vapour(segments)
+	_build_situations(segments)
 
 func _clear_root():
 	vapour_nodes.clear()
@@ -191,6 +198,134 @@ func _update_vapour(delta):
 		var base: Vector3 = item.get("base", Vector3.ZERO)
 		node.position = base + Vector3(sin(t * 0.21 + phase) * 2.4, fmod(t * drift + phase * 1.7, 7.0), cos(t * 0.17 + phase) * 1.4)
 		node.scale = Vector3.ONE * (0.82 + 0.18 * sin(t * 0.13 + phase))
+
+
+func _build_situations(segments: Array):
+	# Unannounced world situations: things the player notices rather than activates.
+	# Their selection is deterministic for the current PUA world seed, so returning
+	# during the same world state feels consistent without becoming a mission system.
+	active_situations.clear()
+	if situation_root and is_instance_valid(situation_root):
+		situation_root.queue_free()
+	situation_root = Node3D.new()
+	situation_root.name = "UnexplainedSituations"
+	root.add_child(situation_root)
+	var seed = abs(int(car.get_meta("pua_api_world_seed", 1)))
+	var count = min(MAX_SITUATIONS, max(3, int(segments.size() / 18)))
+	for n in range(count):
+		var index = (seed + n * 37 + n * n * 11) % segments.size()
+		var seg = segments[index]
+		if not seg is Array or seg.size() < 3:
+			continue
+		var a = Vector2(float(seg[0][0]), float(seg[0][1]))
+		var b = Vector2(float(seg[1][0]), float(seg[1][1]))
+		var d = b - a
+		if d.length() < 18.0:
+			continue
+		var tangent = d.normalized()
+		var normal = Vector2(-tangent.y, tangent.x)
+		var side = -1.0 if ((seed >> (n % 12)) & 1) == 0 else 1.0
+		var road_width = float(seg[2])
+		var p = a.lerp(b, 0.30 + float((seed + n * 19) % 40) / 100.0)
+		p += normal * side * (road_width * 0.5 + 3.6)
+		var node = Node3D.new()
+		node.name = "Situation_%02d" % n
+		node.position = Vector3(p.x, 0.0, p.y)
+		node.rotation.y = atan2(-tangent.x, -tangent.y)
+		situation_root.add_child(node)
+		var kind = (seed + n * 5) % 4
+		if kind == 0:
+			_make_gathering(node, seed + n)
+		elif kind == 1:
+			_make_service_scene(node, seed + n)
+		elif kind == 2:
+			_make_abandoned_scene(node, seed + n)
+		else:
+			_make_light_scene(node, seed + n)
+		active_situations.append({"node": node, "kind": kind, "phase": float((seed + n * 13) % 100) * 0.1})
+
+func _make_gathering(parent: Node3D, seed: int):
+	var amount = 2 + seed % 3
+	for i in range(amount):
+		var vehicle = _make_parked_vehicle(seed + i * 17)
+		vehicle.position = Vector3((float(i) - float(amount - 1) * 0.5) * 2.7, 0.43, -float(i % 2) * 2.2)
+		vehicle.rotation.y = PI * 0.5 + float((i % 2) * 2 - 1) * 0.12
+		parent.add_child(vehicle)
+	var lamp = OmniLight3D.new()
+	lamp.position = Vector3(0, 2.2, -1.0)
+	lamp.light_color = Color(1.0, 0.48, 0.18)
+	lamp.light_energy = 1.35
+	lamp.omni_range = 13.0
+	lamp.shadow_enabled = false
+	parent.add_child(lamp)
+
+func _make_service_scene(parent: Node3D, seed: int):
+	var van = _make_parked_vehicle(seed * 3 + 5)
+	van.position = Vector3(-1.8, 0.43, 0)
+	van.rotation.y = PI * 0.5
+	parent.add_child(van)
+	for i in range(3):
+		var marker = MeshInstance3D.new()
+		var mesh = CylinderMesh.new()
+		mesh.top_radius = 0.08
+		mesh.bottom_radius = 0.28
+		mesh.height = 0.65
+		marker.mesh = mesh
+		marker.position = Vector3(1.4 + i * 1.1, 0.33, -0.8 + i * 0.35)
+		marker.material_override = _material(Color(0.78, 0.30, 0.045), 0.72, 0.0)
+		parent.add_child(marker)
+
+func _make_abandoned_scene(parent: Node3D, seed: int):
+	var vehicle = _make_parked_vehicle(seed + 401)
+	vehicle.position = Vector3(0, 0.43, 0)
+	vehicle.rotation.y = PI * 0.5 + 0.22
+	parent.add_child(vehicle)
+	var beacon = OmniLight3D.new()
+	beacon.position = Vector3(-0.72, 0.82, -0.3)
+	beacon.light_color = Color(1.0, 0.22, 0.04)
+	beacon.light_energy = 0.9
+	beacon.omni_range = 7.0
+	beacon.shadow_enabled = false
+	parent.add_child(beacon)
+
+func _make_light_scene(parent: Node3D, seed: int):
+	var pole = MeshInstance3D.new()
+	var mesh = BoxMesh.new()
+	mesh.size = Vector3(0.13, 5.2, 0.13)
+	pole.mesh = mesh
+	pole.position.y = 2.6
+	pole.material_override = _material(Color(0.16, 0.17, 0.17), 0.6, 0.45)
+	parent.add_child(pole)
+	var lamp = OmniLight3D.new()
+	lamp.position = Vector3(0, 5.0, 0)
+	lamp.light_color = Color(1.0, 0.38 + float(seed % 20) * 0.01, 0.13)
+	lamp.light_energy = 2.0
+	lamp.omni_range = 18.0
+	lamp.shadow_enabled = false
+	parent.add_child(lamp)
+
+func _update_situations(delta: float):
+	if active_situations.is_empty() or not car:
+		return
+	var t = Time.get_ticks_msec() * 0.001
+	var nearest_kind := -1
+	var nearest_distance := INF
+	for item in active_situations:
+		var node = item.get("node")
+		if not is_instance_valid(node):
+			continue
+		var distance = car.global_position.distance_to(node.global_position)
+		node.visible = distance < SITUATION_RADIUS
+		if distance < nearest_distance:
+			nearest_distance = distance
+			nearest_kind = int(item.get("kind", -1))
+		if node.visible and nearest_kind == 2:
+			for child in node.get_children():
+				if child is OmniLight3D:
+					child.light_energy = 0.45 + 0.75 * (0.5 + 0.5 * sin(t * 4.3 + float(item.get("phase", 0.0))))
+	car.set_meta("near_world_situation", nearest_kind if nearest_distance < 32.0 else -1)
+	car.set_meta("world_situation_distance", nearest_distance)
+
 
 func _material(color: Color, roughness: float, metallic: float, transparent := false) -> StandardMaterial3D:
 	var mat = StandardMaterial3D.new()
