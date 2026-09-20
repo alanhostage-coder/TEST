@@ -45,14 +45,14 @@ jobs:
         run: |
           mkdir -p build/android
           EXPORT_DIR="$(readlink -f build/android)"
-          godot --headless --verbose --path godot --export-debug "Android" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_28.apk"
-          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_28.apk"
-          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_28.apk"
+          godot --headless --verbose --path godot --export-debug "Android" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_31.apk"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_31.apk"
+          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_31.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.28-GREYBEARD-ANDROID
-          path: build/android/PROCEED_UNTIL_APPREHENDED_0_28.apk
+          name: PUA-0.31-LIVE-WORLD-ANDROID
+          path: build/android/PROCEED_UNTIL_APPREHENDED_0_31.apk
           if-no-files-found: error
           retention-days: 30
