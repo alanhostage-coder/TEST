@@ -9,7 +9,8 @@ const BAY_HEIGHT_M := 2.30
 const LEFT_WIDTH_M := 0.78
 const CENTRE_WIDTH_M := 1.34
 const RIGHT_WIDTH_M := 0.78
-const SIDE_YAW_DEG := 32.0
+const CAB_VERTICAL_FOV_DEG := 54.0
+const CAB_PITCH_DEG := -3.2
 const RENDER_SCALE := 0.72
 const CORNER_PICK_RADIUS := 82.0
 
@@ -23,6 +24,7 @@ var base_quads: Array = []
 var cal_offsets: Array = []
 var active_plane := -1
 var active_corner := -1
+var camera_yaws := [0.0, 0.0, 0.0]
 var button: Button
 var save_button: Button
 var reset_button: Button
@@ -84,7 +86,8 @@ func _build_views():
 		camera.current = true
 		camera.near = 0.12
 		camera.far = 900.0
-		camera.fov = 63.0
+		camera.keep_aspect = Camera3D.KEEP_HEIGHT
+		camera.fov = CAB_VERTICAL_FOV_DEG
 		viewport.add_child(camera)
 		viewports.append(viewport)
 		cameras.append(camera)
@@ -125,6 +128,7 @@ func _rescale_surfaces():
 		var uv_size = Vector2(viewports[i].size.x, viewports[i].size.y)
 		surfaces[i].uv = PackedVector2Array([Vector2.ZERO, Vector2(uv_size.x, 0), uv_size, Vector2(0, uv_size.y)])
 		x += w
+	_update_camera_frustums()
 	queue_redraw()
 
 func _cycle_mode():
@@ -193,11 +197,13 @@ func _process(_delta):
 	if mode == 0 or not car:
 		return
 	var cab_transform = car.global_transform
-	cab_transform.origin = car.to_global(Vector3(0.0, 1.42, -2.15))
-	var yaws = [deg_to_rad(-SIDE_YAW_DEG), 0.0, deg_to_rad(SIDE_YAW_DEG)]
+	cab_transform.origin = car.to_global(Vector3(0.0, 1.48, -2.18))
 	for i in range(3):
 		var t = cab_transform
-		t.basis = Basis(Vector3.UP, yaws[i]) * cab_transform.basis
+		# The yaw centres are derived from each plane's horizontal FOV, so adjacent
+		# views meet at the same ray instead of overlapping or leaving a jump.
+		t.basis = Basis(Vector3.UP, camera_yaws[i]) * cab_transform.basis
+		t.basis = t.basis * Basis(Vector3.RIGHT, deg_to_rad(CAB_PITCH_DEG))
 		cameras[i].global_transform = t
 	queue_redraw()
 
@@ -239,7 +245,7 @@ func _save_calibration():
 	var cfg = ConfigFile.new()
 	cfg.set_value("bay", "width_m", BAY_WIDTH_M)
 	cfg.set_value("bay", "height_m", BAY_HEIGHT_M)
-	cfg.set_value("bay", "side_yaw_deg", SIDE_YAW_DEG)
+	cfg.set_value("bay", "vertical_fov_deg", CAB_VERTICAL_FOV_DEG)
 	for plane in range(3):
 		for corner in range(4):
 			cfg.set_value("plane_%d" % plane, "corner_%d" % corner, cal_offsets[plane][corner])
@@ -255,3 +261,24 @@ func _load_calibration():
 			var saved = cfg.get_value("plane_%d" % plane, "corner_%d" % corner, Vector2.ZERO)
 			if saved is Vector2:
 				cal_offsets[plane][corner] = saved
+
+
+func _horizontal_fov(vertical_deg: float, aspect: float) -> float:
+	var vf = deg_to_rad(vertical_deg)
+	return 2.0 * atan(tan(vf * 0.5) * max(0.05, aspect))
+
+func _update_camera_frustums():
+	if viewports.size() < 3 or cameras.size() < 3:
+		return
+	var hfov: Array = []
+	for i in range(3):
+		var vp_size = viewports[i].size
+		var aspect = float(vp_size.x) / max(1.0, float(vp_size.y))
+		cameras[i].fov = CAB_VERTICAL_FOV_DEG
+		hfov.append(_horizontal_fov(CAB_VERTICAL_FOV_DEG, aspect))
+	# Centre-to-centre yaw is exactly half of the two neighbouring horizontal
+	# fields of view. This makes the outer ray of one plane equal the inner ray
+	# of the next, producing one continuous panorama before physical keystone.
+	var left_offset = (float(hfov[0]) + float(hfov[1])) * 0.5
+	var right_offset = (float(hfov[1]) + float(hfov[2])) * 0.5
+	camera_yaws = [-left_offset, 0.0, right_offset]
