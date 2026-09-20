@@ -26,7 +26,8 @@ s=s[:i]+STREET+'\n'+SKY+'\n'+CAR+'\n'+s[i:]
 s=s.replace("back=state.onFoot?118:168+speed*5.2","back=state.onFoot?112:178+speed*5.8",1)
 s=s.replace("height:state.onFoot?82:105+speed*2.1+bump","height:state.onFoot?79:99+speed*1.8+bump",1)
 s=s.replace("horizon:H*(state.onFoot?.34:.30-Math.min(.012,speed*.0013))","horizon:H*(state.onFoot?.335:.292-Math.min(.010,speed*.0011))",1)
-old="ctx.lineTo(0,cam.horizon+48);ctx.fill();ctx.strokeStyle='rgba(48,54,51,.52)'";new="ctx.lineTo(0,cam.horizon+48);ctx.fill();drawSkyQuality19(cam,w,sun);ctx.strokeStyle='rgba(48,54,51,.52)'"
+old="ctx.stroke()}ctx.restore();\n  const groundG="
+new="ctx.stroke()}ctx.restore();drawSkyQuality19(cam,w,sun);\n  const groundG="
 if old not in s:raise SystemExit('sky draw anchor missing')
 s=s.replace(old,new,1)
 old='drawRoadside18(chunks,cam,w);drawTraffic(chunks,cam);drawWetWorld(cam,speed,w);drawForthWeather(cam,speed,w);';new='drawStreetLife19(chunks,cam,w);drawTraffic(chunks,cam);drawForthWeather(cam,speed,w);'
