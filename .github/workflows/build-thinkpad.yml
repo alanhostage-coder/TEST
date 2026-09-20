@@ -1,0 +1,64 @@
+name: Build PUA ThinkPad
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+    paths:
+      - 'godot/**'
+      - '.github/workflows/build-thinkpad.yml'
+
+concurrency:
+  group: pua-thinkpad-windows
+  cancel-in-progress: true
+
+jobs:
+  windows:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    container:
+      image: barichello/godot-ci:4.5.1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare Godot export templates
+        run: |
+          mkdir -p "$HOME/.config/godot"
+          mkdir -p "$HOME/.local/share/godot/export_templates"
+          if [ -d /root/.config/godot ]; then
+            cp -a /root/.config/godot/. "$HOME/.config/godot/"
+          fi
+          if [ -d /root/.local/share/godot/export_templates/4.5.1.stable ]; then
+            cp -a /root/.local/share/godot/export_templates/4.5.1.stable "$HOME/.local/share/godot/export_templates/"
+          fi
+          godot --version
+          test -d "$HOME/.local/share/godot/export_templates/4.5.1.stable"
+
+      - name: Strict project parse
+        run: |
+          godot --headless --verbose --path godot --editor --quit > /tmp/pua-thinkpad.log 2>&1
+          cat /tmp/pua-thinkpad.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/pua-thinkpad.log; then
+            exit 1
+          fi
+
+      - name: Export portable Windows x64
+        run: |
+          mkdir -p build/thinkpad
+          EXPORT_DIR="$(readlink -f build/thinkpad)"
+          godot --headless --verbose --path godot --export-release "Windows Desktop" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_41_THINKPAD.exe"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_41_THINKPAD.exe"
+          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_41_THINKPAD.exe"
+          cd "$EXPORT_DIR"
+          sha256sum PROCEED_UNTIL_APPREHENDED_0_41_THINKPAD.exe > SHA256.txt
+          zip -9 PUA-0.41-THINKPAD-WINDOWS.zip PROCEED_UNTIL_APPREHENDED_0_41_THINKPAD.exe SHA256.txt
+
+      - name: Upload portable ThinkPad build
+        uses: actions/upload-artifact@v4
+        with:
+          name: PUA-0.41-THINKPAD-WINDOWS
+          path: |
+            build/thinkpad/PROCEED_UNTIL_APPREHENDED_0_41_THINKPAD.exe
+            build/thinkpad/SHA256.txt
+            build/thinkpad/PUA-0.41-THINKPAD-WINDOWS.zip
+          if-no-files-found: error
+          retention-days: 30
