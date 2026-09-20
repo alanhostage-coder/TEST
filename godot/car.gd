@@ -22,6 +22,7 @@ var distance_driven := 0.0
 var on_road := true
 var persist_timer := 0.0
 var camera_lag := Vector3.ZERO
+var camera_look_ahead := 0.0
 var previous_position := Vector3.ZERO
 
 func _ready():
@@ -34,7 +35,6 @@ func _exit_tree():
 func _input(event):
 	var screen_size = get_viewport().get_visible_rect().size
 	var screen_width = screen_size.x
-	# Leave the tiny top-left PARKVIEW BAY selector free from the driving gesture.
 	if event is InputEventScreenTouch and event.position.x < 145.0 and event.position.y < 100.0:
 		return
 	if event is InputEventScreenDrag and event.position.x < 145.0 and event.position.y < 100.0:
@@ -147,17 +147,22 @@ func _update_camera(delta, speed_ratio):
 		if camera_idle > 0.65:
 			camera_yaw = lerp(camera_yaw, 0.0, 1.0 - exp(-delta * 1.55))
 			camera_pitch = lerp(camera_pitch, 0.0, 1.0 - exp(-delta * 1.8))
+
+	# Cinematic road-reading: at speed the camera subtly opens into the bend before
+	# the car gets there, while retaining manual right-side free look.
+	var bend_preview = -steer_smoothed * speed_ratio * 0.24
+	camera_look_ahead = lerp(camera_look_ahead, bend_preview, 1.0 - exp(-delta * 2.5))
 	var shake = sin(Time.get_ticks_msec() * 0.04) * impact_kick * 0.14
-	var lateral = steer_smoothed * 1.10 + camera_lag.x
-	var chase_height = 2.48 + speed_ratio * 0.50 + shake
-	var chase_distance = 7.35 + speed_ratio * 3.15 + camera_lag.z
+	var lateral = steer_smoothed * 1.28 + camera_lag.x
+	var chase_height = 2.35 + speed_ratio * 0.62 + shake
+	var chase_distance = 7.7 + speed_ratio * 3.7 + camera_lag.z
 	rig.position.x = lerp(rig.position.x, lateral, 1.0 - exp(-delta * 3.0))
 	rig.position.y = lerp(rig.position.y, chase_height, 1.0 - exp(-delta * 2.2))
 	rig.position.z = lerp(rig.position.z, chase_distance, 1.0 - exp(-delta * 1.7))
-	rig.rotation.x = lerp_angle(rig.rotation.x, deg_to_rad(-5.6 + speed_ratio * 1.1) + camera_pitch, 1.0 - exp(-delta * 3.0))
-	rig.rotation.y = lerp_angle(rig.rotation.y, camera_yaw - steer_smoothed * 0.12 - camera_lag.x * 0.025, 1.0 - exp(-delta * 3.1))
-	rig.rotation.z = lerp_angle(rig.rotation.z, -steer_smoothed * speed_ratio * 0.014, 1.0 - exp(-delta * 4.0))
-	$CameraRig/Camera3D.fov = lerp($CameraRig/Camera3D.fov, 61.0 + speed_ratio * 11.5, 1.0 - exp(-delta * 1.65))
+	rig.rotation.x = lerp_angle(rig.rotation.x, deg_to_rad(-4.8 + speed_ratio * 0.8) + camera_pitch, 1.0 - exp(-delta * 3.0))
+	rig.rotation.y = lerp_angle(rig.rotation.y, camera_yaw + camera_look_ahead - camera_lag.x * 0.025, 1.0 - exp(-delta * 3.1))
+	rig.rotation.z = lerp_angle(rig.rotation.z, -steer_smoothed * speed_ratio * 0.012, 1.0 - exp(-delta * 4.0))
+	$CameraRig/Camera3D.fov = lerp($CameraRig/Camera3D.fov, 60.0 + speed_ratio * 13.0, 1.0 - exp(-delta * 1.65))
 
 func _save_state():
 	var cfg = ConfigFile.new()
