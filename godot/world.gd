@@ -21,6 +21,7 @@ var api_moment := "none"
 const CELL := 90.0
 const ROAD_MICRO_STEP := 6.5
 var low_spec_mode := false
+var map_center_lat := 55.95
 
 var asphalt_mat
 var concrete_mat
@@ -766,6 +767,7 @@ func _bind_map_stream():
 			_on_map_ready(map_stream.data)
 
 func _on_map_ready(map_data: Dictionary):
+	map_center_lat = float(map_data.get("center_lat", map_center_lat))
 	var roads = map_data.get("roads", [])
 	var buildings = map_data.get("buildings", [])
 	var linear_features = map_data.get("linear_features", [])
@@ -1107,11 +1109,17 @@ func _add_edinburgh_building(parent: Node3D, base: Vector3, size: Vector3, seed:
 	var detail_scale = 0.62 if low_spec_mode else 1.0
 	var detailed = industrial or (seed % 100) < int(clamp(api_detail_pressure, 0.35, 1.0) * 48.0 * detail_scale)
 	var stone = soot_stone_mat
-	match seed % 4:
-		0: stone = sandstone_mat
-		1: stone = sandstone_warm_mat
-		2: stone = soot_stone_mat
-		_: stone = soot_stone_cool_mat
+	if map_center_lat < 52.5:
+		match seed % 5:
+			0, 1, 2: stone = brick_mat
+			3: stone = render_mat
+			_: stone = concrete_mat
+	else:
+		match seed % 4:
+			0: stone = sandstone_mat
+			1: stone = sandstone_warm_mat
+			2: stone = soot_stone_mat
+			_: stone = soot_stone_cool_mat
 	if industrial:
 		stone = _mat(Color(0.27, 0.285, 0.29), 0.84, 0.03)
 	var body = _box(parent, base + Vector3(0, h * 0.5, 0), Vector3(sx, h, sz), stone)
