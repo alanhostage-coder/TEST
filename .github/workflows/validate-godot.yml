@@ -21,8 +21,17 @@ jobs:
           ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/godot-editor.log
           godot --headless --path godot --quit-after 2 2>&1 | tee /tmp/godot-run.log
           ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/godot-run.log
+      - name: PUA API runtime soak
+        run: |
+          set -o pipefail
+          timeout 20s godot --headless --path godot res://pua_soak_test.tscn 2>&1 | tee /tmp/pua-soak.log
+          grep -q 'PUA_SOAK_OK' /tmp/pua-soak.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|PUA_SOAK_FAIL' /tmp/pua-soak.log
+
       - name: Greybeard invariants
         run: |
           grep -q 'renderer/rendering_method="mobile"' godot/project.godot
           grep -q 'move_and_slide' godot/car.gd
           grep -q '_build_cell' godot/world.gd
+          grep -q 'PUA API 0.1' godot/pua_api.gd
+          grep -q 'directive_changed' godot/world.gd
