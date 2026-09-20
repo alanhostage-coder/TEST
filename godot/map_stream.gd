@@ -180,7 +180,7 @@ func _geometry_to_points(geometry: Array, min_gap: float) -> Array:
 	if geometry.size() > 1:
 		var tail_entry = geometry[geometry.size() - 1]
 		if tail_entry is Dictionary:
-			var tail = _lat_lon_to_local(float(tail_entry.get("lat", CENTER_LAT)), float(tail_entry.get("lon", CENTER_LON)))
+			var tail = _lat_lon_to_local(float(tail_entry.get("lat", center_lat)), float(tail_entry.get("lon", center_lon)))
 			if points.is_empty() or Vector2(float(points[-1][0]), float(points[-1][1])).distance_to(tail) > 2.0:
 				points.append([tail.x, tail.y])
 	return points
