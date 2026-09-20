@@ -41,6 +41,12 @@ jobs:
             exit 1
           fi
 
+      - name: PUA headless soak gate
+        run: |
+          timeout 30s godot --headless --path godot res://pua_soak_test.tscn > /tmp/pua-soak.log 2>&1
+          cat /tmp/pua-soak.log
+          grep -q 'PUA_SOAK_OK' /tmp/pua-soak.log
+
       - name: Export Android debug APK
         run: |
           mkdir -p build/android
