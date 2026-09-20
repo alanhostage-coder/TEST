@@ -6,6 +6,9 @@ var patrol
 var patrol_axis := 0
 var patrol_dir := 1.0
 var patrol_interest := 0.0
+var map_mode_active := false
+var weather_sun_energy := 0.68
+var map_root: Node3D
 const CELL := 90.0
 
 var asphalt_mat
@@ -22,6 +25,7 @@ func _ready():
 	_spawn_traffic()
 	_spawn_patrol()
 	_bind_world_state()
+	_bind_map_stream()
 	for x in range(-1, 2):
 		for y in range(-2, 1):
 			_build_cell(Vector2i(x, y))
@@ -31,11 +35,12 @@ func _process(delta):
 	_update_traffic(delta)
 	_update_patrol(delta, car)
 	_update_atmosphere(car)
-	var c = Vector2i(floor(car.global_position.x / CELL), floor(car.global_position.z / CELL))
-	for x in range(c.x - 2, c.x + 3):
-		for y in range(c.y - 2, c.y + 3):
-			_build_cell(Vector2i(x, y))
-	_trim_cells(c)
+	if not map_mode_active:
+		var c = Vector2i(floor(car.global_position.x / CELL), floor(car.global_position.z / CELL))
+		for x in range(c.x - 2, c.x + 3):
+			for y in range(c.y - 2, c.y + 3):
+				_build_cell(Vector2i(x, y))
+		_trim_cells(c)
 
 func _make_materials():
 	asphalt_mat = _mat(Color(0.055, 0.06, 0.065), 0.34, 0.05)
@@ -333,7 +338,7 @@ func _update_atmosphere(car):
 	var distance = car.global_position.distance_to(mast)
 	var radio_strength = clamp(1.0 - distance / 430.0, 0.0, 1.0)
 	car.set_meta("radio_signal", radio_strength)
-	$Sun.light_energy = 0.60 + radio_strength * 0.10
+	$Sun.light_energy = weather_sun_energy * lerp(0.94, 1.06, radio_strength)
 	var beacon = get_node_or_null("Transmitter/Beacon")
 	if beacon:
 		beacon.light_energy = 1.4 + 1.6 * (0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.006))
@@ -355,7 +360,8 @@ func _on_world_state_changed(state: Dictionary):
 	var wave = max(0.0, float(state.get("wave_height", 0.5)))
 	asphalt_mat.roughness = lerp(0.34, 0.12, wetness)
 	asphalt_mat.metallic = lerp(0.05, 0.18, wetness)
-	$Sun.light_energy = lerp(0.72, 0.34, cloud) * lerp(1.0, 0.84, wetness)
+	weather_sun_energy = lerp(0.72, 0.34, cloud) * lerp(1.0, 0.84, wetness)
+	$Sun.light_energy = weather_sun_energy
 	var env = $WorldEnvironment.environment
 	if env:
 		env.fog_enabled = true
@@ -369,3 +375,69 @@ func _on_world_state_changed(state: Dictionary):
 		car.set_meta("world_wave_height", wave)
 		car.set_meta("world_temperature", float(state.get("temperature", 8.0)))
 		car.set_meta("world_data_source", state.get("source", "offline"))
+
+
+func _bind_map_stream():
+	var map_stream = get_node_or_null("MapStream")
+	if map_stream:
+		map_stream.map_ready.connect(_on_map_ready)
+		if map_stream.data.get("roads", []).size() > 0 or map_stream.data.get("buildings", []).size() > 0:
+			_on_map_ready(map_stream.data)
+
+func _on_map_ready(map_data: Dictionary):
+	var roads = map_data.get("roads", [])
+	var buildings = map_data.get("buildings", [])
+	if roads.is_empty() and buildings.is_empty():
+		return
+	map_mode_active = true
+	for key in cells.keys():
+		var node = cells[key]
+		if is_instance_valid(node):
+			node.queue_free()
+	cells.clear()
+	if map_root and is_instance_valid(map_root):
+		map_root.queue_free()
+	map_root = Node3D.new()
+	map_root.name = "OpenMapWorld"
+	add_child(map_root)
+
+	for road in roads:
+		if not road is Dictionary:
+			continue
+		var points = road.get("points", [])
+		var width = float(road.get("width", 5.0))
+		for i in range(points.size() - 1):
+			if not points[i] is Array or not points[i + 1] is Array:
+				continue
+			if points[i].size() < 2 or points[i + 1].size() < 2:
+				continue
+			var a = Vector2(float(points[i][0]), float(points[i][1]))
+			var b = Vector2(float(points[i + 1][0]), float(points[i + 1][1]))
+			var delta = b - a
+			var length = delta.length()
+			if length < 2.0:
+				continue
+			var mid = (a + b) * 0.5
+			var angle = atan2(delta.x, delta.y)
+			_road_rotated(map_root, Vector3(mid.x, 0.035, mid.y), length + 1.0, width, angle)
+
+	for building in buildings:
+		if not building is Dictionary:
+			continue
+		var center = building.get("center", [])
+		var size = building.get("size", [])
+		if not center is Array or not size is Array or center.size() < 2 or size.size() < 2:
+			continue
+		var h = clamp(float(building.get("height", 6.0)), 3.0, 48.0)
+		var sx = max(2.0, float(size[0]))
+		var sz = max(2.0, float(size[1]))
+		var tone_seed = fmod(abs(float(center[0]) * 0.013 + float(center[1]) * 0.021), 0.10)
+		var tone = 0.22 + tone_seed
+		var building_mat = _mat(Color(tone, tone * 1.015, tone * 1.025), 0.88, 0.0)
+		_box(map_root, Vector3(float(center[0]), h * 0.5, float(center[1])), Vector3(sx, h, sz), building_mat)
+
+	var car = get_node_or_null("Car")
+	if car:
+		car.set_meta("map_data_source", map_data.get("source", "offline"))
+		car.set_meta("map_road_count", roads.size())
+		car.set_meta("map_building_count", buildings.size())
