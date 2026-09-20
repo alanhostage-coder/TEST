@@ -195,7 +195,7 @@ func _make_landmarks():
 
 func _spawn_traffic():
 	for i in range(14):
-		var car = Node3D.new()
+		var car = AnimatableBody3D.new()
 		car.name = "Traffic_%02d" % i
 		var mesh = MeshInstance3D.new()
 		var body = BoxMesh.new()
@@ -204,6 +204,11 @@ func _spawn_traffic():
 		var shade = 0.12 + float((i * 17) % 30) / 100.0
 		mesh.material_override = _mat(Color(shade, shade * 0.95, shade * 0.9), 0.46, 0.18)
 		car.add_child(mesh)
+		var collision = CollisionShape3D.new()
+		var collision_shape = BoxShape3D.new()
+		collision_shape.size = Vector3(1.8, 0.78, 4.0)
+		collision.shape = collision_shape
+		car.add_child(collision)
 		add_child(car)
 		var axis = i % 2
 		var direction = -1.0 if i % 3 == 0 else 1.0
