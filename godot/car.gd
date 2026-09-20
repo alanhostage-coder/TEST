@@ -77,7 +77,7 @@ func _add_shell_box(prefix: String, pos: Vector3, size: Vector3, material: Stand
 	mesh_instance.mesh = mesh
 	mesh_instance.position = pos
 	mesh_instance.material_override = material
-	add_child(mesh_instance)
+	$Body.add_child(mesh_instance)
 
 func _exit_tree():
 	_save_state()
