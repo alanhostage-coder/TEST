@@ -319,7 +319,7 @@ func _update_situations(delta: float):
 		if distance < nearest_distance:
 			nearest_distance = distance
 			nearest_kind = int(item.get("kind", -1))
-		if node.visible and nearest_kind == 2:
+		if node.visible and int(item.get("kind", -1)) == 2:
 			for child in node.get_children():
 				if child is OmniLight3D:
 					child.light_energy = 0.45 + 0.75 * (0.5 + 0.5 * sin(t * 4.3 + float(item.get("phase", 0.0))))
