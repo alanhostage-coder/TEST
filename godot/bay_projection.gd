@@ -92,7 +92,7 @@ func _build_views():
 		var surface = Polygon2D.new()
 		surface.name = "ShutterPlane%d" % i
 		surface.texture = viewport.get_texture()
-		surface.uv = PackedVector2Array([Vector2(0, 0), Vector2(1, 0), Vector2(1, 1), Vector2(0, 1)])
+		surface.uv = PackedVector2Array([Vector2.ZERO, Vector2(1, 0), Vector2.ONE, Vector2(0, 1)])
 		add_child(surface)
 		surfaces.append(surface)
 	_rescale_surfaces()
@@ -122,6 +122,8 @@ func _rescale_surfaces():
 			warped.append(base[corner] + cal_offsets[i][corner] * size)
 		surfaces[i].polygon = warped
 		viewports[i].size = Vector2i(max(160, int(w * RENDER_SCALE)), max(240, int(size.y * RENDER_SCALE)))
+		var uv_size = Vector2(viewports[i].size.x, viewports[i].size.y)
+		surfaces[i].uv = PackedVector2Array([Vector2.ZERO, Vector2(uv_size.x, 0), uv_size, Vector2(0, uv_size.y)])
 		x += w
 	queue_redraw()
 
