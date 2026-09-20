@@ -61,7 +61,7 @@ func _fetch_osm():
 	var north = CENTER_LAT + HALF_LAT
 	var east = CENTER_LON + HALF_LON
 	var bbox = "%.6f,%.6f,%.6f,%.6f" % [south, west, north, east]
-	var query = "[out:json][timeout:15];(way[highway~\\\"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|service|track)$\\\"](%s);way[building](%s););out tags geom qt;" % [bbox, bbox]
+	var query = '[out:json][timeout:15];(way[highway~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|service|track)$"](%s);way[building](%s););out tags geom qt;' % [bbox, bbox]
 	var url = OVERPASS_URL + "?data=" + query.uri_encode()
 	var headers = PackedStringArray([
 		"Accept: application/json",
