@@ -4,6 +4,7 @@ var cells := {}
 const CELL := 90.0
 
 func _ready():
+	_make_ground()
 	for x in range(-1,2):
 		for y in range(-2,1):
 			_build_cell(Vector2i(x,y))
@@ -48,3 +49,9 @@ func _build_cell(c:Vector2i):
 		_box(root,Vector3(27,1.6,-25),Vector3(20,3.2,9))
 	if seed%4==0:
 		_box(root,Vector3(-31,10,29),Vector3(0.8,20,0.8))
+
+func _make_ground():
+	var ground=StaticBody3D.new(); ground.name="Ground"
+	var mesh=MeshInstance3D.new(); var plane=BoxMesh.new(); plane.size=Vector3(1200,0.4,1200); mesh.mesh=plane
+	var col=CollisionShape3D.new(); var shape=BoxShape3D.new(); shape.size=Vector3(1200,0.4,1200); col.shape=shape
+	ground.position=Vector3(0,-0.24,0); ground.add_child(mesh); ground.add_child(col); add_child(ground)
