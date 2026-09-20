@@ -77,7 +77,7 @@ func _resolve_start_postcode():
 	var compact = START_POSTCODE.replace(" ", "").uri_encode()
 	var headers = PackedStringArray([
 		"Accept: application/json",
-		"User-Agent: ProceedUntilApprehended/0.53 (Godot Android; postcode-seeded OSM)"
+		"User-Agent: ProceedUntilApprehended/0.54 (Godot Android; postcode-seeded OSM)"
 	])
 	var err = _postcode_request.request(POSTCODES_URL + compact, headers, HTTPClient.METHOD_GET)
 	if err != OK:
@@ -118,7 +118,7 @@ func _fetch_osm():
 	var url = OVERPASS_URL + "?data=" + query.uri_encode()
 	var headers = PackedStringArray([
 		"Accept: application/json",
-		"User-Agent: ProceedUntilApprehended/0.53 (Godot Android; postcode-seeded cached OSM geometry)"
+		"User-Agent: ProceedUntilApprehended/0.54 (Godot Android; postcode-seeded cached OSM geometry)"
 	])
 	var err = _request.request(url, headers, HTTPClient.METHOD_GET)
 	if err != OK:
