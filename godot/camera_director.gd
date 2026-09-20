@@ -42,8 +42,6 @@ func _process(delta):
 	var acceleration = (speed_now - speed_memory) / max(delta, 0.001)
 	speed_memory = lerp(speed_memory, speed_now, 1.0 - exp(-delta * 7.0))
 
-	# World-space motion gives the camera useful information the steering input cannot:
-	# a slide, curb strike or fast direction change now has visual weight without shake.
 	var measured_velocity = (car.global_position - last_position) / max(delta, 0.001)
 	last_position = car.global_position
 	velocity_memory = velocity_memory.lerp(measured_velocity, 1.0 - exp(-delta * 4.8))
@@ -57,14 +55,11 @@ func _process(delta):
 	var lookahead_target = speed_ratio * 1.72 + abs(steer) * speed_ratio * 0.42
 	lookahead_memory = lerp(lookahead_memory, lookahead_target, 1.0 - exp(-delta * 2.4))
 
-	# Open the inside of bends and let a genuine slide pull the framing sideways.
-	# The effect is geometric rather than screen shake, so the road remains readable.
 	var shoulder_target = -steer * (0.38 + speed_ratio * 1.04) - lateral_memory * 0.82
 	shoulder_bias = lerp(shoulder_bias, shoulder_target, 1.0 - exp(-delta * 3.0))
 	var yaw_target = -steer * speed_ratio * 0.052 - lateral_memory * 0.075
 	yaw_memory = lerp(yaw_memory, yaw_target, 1.0 - exp(-delta * 2.7))
 
-	# Pull the lens toward the car before walls, garages or terraces can swallow it.
 	var pivot = car.global_position + Vector3.UP * (1.48 + speed_ratio * 0.24)
 	var yaw = car.rotation.y + rig.rotation.y
 	var back = Vector3(sin(yaw), 0.0, cos(yaw))
@@ -83,8 +78,7 @@ func _process(delta):
 	rig.position.z = safe_distance
 	rig.position.x = lerp(rig.position.x, shoulder_bias, 1.0 - exp(-delta * 5.0))
 	vertical_memory = lerp(vertical_memory, desired_height, 1.0 - exp(-delta * 2.0))
-	# Tiny suspension-derived heave makes road texture legible but never becomes shake.
-	var suspension = float(car.suspension_heave) if "suspension_heave" in car else 0.0
+	var suspension = float(car.get("suspension_heave"))
 	heave_memory = lerp(heave_memory, clamp(suspension, -0.12, 0.12), 1.0 - exp(-delta * 6.0))
 	rig.position.y = lerp(rig.position.y, vertical_memory + heave_memory * 0.35, 1.0 - exp(-delta * 4.0))
 	var pitch_target = deg_to_rad(-1.15 - lookahead_memory * 0.78 + braking_push * 0.95)
