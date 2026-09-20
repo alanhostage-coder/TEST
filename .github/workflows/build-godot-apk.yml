@@ -45,14 +45,14 @@ jobs:
         run: |
           mkdir -p build/android
           EXPORT_DIR="$(readlink -f build/android)"
-          godot --headless --verbose --path godot --export-debug "Android" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_47.apk"
-          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_47.apk"
-          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_47.apk"
+          godot --headless --verbose --path godot --export-debug "Android" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_48.apk"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_48.apk"
+          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_48.apk"
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.47-MOBILE-HOTFIX-ANDROID
-          path: build/android/PROCEED_UNTIL_APPREHENDED_0_47.apk
+          name: PUA-0.48-ROAD-FEEL-ANDROID
+          path: build/android/PROCEED_UNTIL_APPREHENDED_0_48.apk
           if-no-files-found: error
           retention-days: 30
