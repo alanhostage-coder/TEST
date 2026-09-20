@@ -30,6 +30,7 @@ var save_button: Button
 var reset_button: Button
 var drive_button: Button
 var centre_button: Button
+var cal_button: Button
 var drive_enabled := false
 var title: Label
 
@@ -46,12 +47,20 @@ func _ready():
 
 func _build_buttons():
 	button = Button.new()
-	button.text = "BAY"
+	button.text = "BAY WINDOW"
 	button.position = Vector2(18, 45)
-	button.size = Vector2(112, 42)
+	button.size = Vector2(150, 46)
 	button.modulate = Color(1, 1, 1, 0.80)
 	button.pressed.connect(_cycle_mode)
 	add_child(button)
+
+	cal_button = Button.new()
+	cal_button.text = "CAL"
+	cal_button.position = Vector2(174, 45)
+	cal_button.size = Vector2(62, 46)
+	cal_button.modulate = Color(1, 1, 1, 0.58)
+	cal_button.pressed.connect(_toggle_calibration)
+	add_child(cal_button)
 
 	save_button = Button.new()
 	save_button.text = "SAVE"
@@ -151,7 +160,10 @@ func _rescale_surfaces():
 	queue_redraw()
 
 func _cycle_mode():
-	_set_mode((mode + 1) % 3)
+	_set_mode(0 if mode == 1 else 1)
+
+func _toggle_calibration():
+	_set_mode(0 if mode == 2 else 2)
 
 func _set_mode(value: int):
 	mode = value
@@ -176,16 +188,25 @@ func _set_mode(value: int):
 	active_plane = -1
 	active_corner = -1
 	if mode == 0:
-		button.text = "BAY"
+		button.text = "BAY WINDOW"
+		cal_button.text = "CAL"
 		title.text = ""
 	elif mode == 1:
-		button.text = "CAB"
+		button.text = "DRIVE VIEW"
+		cal_button.text = "CAL"
 		drive_button.text = "DRIVE"
-		title.text = "PARKVIEW BAY · OPEN-TOP DRIVER VIEW"
+		title.text = "BAY WINDOW SIM · FORWARD DRIVER VIEW"
 	else:
-		button.text = "CAL"
+		button.text = "EXIT CAL"
+		cal_button.text = "DONE"
 		title.text = "DRAG CORNERS · SAVE WHEN LINES MEET SHUTTER EDGES"
 	queue_redraw()
+
+func _unhandled_input(event):
+	if event is InputEventJoypadButton and event.pressed:
+		if event.button_index == JOY_BUTTON_Y or event.button_index == JOY_BUTTON_RIGHT_SHOULDER:
+			_cycle_mode()
+			get_viewport().set_input_as_handled()
 
 func _input(event):
 	if mode != 2:
