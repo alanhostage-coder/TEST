@@ -20,6 +20,8 @@ var camera_pitch := 0.0
 var camera_idle := 0.0
 var impact_kick := 0.0
 var speed_camera_pulse := 0.0
+var suspension_pitch := 0.0
+var suspension_heave := 0.0
 var distance_driven := 0.0
 var on_road := true
 var persist_timer := 0.0
@@ -143,6 +145,10 @@ func _physics_process(delta):
 			var hit_normal = get_slide_collision(0).get_normal()
 			global_position += hit_normal * 0.08
 	impact_kick = move_toward(impact_kick, 0.0, delta * 2.8)
+	var longitudinal_g = clamp((speed - float(get_meta("previous_speed", speed))) / max(delta, 0.001) / 24.0, -1.0, 1.0)
+	set_meta("previous_speed", speed)
+	suspension_pitch = lerp(suspension_pitch, longitudinal_g * 0.022, 1.0 - exp(-delta * 7.0))
+	suspension_heave = lerp(suspension_heave, abs(steer_smoothed) * speed_ratio * 0.018, 1.0 - exp(-delta * 5.0))
 	_update_visuals(delta, speed_ratio)
 	# A tiny speed-dependent chassis pulse gives fast roads texture without scripted events.
 	speed_camera_pulse = lerp(speed_camera_pulse, speed_ratio * speed_ratio, 1.0 - exp(-delta * 2.0))
@@ -205,12 +211,12 @@ func _update_camera(delta, speed_ratio):
 	var shake = sin(Time.get_ticks_msec() * 0.04) * impact_kick * 0.14
 	var lateral = steer_smoothed * 1.28 + camera_lag.x
 	var road_texture = sin(distance_driven * 0.72) * speed_camera_pulse * 0.035
-	var chase_height = 2.35 + speed_ratio * 0.62 + shake + road_texture
+	var chase_height = 2.35 + speed_ratio * 0.62 + shake + road_texture - suspension_heave
 	var chase_distance = 7.7 + speed_ratio * 3.7 + camera_lag.z
 	rig.position.x = lerp(rig.position.x, lateral, 1.0 - exp(-delta * 3.0))
 	rig.position.y = lerp(rig.position.y, chase_height, 1.0 - exp(-delta * 2.2))
 	rig.position.z = lerp(rig.position.z, chase_distance, 1.0 - exp(-delta * 1.7))
-	rig.rotation.x = lerp_angle(rig.rotation.x, deg_to_rad(-4.8 + speed_ratio * 0.8) + camera_pitch, 1.0 - exp(-delta * 3.0))
+	rig.rotation.x = lerp_angle(rig.rotation.x, deg_to_rad(-4.8 + speed_ratio * 0.8) + camera_pitch + suspension_pitch, 1.0 - exp(-delta * 3.0))
 	rig.rotation.y = lerp_angle(rig.rotation.y, camera_yaw + camera_look_ahead - camera_lag.x * 0.025, 1.0 - exp(-delta * 3.1))
 	rig.rotation.z = lerp_angle(rig.rotation.z, -steer_smoothed * speed_ratio * 0.012, 1.0 - exp(-delta * 4.0))
 	$CameraRig/Camera3D.fov = lerp($CameraRig/Camera3D.fov, 60.0 + speed_ratio * 13.0, 1.0 - exp(-delta * 1.65))
