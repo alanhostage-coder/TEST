@@ -12,6 +12,7 @@ const RIGHT_WIDTH_M := 0.78
 const CAB_VERTICAL_FOV_DEG := 54.0
 const CAB_PITCH_DEG := -3.2
 const RENDER_SCALE := 0.72
+const LOW_SPEC_RENDER_SCALE := 0.42
 const CORNER_PICK_RADIUS := 82.0
 
 var mode := 0 # 0 normal, 1 cab, 2 calibration
@@ -118,7 +119,7 @@ func _build_views():
 		var camera = Camera3D.new()
 		camera.current = true
 		camera.near = 0.12
-		camera.far = 900.0
+		camera.far = 420.0 if OS.has_feature("thinkpad_low") else 900.0
 		camera.keep_aspect = Camera3D.KEEP_HEIGHT
 		camera.fov = CAB_VERTICAL_FOV_DEG
 		viewport.add_child(camera)
@@ -243,7 +244,8 @@ func _rescale_surfaces():
 		for corner in range(4):
 			warped.append(base[corner] + cal_offsets[i][corner] * size)
 		surfaces[i].polygon = warped
-		viewports[i].size = Vector2i(max(160, int(w * RENDER_SCALE)), max(240, int(size.y * RENDER_SCALE)))
+		var scale = LOW_SPEC_RENDER_SCALE if OS.has_feature("thinkpad_low") else RENDER_SCALE
+		viewports[i].size = Vector2i(max(144, int(w * scale)), max(180, int(size.y * scale)))
 		var uv_size = Vector2(viewports[i].size.x, viewports[i].size.y)
 		surfaces[i].uv = PackedVector2Array([Vector2.ZERO, Vector2(uv_size.x, 0), uv_size, Vector2(0, uv_size.y)])
 		x += w
