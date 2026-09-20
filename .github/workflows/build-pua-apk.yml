@@ -48,10 +48,11 @@ jobs:
         run: |
           for n in 09 10 11 12 13 14 15 16 17 18 19; do python3 android/.build/patch_${n}.py; done
           grep -q "build 0.19" android/app/src/main/assets/www/index.html
-          grep -q "FORTH LIFE" android/app/src/main/assets/www/index.html
+          grep -q "STREET LEVEL" android/app/src/main/assets/www/index.html
           grep -q "function drawRoad18" android/app/src/main/assets/www/index.html
-          grep -q "function drawForthLife19" android/app/src/main/assets/www/index.html
-          grep -q "drawForthLife19(cam,speed,w)" android/app/src/main/assets/www/index.html
+          grep -q "function drawStreetLife19" android/app/src/main/assets/www/index.html
+          grep -q "function drawPlayerCar19" android/app/src/main/assets/www/index.html
+          grep -q "const grip=onRoad?1:" android/app/src/main/assets/www/index.html
           grep -q "versionName '0.19'" android/app/build.gradle
       - name: JavaScript syntax smoke test
         shell: bash
@@ -59,7 +60,8 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           s=Path('android/app/src/main/assets/www/index.html').read_text()
-          a=s.index('<script>')+len('<script>'); b=s.index('</script>',a)
+          a=s.index('<script>')+len('<script>')
+          b=s.index('</script>',a)
           Path('/tmp/pua-main.js').write_text(s[a:b])
           PY
           node --check /tmp/pua-main.js
@@ -70,11 +72,14 @@ jobs:
           from pathlib import Path
           s=Path('android/app/src/main/assets/www/index.html').read_text()
           assert "kind:'A'" in s
-          assert "drawRoadside18(chunks,cam,w)" in s
-          assert "state.a+=ss*" in s
-          assert "body.hud-idle #left{opacity:0!important}" in s
-          assert "drawForthLife19(cam,speed,w);" in s
-          print("0.19 structural checks passed")
+          assert "drawStreetLife19(chunks,cam,w)" in s
+          assert "drawPlayerCar19(p,cam)" in s
+          assert "const grip=onRoad?1:" in s
+          assert "lane=(r.kind==='A'?r.w*.18:r.w*.14)*dir" in s
+          assert "mid.depth>2100" in s
+          draw=s[s.index("function draw(){"):]
+          assert "drawWetWorld(cam,speed,w)" not in draw[:draw.index("function drawHud")]
+          print("0.19 mega-sprint structural checks passed")
           PY
       - name: Build debug APK
         working-directory: android
@@ -84,13 +89,14 @@ jobs:
         run: |
           mkdir -p dist
           cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_19.apk
-      - name: Package build inspection
+      - name: Package built source
         shell: bash
-        run: cp android/app/src/main/assets/www/index.html dist/PUA_0_19_BUILT_INDEX.html
-      - name: Upload APK and built source
+        run: |
+          cp android/app/src/main/assets/www/index.html dist/PUA_0_19_BUILT_INDEX.html
+      - name: Upload mega sprint
         uses: actions/upload-artifact@v4
         with:
-          name: PROCEED-UNTIL-APPREHENDED-0.19-INSPECTION
+          name: PROCEED-UNTIL-APPREHENDED-0.19-MEGA-SPRINT
           path: |
             dist/PROCEED_UNTIL_APPREHENDED_0_19.apk
             dist/PUA_0_19_BUILT_INDEX.html
