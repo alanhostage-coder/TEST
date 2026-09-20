@@ -41,3 +41,5 @@ jobs:
           grep -q '_on_location_ready' godot/osm_ground_tiles.gd
           grep -q 'for ring in range(radius + 1)' godot/osm_ground_tiles.gd
           grep -q 'window/handheld/orientation=0' godot/project.godot
+          grep -q 'Windows PC Max' godot/export_presets.cfg
+          grep -q 'custom_features="pc_max"' godot/export_presets.cfg

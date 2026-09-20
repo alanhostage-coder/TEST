@@ -62,9 +62,11 @@ jobs:
           EXPORT_DIR="$(readlink -f build/thinkpad)"
           godot --headless --verbose --path godot --export-release "Windows Desktop" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_66_THINKPAD.exe"
           godot --headless --verbose --path godot --export-release "Windows Projector Max" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_66_PROJECTOR_MAX.exe"
+          godot --headless --verbose --path godot --export-release "Windows PC Max" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_68_PC_MAX.exe"
           test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_66_THINKPAD.exe"
           test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_66_PROJECTOR_MAX.exe"
-          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_66_THINKPAD.exe" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_66_PROJECTOR_MAX.exe"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_68_PC_MAX.exe"
+          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_66_THINKPAD.exe" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_66_PROJECTOR_MAX.exe" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_68_PC_MAX.exe"
           cd "$EXPORT_DIR"
           cat > PLAY_PUA_THINKPAD.cmd <<'EOF'
           @echo off
@@ -111,10 +113,24 @@ jobs:
           It cuts distant decorative load, ambient vehicles, vapour and extra scene density
           so more of the old machine's budget goes into the three simultaneous window views.
           EOF
+          cat > PLAY_PUA_PC_MAX.cmd <<'EOF'
+          @echo off
+          cd /d "%~dp0"
+          PROCEED_UNTIL_APPREHENDED_0_68_PC_MAX.exe --fullscreen --resolution 1920x1080
+          EOF
+          cat > README-PC-MAX.txt <<'EOF'
+          PROCEED UNTIL APPREHENDED 0.68 - PC MAX
+
+          Full-density Windows profile for the XPS-class machine.
+          Does not enable thinkpad_low or projector_max.
+          Use BAY WINDOW in-game for the higher-resolution triple-view renderer.
+          EOF
           sha256sum PROCEED_UNTIL_APPREHENDED_0_66_THINKPAD.exe > SHA256-THINKPAD.txt
           sha256sum PROCEED_UNTIL_APPREHENDED_0_66_PROJECTOR_MAX.exe > SHA256-PROJECTOR-MAX.txt
+          sha256sum PROCEED_UNTIL_APPREHENDED_0_68_PC_MAX.exe > SHA256-PC-MAX.txt
           zip -9 PUA-0.66-THINKPAD.zip PROCEED_UNTIL_APPREHENDED_0_66_THINKPAD.exe PLAY_PUA_THINKPAD.cmd PLAY_PUA_POTATO.cmd README-THINKPAD.txt SHA256-THINKPAD.txt
           zip -9 PUA-0.66-PROJECTOR-MAX.zip PROCEED_UNTIL_APPREHENDED_0_66_PROJECTOR_MAX.exe PLAY_PUA_PROJECTOR_MAX.cmd PLAY_PUA_PROJECTOR_SAFE.cmd PLAY_PUA_PROJECTOR_FULLSCREEN.cmd README-PROJECTOR-MAX.txt SHA256-PROJECTOR-MAX.txt
+          zip -9 PUA-0.68-PC-MAX.zip PROCEED_UNTIL_APPREHENDED_0_68_PC_MAX.exe PLAY_PUA_PC_MAX.cmd README-PC-MAX.txt SHA256-PC-MAX.txt
 
       - name: Upload portable ThinkPad build
         uses: actions/upload-artifact@v4
@@ -142,5 +158,19 @@ jobs:
             build/thinkpad/README-PROJECTOR-MAX.txt
             build/thinkpad/SHA256-PROJECTOR-MAX.txt
             build/thinkpad/PUA-0.66-PROJECTOR-MAX.zip
+          if-no-files-found: error
+          retention-days: 30
+
+
+      - name: Upload PC Max build
+        uses: actions/upload-artifact@v4
+        with:
+          name: PUA-0.68-PC-MAX
+          path: |
+            build/thinkpad/PROCEED_UNTIL_APPREHENDED_0_68_PC_MAX.exe
+            build/thinkpad/PLAY_PUA_PC_MAX.cmd
+            build/thinkpad/README-PC-MAX.txt
+            build/thinkpad/SHA256-PC-MAX.txt
+            build/thinkpad/PUA-0.68-PC-MAX.zip
           if-no-files-found: error
           retention-days: 30
