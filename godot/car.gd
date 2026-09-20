@@ -33,10 +33,51 @@ var motion_center_angle := 0.0
 var motion_steer := 0.0
 var motion_sensor_live := false
 var assisted_target_speed := 17.5
+var wheel_spin := 0.0
+
 
 func _ready():
+	_build_visual_shell()
 	_load_state()
 	previous_position = global_position
+
+func _build_visual_shell():
+	# Player car keeps primitive collision but gets a stronger silhouette and proper
+	# glass/light separation. Extra geometry is visual only.
+	var paint = StandardMaterial3D.new()
+	paint.albedo_color = Color(0.075, 0.085, 0.095)
+	paint.metallic = 0.58
+	paint.roughness = 0.34
+	var glass = StandardMaterial3D.new()
+	glass.albedo_color = Color(0.035, 0.055, 0.068)
+	glass.metallic = 0.20
+	glass.roughness = 0.16
+	var lamp = StandardMaterial3D.new()
+	lamp.albedo_color = Color(0.95, 0.82, 0.58)
+	lamp.roughness = 0.18
+	var tail = StandardMaterial3D.new()
+	tail.albedo_color = Color(0.64, 0.028, 0.018)
+	tail.roughness = 0.22
+
+	$Roof.material_override = glass
+	_add_shell_box("RoofCap", Vector3(0, 0.84, 0.18), Vector3(1.48, 0.10, 1.58), paint)
+	_add_shell_box("Hood", Vector3(0, 0.28, -1.52), Vector3(1.76, 0.18, 1.05), paint)
+	_add_shell_box("Boot", Vector3(0, 0.30, 1.55), Vector3(1.74, 0.20, 0.78), paint)
+	_add_shell_box("FrontBumper", Vector3(0, -0.02, -2.10), Vector3(1.84, 0.18, 0.16), paint)
+	_add_shell_box("RearBumper", Vector3(0, -0.02, 2.10), Vector3(1.84, 0.18, 0.16), paint)
+	for x in [-0.58, 0.58]:
+		_add_shell_box("LampF", Vector3(x, 0.10, -2.125), Vector3(0.34, 0.16, 0.06), lamp)
+		_add_shell_box("LampR", Vector3(x, 0.11, 2.125), Vector3(0.30, 0.15, 0.06), tail)
+
+func _add_shell_box(prefix: String, pos: Vector3, size: Vector3, material: StandardMaterial3D):
+	var mesh_instance = MeshInstance3D.new()
+	mesh_instance.name = prefix
+	var mesh = BoxMesh.new()
+	mesh.size = size
+	mesh_instance.mesh = mesh
+	mesh_instance.position = pos
+	mesh_instance.material_override = material
+	add_child(mesh_instance)
 
 func _exit_tree():
 	_save_state()
@@ -184,11 +225,18 @@ func _point_segment_distance(p: Vector2, a: Vector2, b: Vector2) -> float:
 
 func _update_visuals(delta, speed_ratio):
 	var body_roll = -steer_smoothed * speed_ratio * 0.045
+	var body_pitch = -suspension_pitch * 0.65
 	$Body.rotation.z = lerp_angle($Body.rotation.z, body_roll, 1.0 - exp(-delta * 6.0))
+	$Body.rotation.x = lerp_angle($Body.rotation.x, body_pitch, 1.0 - exp(-delta * 7.0))
 	$Roof.rotation.z = lerp_angle($Roof.rotation.z, body_roll, 1.0 - exp(-delta * 6.0))
+	$Roof.rotation.x = lerp_angle($Roof.rotation.x, body_pitch, 1.0 - exp(-delta * 7.0))
 	var wheel_steer = steer_smoothed * 0.34
+	wheel_spin = fmod(wheel_spin + speed * delta / 0.36, TAU)
 	$WheelFL.rotation.y = lerp_angle($WheelFL.rotation.y, wheel_steer, 1.0 - exp(-delta * 9.0))
 	$WheelFR.rotation.y = lerp_angle($WheelFR.rotation.y, wheel_steer, 1.0 - exp(-delta * 9.0))
+	for wheel in [$WheelFL, $WheelFR, $WheelRL, $WheelRR]:
+		wheel.rotation.x = wheel_spin
+		wheel.rotation.z = PI * 0.5
 
 func _update_camera(delta, speed_ratio):
 	var rig = $CameraRig
