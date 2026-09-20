@@ -46,15 +46,15 @@ jobs:
       - name: Apply world patches
         shell: bash
         run: |
-          for n in 09 10 11 12 13 14 15 16 17 18 19 20; do python3 android/.build/patch_${n}.py; done
-          grep -q "build 0.20" android/app/src/main/assets/www/index.html
-          grep -q "WORLD COHERENCE" android/app/src/main/assets/www/index.html
-          grep -q "function district20" android/app/src/main/assets/www/index.html
-          grep -q "function drawStreetLife20" android/app/src/main/assets/www/index.html
-          grep -q "function drawJunctions20" android/app/src/main/assets/www/index.html
-          grep -q "function drawPlayerCar20" android/app/src/main/assets/www/index.html
-          grep -q "const nr20=nearestRoadPoint18" android/app/src/main/assets/www/index.html
-          grep -q "versionName '0.20'" android/app/build.gradle
+          for n in 09 10 11 12 13 14 15 16 17 18 19 20 21; do python3 android/.build/patch_${n}.py; done
+          grep -q "build 0.21" android/app/src/main/assets/www/index.html
+          grep -q "MOTION + SOUND" android/app/src/main/assets/www/index.html
+          grep -q "engine2Osc" android/app/src/main/assets/www/index.html
+          grep -q "roadGain" android/app/src/main/assets/www/index.html
+          grep -q "windGain" android/app/src/main/assets/www/index.html
+          grep -q "rainGain" android/app/src/main/assets/www/index.html
+          grep -q "window.__puaQuality" android/app/src/main/assets/www/index.html
+          grep -q "versionName '0.21'" android/app/build.gradle
       - name: JavaScript syntax smoke test
         shell: bash
         run: |
@@ -72,19 +72,15 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           s=Path('android/app/src/main/assets/www/index.html').read_text()
-          assert "drawStreetLife20(chunks,cam,w,sun)" in s
-          assert "drawJunctions20(chunks,cam)" in s
-          assert "drawPlayerCar20(p,cam,sun)" in s
-          assert "nr20.d<82" in s
-          assert "window.__puaCamV" in s
-          assert "cat's-eye points" in s
-          assert "district20(b.x,b.y)" in s
-          assert "lane=(r.kind==='A'?r.w*.18:r.w*.14)*dir" in s
-          draw=s[s.index("function draw(){"):]
-          draw=draw[:draw.index("function drawHud")]
-          assert "drawStreetLife19(chunks,cam,w)" not in draw
-          assert "drawPlayerCar19(p,cam)" not in draw
-          print("0.20 world-coherence checks passed")
+          assert "engine2Gain.gain.setTargetAtTime" in s
+          assert "roadGain.gain.setTargetAtTime" in s
+          assert "windGain.gain.setTargetAtTime" in s
+          assert "rainGain.gain.setTargetAtTime" in s
+          assert "perfAvg=.016" in s
+          assert "window.__puaQuality=perfAvg>.029?.68" in s
+          assert "step=(r.kind==='A'?175:235)/quality" in s
+          assert "mood.traffic*(.55+.45*quality)" in s
+          print("0.21 motion-sound checks passed")
           PY
       - name: Build debug APK
         working-directory: android
@@ -93,17 +89,17 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_20.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_21.apk
       - name: Package built source
         shell: bash
         run: |
-          cp android/app/src/main/assets/www/index.html dist/PUA_0_20_BUILT_INDEX.html
+          cp android/app/src/main/assets/www/index.html dist/PUA_0_21_BUILT_INDEX.html
       - name: Upload mega sprint
         uses: actions/upload-artifact@v4
         with:
-          name: PROCEED-UNTIL-APPREHENDED-0.20-WORLD-COHERENCE
+          name: PROCEED-UNTIL-APPREHENDED-0.21-MOTION-SOUND
           path: |
-            dist/PROCEED_UNTIL_APPREHENDED_0_20.apk
-            dist/PUA_0_20_BUILT_INDEX.html
+            dist/PROCEED_UNTIL_APPREHENDED_0_21.apk
+            dist/PUA_0_21_BUILT_INDEX.html
           if-no-files-found: error
           retention-days: 30
