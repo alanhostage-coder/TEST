@@ -33,6 +33,8 @@ var centre_button: Button
 var cal_button: Button
 var drive_enabled := false
 var title: Label
+var interior_parts: Array = []
+var steering_ring: Line2D
 
 func _ready():
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -95,10 +97,13 @@ func _build_buttons():
 	add_child(centre_button)
 
 	title = Label.new()
-	title.position = Vector2(145, 54)
+	title.position = Vector2(245, 54)
 	title.text = ""
 	title.modulate = Color(1, 1, 1, 0.62)
 	add_child(title)
+
+	for control in [button, cal_button, save_button, reset_button, drive_button, centre_button, title]:
+		control.z_index = 40
 
 func _build_views():
 	for i in range(3):
@@ -122,15 +127,101 @@ func _build_views():
 
 		var surface = Polygon2D.new()
 		surface.name = "ShutterPlane%d" % i
+		surface.z_index = -20
 		surface.texture = viewport.get_texture()
 		surface.uv = PackedVector2Array([Vector2.ZERO, Vector2(1, 0), Vector2.ONE, Vector2(0, 1)])
 		add_child(surface)
 		surfaces.append(surface)
+	_build_interior_overlay()
 	_rescale_surfaces()
+
+func _build_interior_overlay():
+	for part in interior_parts:
+		if is_instance_valid(part):
+			part.queue_free()
+	interior_parts.clear()
+
+	for name in ["Header", "APillarL", "APillarR", "Dash", "Binnacle"]:
+		var poly = Polygon2D.new()
+		poly.name = name
+		poly.color = Color(0.035, 0.040, 0.043, 0.98) if name != "Binnacle" else Color(0.055, 0.060, 0.062, 0.98)
+		poly.z_index = 12
+		add_child(poly)
+		interior_parts.append(poly)
+
+	steering_ring = Line2D.new()
+	steering_ring.name = "SteeringWheel"
+	steering_ring.width = 11.0
+	steering_ring.default_color = Color(0.055, 0.058, 0.060, 0.98)
+	steering_ring.closed = true
+	steering_ring.antialiased = true
+	steering_ring.z_index = 14
+	add_child(steering_ring)
+	interior_parts.append(steering_ring)
+	_layout_interior_overlay()
+
+func _layout_interior_overlay():
+	if interior_parts.size() < 6:
+		return
+	var size = get_viewport_rect().size
+	if size.x < 2.0 or size.y < 2.0:
+		return
+	var w = size.x
+	var h = size.y
+
+	var header: Polygon2D = interior_parts[0]
+	header.polygon = PackedVector2Array([
+		Vector2(0, 0), Vector2(w, 0), Vector2(w, h * 0.045), Vector2(0, h * 0.045)
+	])
+
+	var left: Polygon2D = interior_parts[1]
+	left.polygon = PackedVector2Array([
+		Vector2(0, 0), Vector2(w * 0.048, 0), Vector2(w * 0.115, h * 0.72), Vector2(w * 0.070, h * 0.77), Vector2(0, h * 0.71)
+	])
+
+	var right: Polygon2D = interior_parts[2]
+	right.polygon = PackedVector2Array([
+		Vector2(w, 0), Vector2(w * 0.952, 0), Vector2(w * 0.885, h * 0.72), Vector2(w * 0.930, h * 0.77), Vector2(w, h * 0.71)
+	])
+
+	var dash: Polygon2D = interior_parts[3]
+	dash.polygon = PackedVector2Array([
+		Vector2(0, h),
+		Vector2(0, h * 0.84),
+		Vector2(w * 0.16, h * 0.765),
+		Vector2(w * 0.38, h * 0.735),
+		Vector2(w * 0.60, h * 0.725),
+		Vector2(w * 0.84, h * 0.765),
+		Vector2(w, h * 0.84),
+		Vector2(w, h)
+	])
+
+	var binnacle: Polygon2D = interior_parts[4]
+	binnacle.polygon = PackedVector2Array([
+		Vector2(w * 0.585, h * 0.755),
+		Vector2(w * 0.745, h * 0.755),
+		Vector2(w * 0.775, h * 0.825),
+		Vector2(w * 0.565, h * 0.825)
+	])
+
+	var wheel = steering_ring
+	var centre = Vector2(w * 0.68, h * 0.86)
+	var radius = min(w, h) * 0.105
+	var pts = PackedVector2Array()
+	for i in range(32):
+		var a = TAU * float(i) / 32.0
+		pts.append(centre + Vector2(cos(a), sin(a)) * radius)
+	wheel.points = pts
+
+func _set_interior_visible(visible: bool):
+	for part in interior_parts:
+		if is_instance_valid(part):
+			part.visible = visible
 
 func _notification(what):
 	if what == NOTIFICATION_RESIZED and not surfaces.is_empty():
 		_rescale_surfaces()
+		_layout_interior_overlay()
 
 func _rescale_surfaces():
 	var size = get_viewport_rect().size
@@ -157,6 +248,7 @@ func _rescale_surfaces():
 		surfaces[i].uv = PackedVector2Array([Vector2.ZERO, Vector2(uv_size.x, 0), uv_size, Vector2(0, uv_size.y)])
 		x += w
 	_update_camera_frustums()
+	_layout_interior_overlay()
 	queue_redraw()
 
 func _cycle_mode():
@@ -170,6 +262,7 @@ func _set_mode(value: int):
 	var active = mode > 0
 	for surface in surfaces:
 		surface.visible = active
+	_set_interior_visible(mode == 1)
 	if source_camera:
 		source_camera.current = not active
 	if car:
@@ -246,6 +339,8 @@ func _pick_corner(pos: Vector2):
 func _process(_delta):
 	if mode == 0 or not car:
 		return
+	if mode == 1 and steering_ring:
+		steering_ring.rotation = clamp(float(car.get("steer_smoothed")) * 0.18, -0.18, 0.18)
 	var cab_transform = car.global_transform
 	# Right-hand-drive open-top seating position: the world should feel as if the
 	# viewer is sitting in the car, not watching a bumper camera.
