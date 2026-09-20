@@ -19,6 +19,7 @@ var api_detail_pressure := 0.70
 var api_radio_instability := 0.20
 var api_moment := "none"
 const CELL := 90.0
+var low_spec_mode := false
 
 var asphalt_mat
 var concrete_mat
@@ -36,6 +37,10 @@ var sandstone_warm_mat
 var soot_stone_cool_mat
 
 func _ready():
+	low_spec_mode = OS.has_feature("thinkpad_low")
+	if low_spec_mode:
+		api_detail_pressure = 0.42
+		$Sun.directional_shadow_max_distance = 82.0
 	_make_materials()
 	_make_ground()
 	_make_landmarks()
@@ -545,6 +550,8 @@ func _on_map_ready(map_data: Dictionary):
 	map_lamps.clear()
 	var street_edge_budget := 0
 	var marking_budget := 0
+	var street_edge_limit := 72 if low_spec_mode else 150
+	var marking_limit := 38 if low_spec_mode else 70
 
 	for road in roads:
 		if not road is Dictionary:
@@ -566,10 +573,10 @@ func _on_map_ready(map_data: Dictionary):
 			var mid = (a + b) * 0.5
 			var angle = atan2(road_delta.x, road_delta.y)
 			_road_rotated(map_root, Vector3(mid.x, 0.035, mid.y), length + 1.0, width, angle)
-			if street_edge_budget < 150 and length > 7.0 and kind not in ["motorway", "trunk", "track"]:
+			if street_edge_budget < street_edge_limit and length > 7.0 and kind not in ["motorway", "trunk", "track"]:
 				_street_edges_rotated(map_root, Vector3(mid.x, 0.035, mid.y), length + 0.6, width, angle, kind)
 				street_edge_budget += 1
-			if marking_budget < 70 and length > 9.0 and width >= 5.8:
+			if marking_budget < marking_limit and length > 9.0 and width >= 5.8:
 				_live_road_markings(map_root, Vector3(mid.x, 0.035, mid.y), length, width, angle, kind)
 				marking_budget += 1
 			map_segments.append([[a.x, a.y], [b.x, b.y], width, kind])
@@ -632,7 +639,7 @@ func _spawn_map_agents():
 	map_agents.clear()
 	if map_segments.is_empty():
 		return
-	var count = min(18, map_segments.size())
+	var count = min(8 if low_spec_mode else 18, map_segments.size())
 	for i in range(count):
 		var body = AnimatableBody3D.new()
 		body.name = "MapTraffic_%02d" % i
@@ -726,7 +733,7 @@ func _place_map_agent(agent: Dictionary):
 func _add_verge_life(parent: Node3D):
 	var placed := 0
 	for i in range(map_segments.size()):
-		if placed >= 52:
+		if placed >= (22 if low_spec_mode else 52):
 			break
 		if i % 4 != 0:
 			continue
@@ -765,7 +772,7 @@ func _add_verge_life(parent: Node3D):
 func _add_map_furniture(parent: Node3D):
 	var placed = 0
 	for i in range(map_segments.size()):
-		if placed >= 24 or i % 7 != 0:
+		if placed >= (12 if low_spec_mode else 24) or i % (10 if low_spec_mode else 7) != 0:
 			continue
 		var segment = map_segments[i]
 		var a = Vector2(float(segment[0][0]), float(segment[0][1]))
@@ -796,7 +803,8 @@ func _add_edinburgh_building(parent: Node3D, base: Vector3, size: Vector3, seed:
 	var h = size.y
 	var sz = size.z
 	var industrial = kind in ["industrial", "warehouse", "commercial", "retail"] or sx > 28.0 or sz > 28.0
-	var detailed = industrial or (seed % 100) < int(clamp(api_detail_pressure, 0.35, 1.0) * 48.0)
+	var detail_scale = 0.62 if low_spec_mode else 1.0
+	var detailed = industrial or (seed % 100) < int(clamp(api_detail_pressure, 0.35, 1.0) * 48.0 * detail_scale)
 	var stone = soot_stone_mat
 	match seed % 4:
 		0: stone = sandstone_mat
