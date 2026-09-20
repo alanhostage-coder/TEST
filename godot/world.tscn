@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource path="res://world.gd" type="Script" id="1"]
 [ext_resource path="res://car.gd" type="Script" id="2"]
@@ -7,7 +7,7 @@
 [ext_resource path="res://world_state.gd" type="Script" id="5"]
 [ext_resource path="res://map_stream.gd" type="Script" id="6"]
 [ext_resource path="res://bay_projection.gd" type="Script" id="7"]
-[ext_resource path="res://pua_api.gd" type="Script" id="8"]
+[ext_resource path="res://pua_api.gd" type="Script" id="8"]\n[ext_resource path="res://osm_ground_tiles.gd" type="Script" id="9"]
 
 [sub_resource type="BoxShape3D" id="road_shape"]
 size = Vector3(60, 0.5, 240)
