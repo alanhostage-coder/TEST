@@ -17,22 +17,20 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - name: Find Android SDK and install API 35
+      - name: Android SDK 35
+        uses: android-actions/setup-android@v3
+        with:
+          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
+          accept-android-sdk-licenses: 'true'
+          log-accepted-android-sdk-licenses: 'false'
+      - name: Expose Godot SDK path
         run: |
-          SDKROOT="/usr/local/lib/android/sdk"
-          SDKMANAGER="$(find "$SDKROOT" -type f -name sdkmanager 2>/dev/null | head -n 1)"
-          test -n "$SDKMANAGER"
-          echo "ANDROID_HOME=$SDKROOT" >> "$GITHUB_ENV"
-          echo "ANDROID_SDK_ROOT=$SDKROOT" >> "$GITHUB_ENV"
-          echo "GODOT_ANDROID_SDK_ROOT=$SDKROOT" >> "$GITHUB_ENV"
-          yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0" || true
-          test -x "$SDKROOT/platform-tools/adb"
-          test -d "$SDKROOT/platforms/android-35"
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "GODOT_ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
           mkdir -p "$HOME/Android"
-          ln -sfn "$SDKROOT" "$HOME/Android/Sdk"
-          command -v adb
-          ls -la "$SDKROOT/platform-tools/adb"
+          ln -sfn "$ANDROID_HOME" "$HOME/Android/Sdk"
+          test -x "$ANDROID_HOME/platform-tools/adb"
+          test -d "$ANDROID_HOME/platforms/android-35"
       - name: Install Godot and export templates
         run: |
           wget -q https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_linux.x86_64.zip
@@ -51,12 +49,12 @@ jobs:
         run: |
           mkdir -p dist
           godot --headless --editor --path godot --quit
-          godot --headless --path godot --export-debug Android ../dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_26.apk
-          test -s dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_26.apk
+          godot --headless --path godot --export-debug Android ../dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_27.apk
+          test -s dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_27.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.26-GREYBEARD-ANDROID
-          path: dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_26.apk
+          name: PUA-0.27-GREYBEARD-ANDROID
+          path: dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_27.apk
           if-no-files-found: error
           retention-days: 30
