@@ -40,6 +40,18 @@ jobs:
           mkdir -p ~/.local/share/godot/export_templates/4.5.1.stable
           unzip -q Godot_v4.5.1-stable_export_templates.tpz -d /tmp/templates
           cp -r /tmp/templates/templates/* ~/.local/share/godot/export_templates/4.5.1.stable/
+      - name: Create Godot debug keystore
+        run: |
+          mkdir -p "$HOME/.local/share/godot/keystores"
+          keytool -genkeypair -v \
+            -keystore "$HOME/.local/share/godot/keystores/debug.keystore" \
+            -storepass android \
+            -alias androiddebugkey \
+            -keypass android \
+            -keyalg RSA \
+            -keysize 2048 \
+            -validity 10000 \
+            -dname "CN=Android Debug,O=Abbey Hill,C=GB"
       - name: Parse project
         run: |
           godot --headless --path godot --editor --quit
@@ -49,12 +61,12 @@ jobs:
         run: |
           mkdir -p dist
           godot --headless --editor --path godot --quit
-          godot --headless --path godot --export-debug Android ../dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_27.apk
-          test -s dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_27.apk
+          godot --headless --path godot --export-debug Android ../dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_28.apk
+          test -s dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_28.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.27-GREYBEARD-ANDROID
-          path: dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_27.apk
+          name: PUA-0.28-GREYBEARD-ANDROID
+          path: dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_28.apk
           if-no-files-found: error
           retention-days: 30
