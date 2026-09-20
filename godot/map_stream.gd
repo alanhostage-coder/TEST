@@ -7,14 +7,14 @@ signal map_ready(data)
 const OVERPASS_URL := "https://overpass-api.de/api/interpreter"
 const POSTCODES_URL := "https://api.postcodes.io/postcodes/"
 const START_POSTCODE := "RH15 2BZ"
-const CACHE_PATH := "user://pua_map_stream_rh15_2bz.json"
+const CACHE_PATH := "user://pua_map_stream_rh15_2bz_v2.json"
 const CACHE_MAX_AGE_SECONDS := 604800
 # Burgess Hill fallback only matters if postcode resolution is unavailable.
 const FALLBACK_LAT := 50.9570
 const FALLBACK_LON := -0.1320
 const HALF_LAT := 0.0060
 const HALF_LON := 0.0100
-const MIN_POINT_GAP_METERS := 3.0
+const MIN_POINT_GAP_METERS := 0.75
 const MAX_ROADS := 220
 const MAX_BUILDINGS := 320
 
