@@ -8,7 +8,7 @@ signal location_ready(latitude, longitude, postcode)
 const OVERPASS_URL := "https://overpass-api.de/api/interpreter"
 const POSTCODES_URL := "https://api.postcodes.io/postcodes/"
 const START_POSTCODE := "RH15 2BZ"
-const CACHE_PATH := "user://pua_map_stream_rh15_2bz_v3.json"
+const CACHE_PATH := "user://pua_map_stream_rh15_2bz_v4.json"
 const CACHE_MAX_AGE_SECONDS := 604800
 # Burgess Hill fallback only matters if postcode resolution is unavailable.
 const FALLBACK_LAT := 50.9570
@@ -19,7 +19,8 @@ const MIN_POINT_GAP_METERS := 0.75
 const MAX_ROADS := 220
 const MAX_BUILDINGS := 320
 const MAX_LINEAR_FEATURES := 260
-const MAX_POINT_FEATURES := 220
+const MAX_POINT_FEATURES := 260
+const MAX_POI_FEATURES := 180
 
 var center_lat := FALLBACK_LAT
 var center_lon := FALLBACK_LON
@@ -34,6 +35,7 @@ var data := {
 	"buildings": [],
 	"linear_features": [],
 	"point_features": [],
+	"poi_features": [],
 	"updated_unix": 0
 }
 
@@ -79,7 +81,7 @@ func _resolve_start_postcode():
 	var compact = START_POSTCODE.replace(" ", "").uri_encode()
 	var headers = PackedStringArray([
 		"Accept: application/json",
-		"User-Agent: ProceedUntilApprehended/0.66 (Godot Android; postcode-seeded OSM)"
+		"User-Agent: ProceedUntilApprehended/0.71 (Godot Android; postcode-seeded OSM)"
 	])
 	var err = _postcode_request.request(POSTCODES_URL + compact, headers, HTTPClient.METHOD_GET)
 	if err != OK:
@@ -118,11 +120,11 @@ func _fetch_osm():
 	var north = center_lat + HALF_LAT
 	var east = center_lon + HALF_LON
 	var bbox = "%.6f,%.6f,%.6f,%.6f" % [south, west, north, east]
-	var query = '[out:json][timeout:15];(way[highway~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|service|track)$"](%s);way[building](%s);way[barrier~"^(hedge|fence|wall)$"](%s);way[highway~"^(footway|path|cycleway)$"](%s);node[natural=tree](%s);node[highway~"^(traffic_signals|crossing|bus_stop)$"](%s););out tags geom qt;' % [bbox, bbox, bbox, bbox, bbox, bbox]
+	var query = '[out:json][timeout:15];(way[highway~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|service|track)$"](%s);way[building](%s);way[barrier~"^(hedge|fence|wall)$"](%s);way[highway~"^(footway|path|cycleway)$"](%s);node[natural=tree](%s);node[highway~"^(traffic_signals|crossing|bus_stop|stop|give_way)$"](%s);node[traffic_sign](%s);node[amenity][name](%s);node[shop][name](%s);node[tourism][name](%s);node[leisure][name](%s);node[historic][name](%s);node[place][name](%s););out tags geom qt;' % [bbox, bbox, bbox, bbox, bbox, bbox, bbox, bbox, bbox, bbox, bbox, bbox, bbox]
 	var url = OVERPASS_URL + "?data=" + query.uri_encode()
 	var headers = PackedStringArray([
 		"Accept: application/json",
-		"User-Agent: ProceedUntilApprehended/0.66 (Godot Android; postcode-seeded cached OSM geometry)"
+		"User-Agent: ProceedUntilApprehended/0.71 (Godot Android; postcode-seeded cached OSM geometry)"
 	])
 	var err = _request.request(url, headers, HTTPClient.METHOD_GET)
 	if err != OK:
@@ -145,6 +147,7 @@ func _on_request_completed(result: int, response_code: int, _headers, body: Pack
 	var buildings: Array = []
 	var linear_features: Array = []
 	var point_features: Array = []
+	var poi_features: Array = []
 	for element in elements:
 		if not element is Dictionary:
 			continue
@@ -153,23 +156,42 @@ func _on_request_completed(result: int, response_code: int, _headers, body: Pack
 			continue
 		var element_type = str(element.get("type", ""))
 		if element_type == "node":
-			if point_features.size() >= MAX_POINT_FEATURES:
+			if not element.has("lat") or not element.has("lon"):
 				continue
+			var p = _lat_lon_to_local(float(element.get("lat", center_lat)), float(element.get("lon", center_lon)))
 			var point_kind := ""
 			if str(tags.get("natural", "")) == "tree":
 				point_kind = "tree"
 			else:
 				var highway = str(tags.get("highway", ""))
-				if highway in ["traffic_signals", "crossing", "bus_stop"]:
+				if highway in ["traffic_signals", "crossing", "bus_stop", "stop", "give_way"]:
 					point_kind = highway
-			if point_kind != "" and element.has("lat") and element.has("lon"):
-				var p = _lat_lon_to_local(float(element.get("lat", center_lat)), float(element.get("lon", center_lon)))
+				elif tags.has("traffic_sign"):
+					point_kind = "traffic_sign"
+			if point_kind != "" and point_features.size() < MAX_POINT_FEATURES:
 				point_features.append({
 					"kind": point_kind,
 					"point": [p.x, p.y],
 					"name": str(tags.get("name", "")),
-					"crossing": str(tags.get("crossing", ""))
+					"crossing": str(tags.get("crossing", "")),
+					"traffic_sign": str(tags.get("traffic_sign", "")),
+					"ref": str(tags.get("ref", ""))
 				})
+			var poi_name = str(tags.get("name", "")).strip_edges()
+			if poi_name != "" and poi_features.size() < MAX_POI_FEATURES:
+				var poi_kind := ""
+				for key in ["amenity", "shop", "tourism", "leisure", "historic", "place"]:
+					if tags.has(key):
+						poi_kind = str(tags.get(key, key))
+						break
+				if poi_kind != "":
+					poi_features.append({
+						"kind": poi_kind,
+						"name": poi_name,
+						"brand": str(tags.get("brand", "")),
+						"operator": str(tags.get("operator", "")),
+						"point": [p.x, p.y]
+					})
 			continue
 
 		var geometry = element.get("geometry", [])
@@ -189,6 +211,7 @@ func _on_request_completed(result: int, response_code: int, _headers, body: Pack
 					"sidewalk": str(tags.get("sidewalk", "")),
 					"lit": str(tags.get("lit", "")),
 					"maxspeed": str(tags.get("maxspeed", "")),
+					"ref": str(tags.get("ref", "")),
 					"points": points
 				})
 		elif tags.has("building") and buildings.size() < MAX_BUILDINGS:
@@ -219,6 +242,7 @@ func _on_request_completed(result: int, response_code: int, _headers, body: Pack
 		"buildings": buildings,
 		"linear_features": linear_features,
 		"point_features": point_features,
+		"poi_features": poi_features,
 		"updated_unix": int(Time.get_unix_time_from_system())
 	}
 	_save_cache()
@@ -280,7 +304,12 @@ func _building_from_geometry(tags: Dictionary, geometry: Array) -> Dictionary:
 		"kind": str(tags.get("building", "yes")),
 		"material": str(tags.get("building:material", "")),
 		"roof_shape": str(tags.get("roof:shape", "")),
-		"roof_material": str(tags.get("roof:material", ""))
+		"roof_material": str(tags.get("roof:material", "")),
+		"name": str(tags.get("name", "")),
+		"addr_housenumber": str(tags.get("addr:housenumber", "")),
+		"addr_street": str(tags.get("addr:street", "")),
+		"amenity": str(tags.get("amenity", "")),
+		"shop": str(tags.get("shop", ""))
 	}
 
 func _lat_lon_to_local(lat: float, lon: float) -> Vector2:

@@ -42,5 +42,10 @@ jobs:
           grep -q 'for ring in range(radius + 1)' godot/osm_ground_tiles.gd
           grep -q 'window/handheld/orientation=0' godot/project.godot
           grep -q '_add_exact_osm_facade_detail' godot/world.gd
+          grep -q 'pua_map_stream_rh15_2bz_v4' godot/map_stream.gd
+          grep -q 'poi_features' godot/map_stream.gd
+          grep -q '_add_mapped_road_name_signs' godot/world.gd
+          grep -q '_add_named_poi_markers' godot/world.gd
+          grep -q '_build_live_map_overlay' godot/osm_ground_tiles.gd
           grep -q 'Windows PC Max' godot/export_presets.cfg
           grep -q 'custom_features="pc_max"' godot/export_presets.cfg

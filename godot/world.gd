@@ -45,6 +45,9 @@ var hedge_mat
 var gravel_mat
 var paving_mat
 var path_mat
+var sign_white_mat
+var sign_red_mat
+var sign_blue_mat
 
 func _ready():
 	projector_max_mode = OS.has_feature("projector_max")
@@ -108,6 +111,9 @@ func _make_materials():
 	gravel_mat = _mat(Color(0.28, 0.27, 0.24), 0.96, 0.0)
 	paving_mat = _mat(Color(0.30, 0.30, 0.29), 0.91, 0.0)
 	path_mat = _mat(Color(0.18, 0.19, 0.17), 0.94, 0.0)
+	sign_white_mat = _mat(Color(0.88, 0.88, 0.84), 0.72, 0.0)
+	sign_red_mat = _mat(Color(0.62, 0.045, 0.035), 0.66, 0.0)
+	sign_blue_mat = _mat(Color(0.055, 0.18, 0.48), 0.64, 0.0)
 
 func _mat(color: Color, roughness: float, metallic: float):
 	var m = StandardMaterial3D.new()
@@ -306,7 +312,95 @@ func _add_mapped_point_features(parent: Node3D, features: Array):
 			_visual_box(parent, p + Vector3(0, 2.35, 0), Vector3(0.52, 0.42, 0.10), marking_mat)
 		elif kind == "crossing":
 			_visual_box(parent, p + Vector3(0, 0.48, 0), Vector3(0.11, 0.96, 0.11), metal_mat)
+		elif kind in ["stop", "give_way", "traffic_sign"]:
+			_visual_box(parent, p + Vector3(0, 1.18, 0), Vector3(0.09, 2.36, 0.09), metal_mat)
+			var board_mat = sign_red_mat if kind in ["stop", "give_way"] else sign_white_mat
+			_visual_box(parent, p + Vector3(0, 2.24, 0), Vector3(0.08, 0.62, 0.62), board_mat)
+			var sign_text = "STOP" if kind == "stop" else ("GIVE WAY" if kind == "give_way" else str(feature.get("traffic_sign", "")).replace("GB:", ""))
+			if sign_text != "":
+				_add_world_label(parent, p + Vector3(0, 2.25, 0), sign_text, Color(0.98, 0.98, 0.96), 30, 95.0)
 		made += 1
+
+func _add_world_label(parent: Node3D, pos: Vector3, text_value: String, colour: Color, font_size: int, range_end: float):
+	if text_value.strip_edges() == "":
+		return
+	var label = Label3D.new()
+	label.text = text_value
+	label.position = pos
+	label.font_size = font_size
+	label.pixel_size = 0.0045
+	label.modulate = colour
+	label.outline_size = 8
+	label.outline_modulate = Color(0.02, 0.025, 0.03, 0.95)
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.visibility_range_end = range_end
+	parent.add_child(label)
+
+func _add_mapped_road_name_signs(parent: Node3D, roads: Array):
+	if low_spec_mode:
+		return
+	var seen := {}
+	var cap = 34 if pc_max_mode else 18
+	var made := 0
+	for road in roads:
+		if made >= cap or not road is Dictionary:
+			break
+		var road_name = str(road.get("name", "")).strip_edges()
+		if road_name == "" or seen.has(road_name):
+			continue
+		var points = road.get("points", [])
+		if not points is Array or points.size() < 2:
+			continue
+		var chosen := Vector2(INF, INF)
+		for i in range(points.size() - 1):
+			if not points[i] is Array or not points[i + 1] is Array:
+				continue
+			var a = Vector2(float(points[i][0]), float(points[i][1]))
+			var b = Vector2(float(points[i + 1][0]), float(points[i + 1][1]))
+			if a.distance_to(b) < 8.0:
+				continue
+			var mid = (a + b) * 0.5
+			if mid.length() < chosen.length():
+				chosen = mid
+		if chosen.x == INF or chosen.length() > 260.0:
+			continue
+		seen[road_name] = true
+		_visual_box(parent, Vector3(chosen.x, 1.55, chosen.y), Vector3(0.10, 3.10, 0.10), metal_mat)
+		_visual_box(parent, Vector3(chosen.x, 2.75, chosen.y), Vector3(1.60, 0.46, 0.08), sign_white_mat)
+		_add_world_label(parent, Vector3(chosen.x, 2.76, chosen.y), road_name.to_upper(), Color(0.08, 0.10, 0.12), 34, 180.0)
+		made += 1
+
+func _add_named_poi_markers(parent: Node3D, pois: Array):
+	if low_spec_mode:
+		return
+	var cap = 32 if pc_max_mode else 14
+	var made := 0
+	for poi in pois:
+		if made >= cap or not poi is Dictionary:
+			break
+		var point = poi.get("point", [])
+		var poi_name = str(poi.get("name", "")).strip_edges()
+		if poi_name == "" or not point is Array or point.size() < 2:
+			continue
+		var p = Vector2(float(point[0]), float(point[1]))
+		if p.length() > 300.0:
+			continue
+		_visual_box(parent, Vector3(p.x, 1.35, p.y), Vector3(0.08, 2.70, 0.08), metal_mat)
+		_visual_box(parent, Vector3(p.x, 2.55, p.y), Vector3(0.92, 0.40, 0.08), sign_blue_mat)
+		_add_world_label(parent, Vector3(p.x, 2.58, p.y), poi_name, Color(0.98, 0.98, 0.96), 32, 200.0)
+		made += 1
+
+func _add_named_building_marker(parent: Node3D, building: Dictionary):
+	if low_spec_mode:
+		return
+	var name = str(building.get("name", "")).strip_edges()
+	var center = building.get("center", [])
+	if name == "" or not center is Array or center.size() < 2:
+		return
+	var p = Vector2(float(center[0]), float(center[1]))
+	if p.length() > (230.0 if pc_max_mode else 150.0):
+		return
+	_add_world_label(parent, Vector3(p.x, 3.2, p.y), name, Color(0.95, 0.93, 0.86), 34, 170.0)
 
 func _visual_box(parent: Node3D, pos: Vector3, size: Vector3, material):
 	var mesh = MeshInstance3D.new()
@@ -853,6 +947,7 @@ func _on_map_ready(map_data: Dictionary):
 	var buildings = map_data.get("buildings", [])
 	var linear_features = map_data.get("linear_features", [])
 	var point_features = map_data.get("point_features", [])
+	var poi_features = map_data.get("poi_features", [])
 	if roads.is_empty() and buildings.is_empty():
 		return
 	map_mode_active = true
@@ -935,9 +1030,12 @@ func _on_map_ready(map_data: Dictionary):
 		var exact = Vector2(cx, cz).length() <= exact_radius and _add_exact_osm_building(map_root, building, h, seed)
 		if not exact:
 			_add_edinburgh_building(map_root, Vector3(cx, 0.0, cz), Vector3(sx, h, sz), seed, kind)
+		_add_named_building_marker(map_root, building)
 
 	_add_mapped_linear_features(map_root, linear_features)
 	_add_mapped_point_features(map_root, point_features)
+	_add_mapped_road_name_signs(map_root, roads)
+	_add_named_poi_markers(map_root, poi_features)
 	if linear_features.is_empty() and point_features.is_empty():
 		_add_map_furniture(map_root)
 		_add_verge_life(map_root)
@@ -955,6 +1053,7 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_building_count", buildings.size())
 		car.set_meta("map_linear_feature_count", linear_features.size())
 		car.set_meta("map_point_feature_count", point_features.size())
+		car.set_meta("map_poi_feature_count", poi_features.size())
 		car.set_meta("map_road_segments", map_segments)
 		_snap_car_to_map_junction(car, roads)
 

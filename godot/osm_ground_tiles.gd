@@ -19,11 +19,19 @@ var _center_lat := 0.0
 var _center_lon := 0.0
 var _signature := ""
 var _loaded_tile_count := 0
+var _overlay_root: Control
+var _overlay_map: TextureRect
+var _overlay_marker: ColorRect
+var _tile_textures := {}
+var _overlay_tile := Vector2i(-1, -1)
 
 func _ready():
 	_root = Node3D.new()
 	_root.name = "OSMMapGround"
 	add_child(_root)
+	if OS.has_feature("pc_max"):
+		_build_live_map_overlay()
+	set_process(OS.has_feature("pc_max"))
 	call_deferred("_bind_map_stream")
 
 func _bind_map_stream():
@@ -72,6 +80,7 @@ func _clear_tiles():
 	_tile_queue.clear()
 	_pending = Vector2i(-1, -1)
 	_loaded_tile_count = 0
+	_tile_textures.clear()
 	if _request and is_instance_valid(_request):
 		_request.cancel_request()
 		_request.queue_free()
@@ -181,8 +190,10 @@ func _add_tile(tile: Vector2i, image: Image):
 	if mesh == null:
 		return
 
+	var tile_texture = ImageTexture.create_from_image(image)
+	_tile_textures["%d:%d" % [tile.x, tile.y]] = tile_texture
 	var material = StandardMaterial3D.new()
-	material.albedo_texture = ImageTexture.create_from_image(image)
+	material.albedo_texture = tile_texture
 	material.albedo_color = Color(0.38, 0.40, 0.38, 1.0)
 	material.roughness = 1.0
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
@@ -198,3 +209,69 @@ func _add_tile(tile: Vector2i, image: Image):
 	var car = get_node_or_null("../Car")
 	if car:
 		car.set_meta("osm_ground_tiles_loaded", _loaded_tile_count)
+
+
+func _build_live_map_overlay():
+	var layer = CanvasLayer.new()
+	layer.layer = 40
+	add_child(layer)
+	_overlay_root = Control.new()
+	_overlay_root.size = Vector2(252, 286)
+	layer.add_child(_overlay_root)
+	var back = ColorRect.new()
+	back.size = _overlay_root.size
+	back.color = Color(0.015, 0.02, 0.025, 0.88)
+	_overlay_root.add_child(back)
+	var title = Label.new()
+	title.position = Vector2(12, 8)
+	title.size = Vector2(228, 22)
+	title.text = "LIVE OSM · RH15 2BZ"
+	title.add_theme_font_size_override("font_size", 14)
+	_overlay_root.add_child(title)
+	_overlay_map = TextureRect.new()
+	_overlay_map.position = Vector2(12, 34)
+	_overlay_map.size = Vector2(228, 228)
+	_overlay_map.stretch_mode = TextureRect.STRETCH_SCALE
+	_overlay_root.add_child(_overlay_map)
+	_overlay_marker = ColorRect.new()
+	_overlay_marker.size = Vector2(8, 8)
+	_overlay_marker.color = Color(1.0, 0.25, 0.12, 1.0)
+	_overlay_root.add_child(_overlay_marker)
+	var credit = Label.new()
+	credit.position = Vector2(12, 264)
+	credit.size = Vector2(228, 18)
+	credit.text = "© OpenStreetMap contributors"
+	credit.add_theme_font_size_override("font_size", 10)
+	_overlay_root.add_child(credit)
+
+func _process(_delta):
+	if _overlay_root == null or _overlay_map == null:
+		return
+	var view_size = get_viewport().get_visible_rect().size
+	_overlay_root.position = Vector2(max(8.0, view_size.x - _overlay_root.size.x - 14.0), 14.0)
+	var car = get_node_or_null("../Car")
+	if car == null or abs(_center_lat) < 0.001:
+		return
+	var meters_per_lon = 111320.0 * cos(deg_to_rad(_center_lat))
+	var lat = _center_lat - car.global_position.z / 111320.0
+	var lon = _center_lon + car.global_position.x / meters_per_lon
+	var tile_float = _lat_lon_to_tile_float(lat, lon)
+	var tile = Vector2i(int(floor(tile_float.x)), int(floor(tile_float.y)))
+	var key = "%d:%d" % [tile.x, tile.y]
+	if _tile_textures.has(key) and tile != _overlay_tile:
+		_overlay_tile = tile
+		_overlay_map.texture = _tile_textures[key]
+	if _overlay_tile == tile:
+		var frac = Vector2(tile_float.x - floor(tile_float.x), tile_float.y - floor(tile_float.y))
+		_overlay_marker.position = _overlay_map.position + frac * _overlay_map.size - _overlay_marker.size * 0.5
+		_overlay_marker.visible = true
+	else:
+		_overlay_marker.visible = false
+
+func _lat_lon_to_tile_float(lat_deg: float, lon_deg: float) -> Vector2:
+	var n = pow(2.0, float(TILE_ZOOM))
+	var lat_rad = deg_to_rad(clamp(lat_deg, -85.05112878, 85.05112878))
+	var x = (lon_deg + 180.0) / 360.0 * n
+	var merc = log(tan(lat_rad) + 1.0 / cos(lat_rad))
+	var y = (1.0 - merc / PI) * 0.5 * n
+	return Vector2(x, y)
