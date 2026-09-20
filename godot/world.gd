@@ -390,6 +390,11 @@ func _on_map_ready(map_data: Dictionary):
 	if roads.is_empty() and buildings.is_empty():
 		return
 	map_mode_active = true
+	for t in traffic:
+		if t.has("node") and is_instance_valid(t["node"]):
+			t["node"].visible = false
+	if patrol and is_instance_valid(patrol):
+		patrol.visible = false
 	for key in cells.keys():
 		var node = cells[key]
 		if is_instance_valid(node):
@@ -441,3 +446,26 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_data_source", map_data.get("source", "offline"))
 		car.set_meta("map_road_count", roads.size())
 		car.set_meta("map_building_count", buildings.size())
+		_snap_car_to_map_road(car, roads)
+
+
+func _snap_car_to_map_road(car, roads: Array):
+	var current = Vector2(car.global_position.x, car.global_position.z)
+	var best = current
+	var best_dist = INF
+	for road in roads:
+		if not road is Dictionary:
+			continue
+		var points = road.get("points", [])
+		for point in points:
+			if not point is Array or point.size() < 2:
+				continue
+			var p = Vector2(float(point[0]), float(point[1]))
+			var d = current.distance_squared_to(p)
+			if d < best_dist:
+				best_dist = d
+				best = p
+	if best_dist < INF:
+		car.global_position.x = best.x
+		car.global_position.z = best.y
+		car.global_position.y = max(car.global_position.y, 0.58)
