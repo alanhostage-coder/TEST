@@ -45,6 +45,7 @@ var _moment_duration := 0.0
 var _active_moment := "none"
 var _active_moment_strength := 0.0
 var _last_car_position := Vector3.ZERO
+var _situation_latch := -1
 
 func _ready():
 	_load_cache()
@@ -110,18 +111,17 @@ func _capture_situation_memory():
 		return
 	var kind = int(_car.get_meta("near_world_situation", -1))
 	if kind < 0:
+		_situation_latch = -1
 		return
+	if kind == _situation_latch:
+		return
+	_situation_latch = kind
 	var seen = session.get("situations_encountered", {})
 	if not seen is Dictionary:
 		seen = {}
 	var key = str(kind)
-	if not seen.has(key):
-		seen[key] = 0
-	seen[key] = int(seen[key]) + 1
+	seen[key] = int(seen.get(key, 0)) + 1
 	session["situations_encountered"] = seen
-	# Clear the proximity marker after capture so a single encounter is not counted
-	# every frame. OpenWorldDirector sets it again only while the player remains close.
-	_car.set_meta("near_world_situation", -1)
 
 func _on_external_change(_payload = null):
 	_recompute()
