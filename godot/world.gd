@@ -30,6 +30,10 @@ var glass_mat
 var sandstone_mat
 var soot_stone_mat
 var roof_mat
+var pavement_mat
+var kerb_mat
+var sandstone_warm_mat
+var soot_stone_cool_mat
 
 func _ready():
 	_make_materials()
@@ -71,6 +75,10 @@ func _make_materials():
 	sandstone_mat = _mat(Color(0.43, 0.40, 0.34), 0.91, 0.0)
 	soot_stone_mat = _mat(Color(0.255, 0.265, 0.26), 0.94, 0.0)
 	roof_mat = _mat(Color(0.11, 0.12, 0.12), 0.86, 0.06)
+	pavement_mat = _mat(Color(0.225, 0.23, 0.225), 0.90, 0.0)
+	kerb_mat = _mat(Color(0.34, 0.345, 0.335), 0.94, 0.0)
+	sandstone_warm_mat = _mat(Color(0.39, 0.355, 0.295), 0.93, 0.0)
+	soot_stone_cool_mat = _mat(Color(0.215, 0.225, 0.225), 0.95, 0.0)
 
 func _mat(color: Color, roughness: float, metallic: float):
 	var m = StandardMaterial3D.new()
@@ -114,6 +122,36 @@ func _road_rotated(parent: Node3D, pos: Vector3, length: float, width: float, an
 	mesh.position = pos
 	mesh.rotation.y = angle
 	parent.add_child(mesh)
+
+func _street_edges_rotated(parent: Node3D, pos: Vector3, length: float, width: float, angle: float, kind: String):
+	# Pavement and kerb strips give roads a believable cross-section. Kept shallow,
+	# uncollided and distance-capped so the mobile renderer gets the silhouette cues
+	# without doubling the physics load.
+	var tangent = Vector2(sin(angle), cos(angle))
+	var normal = Vector2(-tangent.y, tangent.x)
+	var pavement_w = 1.35 if kind in ["residential", "living_street", "tertiary"] else 0.95
+	for side in [-1.0, 1.0]:
+		var off = normal * side * (width * 0.5 + pavement_w * 0.5 + 0.16)
+		var pavement = MeshInstance3D.new()
+		var pm = BoxMesh.new()
+		pm.size = Vector3(pavement_w, 0.12, length)
+		pavement.mesh = pm
+		pavement.material_override = pavement_mat
+		pavement.position = pos + Vector3(off.x, 0.075, off.y)
+		pavement.rotation.y = angle
+		pavement.visibility_range_end = 180.0
+		parent.add_child(pavement)
+
+		var kerb_off = normal * side * (width * 0.5 + 0.08)
+		var kerb = MeshInstance3D.new()
+		var km = BoxMesh.new()
+		km.size = Vector3(0.16, 0.16, length)
+		kerb.mesh = km
+		kerb.material_override = kerb_mat
+		kerb.position = pos + Vector3(kerb_off.x, 0.10, kerb_off.y)
+		kerb.rotation.y = angle
+		kerb.visibility_range_end = 145.0
+		parent.add_child(kerb)
 
 func _visual_box(parent: Node3D, pos: Vector3, size: Vector3, material):
 	var mesh = MeshInstance3D.new()
@@ -434,6 +472,9 @@ func _on_world_state_changed(state: Dictionary):
 	var wave = max(0.0, float(state.get("wave_height", 0.5)))
 	asphalt_mat.roughness = lerp(0.34, 0.12, wetness)
 	asphalt_mat.metallic = lerp(0.05, 0.18, wetness)
+	pavement_mat.roughness = lerp(0.90, 0.58, wetness)
+	kerb_mat.roughness = lerp(0.94, 0.68, wetness)
+	concrete_mat.roughness = lerp(0.86, 0.62, wetness)
 	weather_sun_energy = lerp(0.72, 0.34, cloud) * lerp(1.0, 0.84, wetness)
 	$Sun.light_energy = weather_sun_energy
 	var env = $WorldEnvironment.environment
@@ -442,6 +483,9 @@ func _on_world_state_changed(state: Dictionary):
 		var visibility_fog = clamp(1.0 - visibility / 22000.0, 0.0, 0.92)
 		env.fog_density = 0.0045 + visibility_fog * 0.018 + clamp(aqi / 150.0, 0.0, 1.0) * 0.004
 		env.fog_light_color = Color(0.39, 0.42, 0.42).lerp(Color(0.31, 0.34, 0.35), cloud)
+		env.ambient_light_energy = lerp(0.72, 0.46, cloud) * lerp(1.0, 0.90, wetness)
+		env.ambient_light_color = Color(0.47, 0.50, 0.51).lerp(Color(0.34, 0.37, 0.39), cloud)
+		env.tonemap_exposure = lerp(1.08, 0.92, cloud) * lerp(1.0, 0.96, wetness)
 	var car = get_node_or_null("Car")
 	if car:
 		car.set_meta("world_wetness", wetness)
@@ -481,6 +525,7 @@ func _on_map_ready(map_data: Dictionary):
 	add_child(map_root)
 	map_segments.clear()
 	map_lamps.clear()
+	var street_edge_budget := 0
 
 	for road in roads:
 		if not road is Dictionary:
@@ -502,6 +547,9 @@ func _on_map_ready(map_data: Dictionary):
 			var mid = (a + b) * 0.5
 			var angle = atan2(road_delta.x, road_delta.y)
 			_road_rotated(map_root, Vector3(mid.x, 0.035, mid.y), length + 1.0, width, angle)
+			if street_edge_budget < 150 and length > 7.0 and kind not in ["motorway", "trunk", "track"]:
+				_street_edges_rotated(map_root, Vector3(mid.x, 0.035, mid.y), length + 0.6, width, angle, kind)
+				street_edge_budget += 1
 			map_segments.append([[a.x, a.y], [b.x, b.y], width, kind])
 
 	for building in buildings:
@@ -687,7 +735,12 @@ func _add_edinburgh_building(parent: Node3D, base: Vector3, size: Vector3, seed:
 	var sz = size.z
 	var industrial = kind in ["industrial", "warehouse", "commercial", "retail"] or sx > 28.0 or sz > 28.0
 	var detailed = industrial or (seed % 100) < int(clamp(api_detail_pressure, 0.35, 1.0) * 48.0)
-	var stone = soot_stone_mat if seed % 3 != 0 else sandstone_mat
+	var stone = soot_stone_mat
+	match seed % 4:
+		0: stone = sandstone_mat
+		1: stone = sandstone_warm_mat
+		2: stone = soot_stone_mat
+		_: stone = soot_stone_cool_mat
 	if industrial:
 		stone = _mat(Color(0.27, 0.285, 0.29), 0.84, 0.03)
 	var body = _box(parent, base + Vector3(0, h * 0.5, 0), Vector3(sx, h, sz), stone)
