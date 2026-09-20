@@ -35,3 +35,6 @@ jobs:
           grep -q '_build_cell' godot/world.gd
           grep -q 'PUA API 0.1' godot/pua_api.gd
           grep -q 'directive_changed' godot/world.gd
+          grep -q 'OSMGroundTiles' godot/world.tscn
+          grep -q 'tile.openstreetmap.org' godot/osm_ground_tiles.gd
+          grep -q 'window/handheld/orientation=0' godot/project.godot
