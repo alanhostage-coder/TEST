@@ -31,7 +31,8 @@ var session: Dictionary = {
 	"distance_observed": 0.0,
 	"last_position": [0.0, 0.0, 0.0],
 	"last_moment": "none",
-	"moments_seen": 0
+	"moments_seen": 0,
+	"situations_encountered": {}
 }
 
 var _world_state: Node
@@ -73,6 +74,7 @@ func _process(delta):
 	_save_clock += delta
 	_moment_clock += delta
 	_capture_car()
+	_capture_situation_memory()
 
 	if _active_moment != "none":
 		_moment_duration -= delta
@@ -101,6 +103,25 @@ func _capture_car():
 			session["distance_observed"] = float(session.get("distance_observed", 0.0)) + step
 	_last_car_position = p
 	session["last_position"] = [p.x, p.y, p.z]
+
+
+func _capture_situation_memory():
+	if not _car:
+		return
+	var kind = int(_car.get_meta("near_world_situation", -1))
+	if kind < 0:
+		return
+	var seen = session.get("situations_encountered", {})
+	if not seen is Dictionary:
+		seen = {}
+	var key = str(kind)
+	if not seen.has(key):
+		seen[key] = 0
+	seen[key] = int(seen[key]) + 1
+	session["situations_encountered"] = seen
+	# Clear the proximity marker after capture so a single encounter is not counted
+	# every frame. OpenWorldDirector sets it again only while the player remains close.
+	_car.set_meta("near_world_situation", -1)
 
 func _on_external_change(_payload = null):
 	_recompute()
