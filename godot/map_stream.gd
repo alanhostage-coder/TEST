@@ -14,9 +14,9 @@ const FALLBACK_LAT := 50.9570
 const FALLBACK_LON := -0.1320
 const HALF_LAT := 0.0060
 const HALF_LON := 0.0100
-const MIN_POINT_GAP_METERS := 14.0
-const MAX_ROADS := 110
-const MAX_BUILDINGS := 140
+const MIN_POINT_GAP_METERS := 3.0
+const MAX_ROADS := 220
+const MAX_BUILDINGS := 320
 
 var center_lat := FALLBACK_LAT
 var center_lon := FALLBACK_LON
@@ -148,7 +148,9 @@ func _on_request_completed(result: int, response_code: int, _headers, body: Pack
 				roads.append({
 					"kind": str(tags.get("highway", "road")),
 					"name": str(tags.get("name", "")),
-					"width": _road_width(str(tags.get("highway", ""))),
+					"width": _road_width_from_tags(tags),
+					"lanes": int(str(tags.get("lanes", "0")).to_int()),
+					"oneway": str(tags.get("oneway", "no")),
 					"points": points
 				})
 		elif tags.has("building") and buildings.size() < MAX_BUILDINGS:
@@ -190,10 +192,12 @@ func _building_from_geometry(tags: Dictionary, geometry: Array) -> Dictionary:
 	var max_x = -INF
 	var min_z = INF
 	var max_z = -INF
+	var footprint: Array = []
 	for entry in geometry:
 		if not entry is Dictionary:
 			continue
 		var p = _lat_lon_to_local(float(entry.get("lat", center_lat)), float(entry.get("lon", center_lon)))
+		footprint.append([p.x, p.y])
 		min_x = min(min_x, p.x)
 		max_x = max(max_x, p.x)
 		min_z = min(min_z, p.y)
@@ -210,10 +214,14 @@ func _building_from_geometry(tags: Dictionary, geometry: Array) -> Dictionary:
 	if height <= 3.2:
 		height = 5.0 + fmod(sx + sz, 7.0)
 	height = clamp(height, 3.0, 48.0)
+	if footprint.size() > 2 and footprint[0] == footprint[-1]:
+		footprint.pop_back()
 	return {
 		"center": [(min_x + max_x) * 0.5, (min_z + max_z) * 0.5],
 		"size": [sx, sz],
+		"footprint": footprint,
 		"height": height,
+		"levels": levels,
 		"kind": str(tags.get("building", "yes"))
 	}
 
@@ -222,6 +230,17 @@ func _lat_lon_to_local(lat: float, lon: float) -> Vector2:
 	var x = (lon - center_lon) * meters_per_lon
 	var z = -(lat - center_lat) * 111320.0
 	return Vector2(x, z)
+
+func _road_width_from_tags(tags: Dictionary) -> float:
+	var explicit = float(str(tags.get("width", "0")).to_float())
+	if explicit > 2.0 and explicit < 30.0:
+		return explicit
+	var kind = str(tags.get("highway", ""))
+	var lanes = int(str(tags.get("lanes", "0")).to_int())
+	if lanes > 0:
+		var lane_width = 3.15 if kind in ["primary", "secondary", "tertiary"] else 2.85
+		return clamp(float(lanes) * lane_width, 3.0, 14.0)
+	return _road_width(kind)
 
 func _road_width(kind: String) -> float:
 	match kind:
