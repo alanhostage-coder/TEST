@@ -51,9 +51,10 @@ jobs:
           python3 android/.build/patch_11.py
           python3 android/.build/patch_12.py
           python3 android/.build/patch_13.py
-          grep -q "build 0.13" android/app/src/main/assets/www/index.html
-          grep -q "ROAMING FORTH" android/app/src/main/assets/www/index.html
-          grep -q "drawRoadKinetics" android/app/src/main/assets/www/index.html
+          python3 android/.build/patch_14.py
+          grep -q "build 0.14" android/app/src/main/assets/www/index.html
+          grep -q "JUNCTION LIFE" android/app/src/main/assets/www/index.html
+          grep -q "drawJunctionLife" android/app/src/main/assets/www/index.html
       - name: Build debug APK
         working-directory: android
         run: gradle --no-daemon :app:assembleDebug
@@ -61,11 +62,11 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_13.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_14.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PROCEED-UNTIL-APPREHENDED-0.13-APK
-          path: dist/PROCEED_UNTIL_APPREHENDED_0_13.apk
+          name: PROCEED-UNTIL-APPREHENDED-0.14-APK
+          path: dist/PROCEED_UNTIL_APPREHENDED_0_14.apk
           if-no-files-found: error
           retention-days: 30
