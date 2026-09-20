@@ -3,7 +3,8 @@ extends Node
 # Original ambient-world layer for PUA. It reads the road geometry already cached
 # by MapStream and adds cheap, deterministic roadside life without missions or scores.
 const MAX_PARKED := 28
-const MAX_ROAMERS := 9
+const MAX_ROAMERS := 14
+const MAX_NEAR_ROAMERS := 8
 const MAX_PUDDLES := 30
 const MAX_SITUATIONS := 7
 const MAX_ROAD_CLUTTER := 36
@@ -20,6 +21,7 @@ var vapour_nodes: Array = []
 var situation_root: Node3D
 var situation_signature := ""
 var active_situations: Array = []
+var roaming_agents: Array = []
 var low_spec_mode := false
 
 func _ready():
@@ -48,6 +50,7 @@ func _process(delta):
 		clock = 0.0
 		_try_build_from_live_roads()
 	_update_vapour(delta)
+	_update_roaming_agents(delta)
 	_update_situations(delta)
 
 func _try_build_from_live_roads():
@@ -70,6 +73,7 @@ func _try_build_from_live_roads():
 
 func _clear_root():
 	vapour_nodes.clear()
+	roaming_agents.clear()
 	for child in root.get_children():
 		child.queue_free()
 
@@ -102,33 +106,95 @@ func _build_parked_life(segments: Array):
 
 
 func _build_roaming_life(segments: Array):
-	# Sparse deterministic moving traffic. No goals or scoring: it simply gives the
-	# streamed road network a pulse while keeping mobile CPU/GPU cost predictable.
+	# Road-following ambient traffic. Agents pick connected segment ends instead of
+	# ping-ponging on one road, so junctions produce unscripted turns and local flow.
 	var made := 0
-	for i in range(0, segments.size(), 9):
-		if made >= (4 if low_spec_mode else MAX_ROAMERS):
+	var cap = 5 if low_spec_mode else MAX_ROAMERS
+	for i in range(0, segments.size(), 5):
+		if made >= cap:
 			break
 		var seg = segments[i]
 		if not seg is Array or seg.size() < 3:
 			continue
 		var a = Vector2(float(seg[0][0]), float(seg[0][1]))
 		var b = Vector2(float(seg[1][0]), float(seg[1][1]))
-		if a.distance_to(b) < 24.0:
+		if a.distance_to(b) < 18.0:
 			continue
 		var vehicle = _make_parked_vehicle(100 + i)
 		vehicle.name = "Roamer_%02d" % made
 		root.add_child(vehicle)
-		var tween = vehicle.create_tween().set_loops()
-		var p0 = Vector3(a.x, 0.43, a.y)
-		var p1 = Vector3(b.x, 0.43, b.y)
-		vehicle.position = p0
-		vehicle.look_at(p1, Vector3.UP)
-		var seconds = clamp(a.distance_to(b) / (8.5 + float(i % 5)), 3.5, 13.0)
-		tween.tween_property(vehicle, "position", p1, seconds).set_trans(Tween.TRANS_LINEAR)
-		tween.tween_callback(func(): vehicle.look_at(p0, Vector3.UP))
-		tween.tween_property(vehicle, "position", p0, seconds).set_trans(Tween.TRANS_LINEAR)
-		tween.tween_callback(func(): vehicle.look_at(p1, Vector3.UP))
+		var reverse = (i + made) % 3 == 0
+		var p = b if reverse else a
+		vehicle.position = Vector3(p.x, 0.43, p.y)
+		roaming_agents.append({
+			"node": vehicle, "segment": i, "target_end": 0 if reverse else 1,
+			"speed": 7.4 + float((i * 13) % 55) * 0.10,
+			"seed": i * 97 + made * 31, "segments": segments
+		})
 		made += 1
+
+func _update_roaming_agents(delta: float):
+	if roaming_agents.is_empty() or not car:
+		return
+	var player2 = Vector2(car.global_position.x, car.global_position.z)
+	for agent in roaming_agents:
+		var node = agent.get("node")
+		if not is_instance_valid(node):
+			continue
+		var segments: Array = agent.get("segments", [])
+		var si = int(agent.get("segment", 0))
+		if si < 0 or si >= segments.size():
+			continue
+		var seg = segments[si]
+		if not seg is Array or seg.size() < 2:
+			continue
+		var target_end = int(agent.get("target_end", 1))
+		var target_arr = seg[target_end]
+		var target = Vector2(float(target_arr[0]), float(target_arr[1]))
+		var here = Vector2(node.position.x, node.position.z)
+		var to_target = target - here
+		var dist = to_target.length()
+		var speed = float(agent.get("speed", 8.0))
+		# Nearby traffic eases off instead of ghosting through the player.
+		var player_dist = here.distance_to(player2)
+		if player_dist < 10.0:
+			speed *= clamp((player_dist - 2.8) / 7.2, 0.10, 1.0)
+		if dist > 0.12:
+			var dir = to_target / dist
+			var step = min(dist, speed * delta)
+			node.position.x += dir.x * step
+			node.position.z += dir.y * step
+			var desired = atan2(-dir.x, -dir.y)
+			node.rotation.y = lerp_angle(node.rotation.y, desired, clamp(delta * 5.0, 0.0, 1.0))
+		if dist <= 1.15:
+			var next = _choose_connected_segment(segments, si, target, int(agent.get("seed", 1)))
+			if next.x >= 0:
+				agent["segment"] = next.x
+				agent["target_end"] = next.y
+				agent["seed"] = int(agent.get("seed", 1)) + 17
+		node.visible = player_dist < (150.0 if low_spec_mode else 245.0)
+
+func _choose_connected_segment(segments: Array, current: int, junction: Vector2, seed: int) -> Vector2i:
+	var candidates: Array[Vector2i] = []
+	var best_gap := 3.25
+	for j in range(segments.size()):
+		if j == current:
+			continue
+		var s = segments[j]
+		if not s is Array or s.size() < 2:
+			continue
+		for endpoint in [0, 1]:
+			var p = Vector2(float(s[endpoint][0]), float(s[endpoint][1]))
+			var gap = p.distance_to(junction)
+			if gap <= best_gap:
+				# target_end is the far end, so the vehicle travels away from the junction.
+				candidates.append(Vector2i(j, 1 - endpoint))
+	if candidates.is_empty():
+		# Dead end: reverse along the current road.
+		var s = segments[current]
+		var a = Vector2(float(s[0][0]), float(s[0][1]))
+		return Vector2i(current, 1 if junction.distance_to(a) < 3.25 else 0)
+	return candidates[abs(seed) % candidates.size()]
 
 func _make_parked_vehicle(seed: int) -> Node3D:
 	var vehicle = Node3D.new()
