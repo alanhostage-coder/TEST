@@ -14,6 +14,7 @@ var touch_now := Vector2.ZERO
 var touching := false
 var look_touching := false
 var look_last := Vector2.ZERO
+var mouse_looking := false
 var camera_yaw := 0.0
 var camera_pitch := 0.0
 var camera_idle := 0.0
@@ -43,6 +44,15 @@ func _input(event):
 	if event is InputEventScreenTouch and event.position.x < 150.0 and event.position.y < 240.0:
 		return
 	if event is InputEventScreenDrag and event.position.x < 150.0 and event.position.y < 240.0:
+		return
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_RIGHT:
+		mouse_looking = event.pressed
+		camera_idle = 0.0
+		return
+	if event is InputEventMouseMotion and mouse_looking:
+		camera_yaw = clamp(camera_yaw - event.relative.x * 0.0038, -1.25, 1.25)
+		camera_pitch = clamp(camera_pitch - event.relative.y * 0.0030, -0.22, 0.28)
+		camera_idle = 0.0
 		return
 	if event is InputEventScreenTouch:
 		if event.position.x < screen_width * 0.58:
@@ -162,7 +172,7 @@ func _update_camera(delta, speed_ratio):
 	var local_motion = global_transform.basis.inverse() * world_motion
 	var lag_target = Vector3(clamp(-local_motion.x * 0.060, -1.5, 1.5), 0.0, clamp(local_motion.z * 0.038, -0.8, 0.8))
 	camera_lag = camera_lag.lerp(lag_target, 1.0 - exp(-delta * 2.2))
-	if look_touching:
+	if look_touching or mouse_looking:
 		camera_idle = 0.0
 	else:
 		camera_idle += delta
