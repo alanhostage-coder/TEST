@@ -108,10 +108,14 @@ func _on_external_change(_payload = null):
 func _recompute():
 	var weather: Dictionary = {}
 	var map_data: Dictionary = {}
-	if _world_state and "state" in _world_state:
-		weather = _world_state.state.duplicate(true)
-	if _map_stream and "data" in _map_stream:
-		map_data = _map_stream.data.duplicate(true)
+	if _world_state:
+		var weather_value = _world_state.get("state")
+		if weather_value is Dictionary:
+			weather = weather_value.duplicate(true)
+	if _map_stream:
+		var map_value = _map_stream.get("data")
+		if map_value is Dictionary:
+			map_data = map_value.duplicate(true)
 
 	var now = Time.get_datetime_dict_from_system()
 	var hour = int(now.get("hour", 12))
@@ -206,8 +210,8 @@ func _start_moment():
 	var seed = abs(int(directive.get("world_seed", 1))) + int(session.get("moments_seen", 0)) * 3571
 	var candidates = ["traffic_wave", "quiet_patch", "sodium_bloom", "radio_bleed"]
 	_active_moment = candidates[seed % candidates.size()]
-	_active_moment_strength = 0.55 + float((seed / 11) % 40) / 100.0
-	_moment_duration = 18.0 + float((seed / 23) % 28)
+	_active_moment_strength = 0.55 + float((seed / 11) as int % 40) / 100.0
+	_moment_duration = 18.0 + float((seed / 23) as int % 28)
 	session["moments_seen"] = int(session.get("moments_seen", 0)) + 1
 	session["last_moment"] = _active_moment
 	_moment_clock = 0.0
