@@ -44,10 +44,10 @@ func _physics_process(delta):
 
 	on_road = _is_near_road()
 	steer_smoothed = move_toward(steer_smoothed, input_steer, delta * 4.2)
-	var speed_limit = max_speed if on_road else max_speed * 0.50
+	var speed_limit = max_speed if on_road else max_speed * 0.56
 	var reversing_limit = speed_limit * 0.38
 	var target_speed = 0.0
-	var rate = drag * (1.0 if on_road else 1.8)
+	var rate = drag * (1.0 if on_road else 1.7)
 	if input_throttle > 0.04:
 		if speed < -0.7: target_speed = 0.0; rate = braking
 		else: target_speed = speed_limit; rate = acceleration
@@ -62,7 +62,7 @@ func _physics_process(delta):
 	rotate_y(-steer_smoothed * steer_rate * steering_at_speed * steering_authority * delta * travel_sign)
 	var desired_velocity = -global_transform.basis.z * speed
 	var wetness = clamp(float(get_meta("world_wetness", 0.0)), 0.0, 1.0)
-	var grip = (lerp(10.5, 7.2, wetness)) if on_road else lerp(4.2, 3.4, wetness)
+	var grip = (lerp(10.5, 7.2, wetness)) if on_road else lerp(4.6, 3.5, wetness)
 	velocity = velocity.lerp(desired_velocity, 1.0 - exp(-delta * grip))
 	var before = global_position
 	move_and_slide()
@@ -81,9 +81,27 @@ func _physics_process(delta):
 		_save_state()
 
 func _is_near_road() -> bool:
+	var segments = get_meta("map_road_segments", [])
+	if segments is Array and not segments.is_empty():
+		var p = Vector2(global_position.x, global_position.z)
+		for segment in segments:
+			if not segment is Array or segment.size() < 3: continue
+			var a = Vector2(float(segment[0][0]), float(segment[0][1]))
+			var b = Vector2(float(segment[1][0]), float(segment[1][1]))
+			var width = float(segment[2])
+			if _point_segment_distance(p, a, b) < width * 0.5 + 2.4:
+				return true
+		return false
 	var local_x = abs(fposmod(global_position.x + 45.0, 90.0) - 45.0)
 	var local_z = abs(fposmod(global_position.z + 45.0, 90.0) - 45.0)
 	return local_x < 8.5 or local_z < 8.5
+
+func _point_segment_distance(p: Vector2, a: Vector2, b: Vector2) -> float:
+	var ab = b - a
+	var denom = ab.length_squared()
+	if denom < 0.001: return p.distance_to(a)
+	var t = clamp((p - a).dot(ab) / denom, 0.0, 1.0)
+	return p.distance_to(a + ab * t)
 
 func _update_visuals(delta, speed_ratio):
 	var body_roll = -steer_smoothed * speed_ratio * 0.045
@@ -97,17 +115,19 @@ func _update_camera(delta, speed_ratio):
 	var rig = $CameraRig
 	var world_motion = (global_position - previous_position) / max(delta, 0.001)
 	var local_motion = global_transform.basis.inverse() * world_motion
-	var lag_target = Vector3(clamp(-local_motion.x * 0.055, -1.35, 1.35), 0.0, clamp(local_motion.z * 0.035, -0.7, 0.7))
-	camera_lag = camera_lag.lerp(lag_target, 1.0 - exp(-delta * 2.4))
-	var shake = sin(Time.get_ticks_msec() * 0.04) * impact_kick * 0.16
-	var lateral = steer_smoothed * 1.15 + camera_lag.x
-	rig.position.x = lerp(rig.position.x, lateral, 1.0 - exp(-delta * 3.2))
-	rig.position.y = lerp(rig.position.y, 2.72 + speed_ratio * 0.48 + shake, 1.0 - exp(-delta * 2.3))
-	rig.position.z = lerp(rig.position.z, 7.85 + speed_ratio * 2.55 + camera_lag.z, 1.0 - exp(-delta * 1.9))
-	rig.rotation.x = lerp_angle(rig.rotation.x, deg_to_rad(-7.5 + speed_ratio * 1.5), 1.0 - exp(-delta * 2.6))
-	rig.rotation.y = lerp_angle(rig.rotation.y, -steer_smoothed * 0.11 - camera_lag.x * 0.025, 1.0 - exp(-delta * 2.6))
-	rig.rotation.z = lerp_angle(rig.rotation.z, -steer_smoothed * speed_ratio * 0.018, 1.0 - exp(-delta * 4.0))
-	$CameraRig/Camera3D.fov = lerp($CameraRig/Camera3D.fov, 64.0 + speed_ratio * 9.0, 1.0 - exp(-delta * 1.8))
+	var lag_target = Vector3(clamp(-local_motion.x * 0.060, -1.5, 1.5), 0.0, clamp(local_motion.z * 0.038, -0.8, 0.8))
+	camera_lag = camera_lag.lerp(lag_target, 1.0 - exp(-delta * 2.2))
+	var shake = sin(Time.get_ticks_msec() * 0.04) * impact_kick * 0.14
+	var lateral = steer_smoothed * 1.28 + camera_lag.x
+	var chase_height = 2.42 + speed_ratio * 0.52 + shake
+	var chase_distance = 7.1 + speed_ratio * 3.25 + camera_lag.z
+	rig.position.x = lerp(rig.position.x, lateral, 1.0 - exp(-delta * 3.0))
+	rig.position.y = lerp(rig.position.y, chase_height, 1.0 - exp(-delta * 2.2))
+	rig.position.z = lerp(rig.position.z, chase_distance, 1.0 - exp(-delta * 1.7))
+	rig.rotation.x = lerp_angle(rig.rotation.x, deg_to_rad(-5.8 + speed_ratio * 1.2), 1.0 - exp(-delta * 2.5))
+	rig.rotation.y = lerp_angle(rig.rotation.y, -steer_smoothed * 0.145 - camera_lag.x * 0.028, 1.0 - exp(-delta * 2.4))
+	rig.rotation.z = lerp_angle(rig.rotation.z, -steer_smoothed * speed_ratio * 0.016, 1.0 - exp(-delta * 4.0))
+	$CameraRig/Camera3D.fov = lerp($CameraRig/Camera3D.fov, 61.5 + speed_ratio * 11.0, 1.0 - exp(-delta * 1.65))
 
 func _save_state():
 	var cfg = ConfigFile.new()
