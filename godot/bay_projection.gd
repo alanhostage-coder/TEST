@@ -27,6 +27,9 @@ var cal_offsets: Array = []
 var active_plane := -1
 var active_corner := -1
 var camera_yaws := [0.0, 0.0, 0.0]
+# Screen order is physical left, centre, right. Godot yaw sign is opposite the
+# intuitive screen direction for this vehicle basis, so keep the mapping explicit.
+const BAY_VIEW_YAW_SIGN := -1.0
 var button: Button
 var save_button: Button
 var reset_button: Button
@@ -356,7 +359,7 @@ func _process(_delta):
 		var t = cab_transform
 		# The yaw centres are derived from each plane's horizontal FOV, so adjacent
 		# views meet at the same ray instead of overlapping or leaving a jump.
-		t.basis = Basis(Vector3.UP, camera_yaws[i]) * cab_transform.basis
+		t.basis = Basis(Vector3.UP, camera_yaws[i] * BAY_VIEW_YAW_SIGN) * cab_transform.basis
 		t.basis = t.basis * Basis(Vector3.RIGHT, deg_to_rad(CAB_PITCH_DEG))
 		cameras[i].global_transform = t
 	queue_redraw()
