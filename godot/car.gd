@@ -9,6 +9,8 @@ var steer_smoothed:=0.0
 var touch_origin:=Vector2.ZERO
 var touch_now:=Vector2.ZERO
 var touching:=false
+var impact_kick:=0.0
+var distance_driven:=0.0
 
 func _input(e):
 	if e is InputEventScreenTouch and e.position.x < get_viewport().get_visible_rect().size.x*0.58:
@@ -32,13 +34,18 @@ func _physics_process(delta):
 	var authority=clamp(abs(speed)/7.0,0.2,1.0)
 	rotate_y(-steer_smoothed*steer_rate*authority*delta*sign(speed if abs(speed)>0.1 else 1.0))
 	velocity=-global_transform.basis.z*speed
+	var before=global_position
 	move_and_slide()
-	if is_on_wall(): speed*=0.42
+	distance_driven+=before.distance_to(global_position)
+	if is_on_wall():
+		impact_kick=min(1.0,impact_kick+abs(speed)/24.0)
+		speed*=0.38
+	impact_kick=move_toward(impact_kick,0.0,delta*2.8)
 	_update_camera(delta)
 
 func _update_camera(delta):
 	var rig=$CameraRig
 	rig.position.x=lerp(rig.position.x,steer_smoothed*1.35,1.0-exp(-delta*4.0))
-	rig.position.y=lerp(rig.position.y,3.0+clamp(abs(speed)*0.018,0.0,0.55),1.0-exp(-delta*2.5))
+	rig.position.y=lerp(rig.position.y,3.0+clamp(abs(speed)*0.018,0.0,0.55)+sin(Time.get_ticks_msec()*0.04)*impact_kick*0.16,1.0-exp(-delta*2.5))
 	rig.position.z=lerp(rig.position.z,7.4+clamp(abs(speed)*0.06,0.0,2.0),1.0-exp(-delta*2.2))
 	$CameraRig/Camera3D.fov=lerp($CameraRig/Camera3D.fov,66.0+clamp(abs(speed)*0.22,0.0,8.0),1.0-exp(-delta*2.0))
