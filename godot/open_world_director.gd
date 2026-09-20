@@ -2,7 +2,8 @@ extends Node
 
 # Original ambient-world layer for PUA. It reads the road geometry already cached
 # by MapStream and adds cheap, deterministic roadside life without missions or scores.
-const MAX_PARKED := 22
+const MAX_PARKED := 28
+const MAX_ROAMERS := 9
 const MAX_PUDDLES := 30
 const REBUILD_INTERVAL := 3.0
 
@@ -52,6 +53,7 @@ func _try_build_from_live_roads():
 	built_signature = signature
 	_clear_root()
 	_build_parked_life(segments)
+	_build_roaming_life(segments)
 	_build_wet_ground_memory(segments)
 	_build_industrial_vapour(segments)
 
@@ -85,6 +87,36 @@ func _build_parked_life(segments: Array):
 		vehicle.position = Vector3(p.x, 0.43, p.y)
 		vehicle.rotation.y = atan2(-tangent.x, -tangent.y) + (PI if side < 0.0 else 0.0)
 		root.add_child(vehicle)
+		made += 1
+
+
+func _build_roaming_life(segments: Array):
+	# Sparse deterministic moving traffic. No goals or scoring: it simply gives the
+	# streamed road network a pulse while keeping mobile CPU/GPU cost predictable.
+	var made := 0
+	for i in range(0, segments.size(), 9):
+		if made >= MAX_ROAMERS:
+			break
+		var seg = segments[i]
+		if not seg is Array or seg.size() < 3:
+			continue
+		var a = Vector2(float(seg[0][0]), float(seg[0][1]))
+		var b = Vector2(float(seg[1][0]), float(seg[1][1]))
+		if a.distance_to(b) < 24.0:
+			continue
+		var vehicle = _make_parked_vehicle(100 + i)
+		vehicle.name = "Roamer_%02d" % made
+		root.add_child(vehicle)
+		var tween = vehicle.create_tween().set_loops()
+		var p0 = Vector3(a.x, 0.43, a.y)
+		var p1 = Vector3(b.x, 0.43, b.y)
+		vehicle.position = p0
+		vehicle.look_at(p1, Vector3.UP)
+		var seconds = clamp(a.distance_to(b) / (8.5 + float(i % 5)), 3.5, 13.0)
+		tween.tween_property(vehicle, "position", p1, seconds).set_trans(Tween.TRANS_LINEAR)
+		tween.tween_callback(func(): vehicle.look_at(p0, Vector3.UP))
+		tween.tween_property(vehicle, "position", p0, seconds).set_trans(Tween.TRANS_LINEAR)
+		tween.tween_callback(func(): vehicle.look_at(p1, Vector3.UP))
 		made += 1
 
 func _make_parked_vehicle(seed: int) -> Node3D:
