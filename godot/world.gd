@@ -9,6 +9,8 @@ var patrol_interest := 0.0
 var map_mode_active := false
 var weather_sun_energy := 0.68
 var map_root: Node3D
+var map_segments: Array = []
+var map_agents: Array = []
 const CELL := 90.0
 
 var asphalt_mat
@@ -32,8 +34,12 @@ func _ready():
 
 func _process(delta):
 	var car = $Car
-	_update_traffic(delta)
-	_update_patrol(delta, car)
+	if map_mode_active:
+		_update_map_agents(delta)
+		car.set_meta("patrol_interest", 0.0)
+	else:
+		_update_traffic(delta)
+		_update_patrol(delta, car)
 	_update_atmosphere(car)
 	if not map_mode_active:
 		var c = Vector2i(floor(car.global_position.x / CELL), floor(car.global_position.z / CELL))
@@ -405,12 +411,14 @@ func _on_map_ready(map_data: Dictionary):
 	map_root = Node3D.new()
 	map_root.name = "OpenMapWorld"
 	add_child(map_root)
+	map_segments.clear()
 
 	for road in roads:
 		if not road is Dictionary:
 			continue
 		var points = road.get("points", [])
 		var width = float(road.get("width", 5.0))
+		var kind = str(road.get("kind", "road"))
 		for i in range(points.size() - 1):
 			if not points[i] is Array or not points[i + 1] is Array:
 				continue
@@ -418,13 +426,14 @@ func _on_map_ready(map_data: Dictionary):
 				continue
 			var a = Vector2(float(points[i][0]), float(points[i][1]))
 			var b = Vector2(float(points[i + 1][0]), float(points[i + 1][1]))
-			var delta = b - a
-			var length = delta.length()
+			var road_delta = b - a
+			var length = road_delta.length()
 			if length < 2.0:
 				continue
 			var mid = (a + b) * 0.5
-			var angle = atan2(delta.x, delta.y)
+			var angle = atan2(road_delta.x, road_delta.y)
 			_road_rotated(map_root, Vector3(mid.x, 0.035, mid.y), length + 1.0, width, angle)
+			map_segments.append([[a.x, a.y], [b.x, b.y], width, kind])
 
 	for building in buildings:
 		if not building is Dictionary:
@@ -441,11 +450,15 @@ func _on_map_ready(map_data: Dictionary):
 		var building_mat = _mat(Color(tone, tone * 1.015, tone * 1.025), 0.88, 0.0)
 		_box(map_root, Vector3(float(center[0]), h * 0.5, float(center[1])), Vector3(sx, h, sz), building_mat)
 
+	_add_map_furniture(map_root)
+	_spawn_map_agents()
+
 	var car = get_node_or_null("Car")
 	if car:
 		car.set_meta("map_data_source", map_data.get("source", "offline"))
 		car.set_meta("map_road_count", roads.size())
 		car.set_meta("map_building_count", buildings.size())
+		car.set_meta("map_road_segments", map_segments)
 		_snap_car_to_map_road(car, roads)
 
 
@@ -469,3 +482,125 @@ func _snap_car_to_map_road(car, roads: Array):
 		car.global_position.x = best.x
 		car.global_position.z = best.y
 		car.global_position.y = max(car.global_position.y, 0.58)
+
+
+func _spawn_map_agents():
+	for agent in map_agents:
+		if agent.has("node") and is_instance_valid(agent["node"]):
+			agent["node"].queue_free()
+	map_agents.clear()
+	if map_segments.is_empty():
+		return
+	var count = min(18, map_segments.size())
+	for i in range(count):
+		var body = AnimatableBody3D.new()
+		body.name = "MapTraffic_%02d" % i
+		var mesh = MeshInstance3D.new()
+		var car_mesh = BoxMesh.new()
+		car_mesh.size = Vector3(1.78, 0.76, 3.9)
+		mesh.mesh = car_mesh
+		var shade = 0.10 + float((i * 23) % 34) / 100.0
+		mesh.material_override = _mat(Color(shade, shade * 0.96, shade * 0.91), 0.44, 0.20)
+		body.add_child(mesh)
+		var collision = CollisionShape3D.new()
+		var shape = BoxShape3D.new()
+		shape.size = Vector3(1.78, 0.76, 3.9)
+		collision.shape = shape
+		body.add_child(collision)
+		add_child(body)
+		var seg_index = int((i * 17 + 5) % map_segments.size())
+		var agent = {
+			"node": body,
+			"seg": seg_index,
+			"t": fmod(0.13 + float(i) * 0.173, 0.94),
+			"dir": -1.0 if i % 4 == 0 else 1.0,
+			"speed": 7.0 + float((i * 7) % 9)
+		}
+		map_agents.append(agent)
+		_place_map_agent(agent)
+
+func _update_map_agents(delta):
+	for agent in map_agents:
+		if not agent.has("node") or not is_instance_valid(agent["node"]):
+			continue
+		var seg_index = int(agent.get("seg", 0))
+		if seg_index < 0 or seg_index >= map_segments.size():
+			continue
+		var segment = map_segments[seg_index]
+		var a = Vector2(float(segment[0][0]), float(segment[0][1]))
+		var b = Vector2(float(segment[1][0]), float(segment[1][1]))
+		var length = max(2.0, a.distance_to(b))
+		var t = float(agent.get("t", 0.0))
+		var direction = float(agent.get("dir", 1.0))
+		t += direction * float(agent.get("speed", 9.0)) * delta / length
+		if t >= 1.0:
+			agent["t"] = 1.0
+			_choose_next_map_segment(agent, b, seg_index)
+		elif t <= 0.0:
+			agent["t"] = 0.0
+			_choose_next_map_segment(agent, a, seg_index)
+		else:
+			agent["t"] = t
+		_place_map_agent(agent)
+
+func _choose_next_map_segment(agent: Dictionary, junction: Vector2, current_index: int):
+	var candidates: Array = []
+	for i in range(map_segments.size()):
+		if i == current_index:
+			continue
+		var seg = map_segments[i]
+		var a = Vector2(float(seg[0][0]), float(seg[0][1]))
+		var b = Vector2(float(seg[1][0]), float(seg[1][1]))
+		if junction.distance_to(a) < 5.0:
+			candidates.append([i, 1.0, 0.0])
+		elif junction.distance_to(b) < 5.0:
+			candidates.append([i, -1.0, 1.0])
+	if candidates.is_empty():
+		agent["dir"] = -float(agent.get("dir", 1.0))
+		agent["t"] = clamp(float(agent.get("t", 0.0)), 0.02, 0.98)
+		return
+	var pick = candidates[int((Time.get_ticks_msec() / 173 + current_index * 7) % candidates.size())]
+	agent["seg"] = int(pick[0])
+	agent["dir"] = float(pick[1])
+	agent["t"] = float(pick[2])
+
+func _place_map_agent(agent: Dictionary):
+	var seg_index = int(agent.get("seg", 0))
+	if seg_index < 0 or seg_index >= map_segments.size():
+		return
+	var node = agent["node"]
+	var segment = map_segments[seg_index]
+	var a = Vector2(float(segment[0][0]), float(segment[0][1]))
+	var b = Vector2(float(segment[1][0]), float(segment[1][1]))
+	var t = clamp(float(agent.get("t", 0.0)), 0.0, 1.0)
+	var p = a.lerp(b, t)
+	var heading = (b - a).normalized() * float(agent.get("dir", 1.0))
+	node.position = Vector3(p.x, 0.44, p.y)
+	node.rotation.y = atan2(-heading.x, -heading.y)
+
+func _add_map_furniture(parent: Node3D):
+	var placed = 0
+	for i in range(map_segments.size()):
+		if placed >= 24 or i % 7 != 0:
+			continue
+		var segment = map_segments[i]
+		var a = Vector2(float(segment[0][0]), float(segment[0][1]))
+		var b = Vector2(float(segment[1][0]), float(segment[1][1]))
+		var delta = b - a
+		if delta.length() < 26.0:
+			continue
+		var width = float(segment[2])
+		var normal = Vector2(-delta.y, delta.x).normalized()
+		var side = -1.0 if placed % 2 == 0 else 1.0
+		var p = (a + b) * 0.5 + normal * (width * 0.5 + 1.8) * side
+		_visual_box(parent, Vector3(p.x, 2.8, p.y), Vector3(0.12, 5.6, 0.12), metal_mat)
+		_visual_box(parent, Vector3(p.x, 5.55, p.y), Vector3(0.9, 0.12, 0.24), metal_mat)
+		if placed % 3 == 0:
+			var lamp = OmniLight3D.new()
+			lamp.position = Vector3(p.x, 5.25, p.y)
+			lamp.light_color = Color(1.0, 0.49, 0.20)
+			lamp.light_energy = 0.72
+			lamp.omni_range = 10.0
+			lamp.shadow_enabled = false
+			parent.add_child(lamp)
+		placed += 1
