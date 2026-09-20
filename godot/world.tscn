@@ -1,8 +1,9 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=11 format=3]
 
 [ext_resource path="res://world.gd" type="Script" id="1"]
 [ext_resource path="res://car.gd" type="Script" id="2"]
 [ext_resource path="res://hud.gd" type="Script" id="3"]
+[ext_resource path="res://engine_audio.gd" type="Script" id="4"]
 
 [sub_resource type="BoxShape3D" id="road_shape"]
 size = Vector3(60, 0.5, 240)
@@ -112,6 +113,9 @@ shadow_enabled = false
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Car"]
 shape = SubResource("car_shape")
+
+[node name="EngineAudio" type="AudioStreamPlayer" parent="Car"]
+script = ExtResource("4")
 
 [node name="CameraRig" type="Node3D" parent="Car"]
 position = Vector3(0, 3.2, 7.8)
