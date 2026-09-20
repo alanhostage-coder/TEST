@@ -1,9 +1,9 @@
 extends CharacterBody3D
 
-@export var acceleration := 19.0
+@export var acceleration := 21.5
 @export var reverse_acceleration := 11.0
-@export var braking := 30.0
-@export var drag := 5.5
+@export var braking := 34.0
+@export var drag := 6.2
 @export var max_speed := 34.0
 @export var steer_rate := 1.75
 
@@ -108,7 +108,8 @@ func _physics_process(delta):
 			input_throttle = -0.70
 		else:
 			input_throttle = 0.12
-	steer_smoothed = move_toward(steer_smoothed, input_steer, delta * 4.2)
+	var steer_response = 5.6 if abs(speed) < 15.0 else 4.5
+	steer_smoothed = move_toward(steer_smoothed, input_steer, delta * steer_response)
 	var speed_limit = max_speed if on_road else max_speed * 0.72
 	var reversing_limit = speed_limit * 0.38
 	var target_speed = 0.0
@@ -121,7 +122,7 @@ func _physics_process(delta):
 		else: target_speed = -reversing_limit; rate = reverse_acceleration
 	speed = move_toward(speed, target_speed, delta * rate)
 	var speed_ratio = clamp(abs(speed) / max_speed, 0.0, 1.0)
-	var steering_at_speed = lerp(1.0, 0.56, speed_ratio)
+	var steering_at_speed = lerp(1.0, 0.48, speed_ratio)
 	var steering_authority = clamp(abs(speed) / 6.0, 0.22, 1.0)
 	var travel_sign = sign(speed) if abs(speed) > 0.1 else 1.0
 	rotate_y(-steer_smoothed * steer_rate * steering_at_speed * steering_authority * delta * travel_sign)
@@ -134,8 +135,12 @@ func _physics_process(delta):
 	distance_driven += before.distance_to(global_position)
 	if is_on_wall():
 		impact_kick = min(1.0, impact_kick + abs(speed) / 22.0)
-		speed *= 0.32
-		velocity *= 0.38
+		speed *= 0.24
+		velocity *= 0.30
+		# Nudge away from collision surfaces to reduce sticky wall-lock on touch screens.
+		if get_slide_collision_count() > 0:
+			var hit_normal = get_slide_collision(0).get_normal()
+			global_position += hit_normal * 0.08
 	impact_kick = move_toward(impact_kick, 0.0, delta * 2.8)
 	_update_visuals(delta, speed_ratio)
 	_update_camera(delta, speed_ratio)
