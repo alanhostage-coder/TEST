@@ -1,0 +1,18 @@
+[application]
+config/name="PROCEED UNTIL APPREHENDED"
+run/main_scene="res://world.tscn"
+[display]
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/stretch/mode="canvas_items"
+[rendering]
+renderer/rendering_method="mobile"
+renderer/rendering_method.mobile="mobile"
+textures/default_filters/use_nearest_mipmap_filter=false
+[physics]
+common/physics_ticks_per_second=60
+[input]
+throttle={"deadzone":0.15,"events":[Object(InputEventKey,"physical_keycode":87)]}
+brake={"deadzone":0.15,"events":[Object(InputEventKey,"physical_keycode":83)]}
+steer_left={"deadzone":0.15,"events":[Object(InputEventKey,"physical_keycode":65)]}
+steer_right={"deadzone":0.15,"events":[Object(InputEventKey,"physical_keycode":68)]}
