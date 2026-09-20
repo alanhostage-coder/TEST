@@ -24,6 +24,11 @@ var persist_timer := 0.0
 var camera_lag := Vector3.ZERO
 var camera_look_ahead := 0.0
 var previous_position := Vector3.ZERO
+var motion_drive_enabled := false
+var motion_center_angle := 0.0
+var motion_steer := 0.0
+var motion_sensor_live := false
+var assisted_target_speed := 17.5
 
 func _ready():
 	_load_state()
@@ -35,9 +40,9 @@ func _exit_tree():
 func _input(event):
 	var screen_size = get_viewport().get_visible_rect().size
 	var screen_width = screen_size.x
-	if event is InputEventScreenTouch and event.position.x < 145.0 and event.position.y < 100.0:
+	if event is InputEventScreenTouch and event.position.x < 150.0 and event.position.y < 240.0:
 		return
-	if event is InputEventScreenDrag and event.position.x < 145.0 and event.position.y < 100.0:
+	if event is InputEventScreenDrag and event.position.x < 150.0 and event.position.y < 240.0:
 		return
 	if event is InputEventScreenTouch:
 		if event.position.x < screen_width * 0.58:
@@ -66,6 +71,23 @@ func _physics_process(delta):
 		input_throttle = clamp(-touch_delta.y, -1.0, 1.0)
 
 	on_road = _is_near_road()
+	if motion_drive_enabled:
+		_update_motion_steering(delta)
+		if motion_sensor_live:
+			input_steer = motion_steer
+		var wetness_for_cruise = clamp(float(get_meta("world_wetness", 0.0)), 0.0, 1.0)
+		var corner_load = abs(motion_steer)
+		var cruise = assisted_target_speed * lerp(1.0, 0.60, corner_load) * lerp(1.0, 0.78, wetness_for_cruise)
+		if not on_road:
+			cruise *= 0.70
+		# Assisted throttle/brake: keep the car moving, but slow itself for large
+		# steering inputs, wet roads and off-road excursions.
+		if speed < cruise - 0.8:
+			input_throttle = 1.0
+		elif speed > cruise + 1.5:
+			input_throttle = -0.70
+		else:
+			input_throttle = 0.12
 	steer_smoothed = move_toward(steer_smoothed, input_steer, delta * 4.2)
 	var speed_limit = max_speed if on_road else max_speed * 0.72
 	var reversing_limit = speed_limit * 0.38
@@ -178,3 +200,35 @@ func _load_state():
 	if saved_position is Vector3: global_position = saved_position
 	rotation.y = float(cfg.get_value("car", "rotation_y", rotation.y))
 	distance_driven = float(cfg.get_value("car", "distance", 0.0))
+
+func set_motion_drive_enabled(enabled: bool):
+	motion_drive_enabled = enabled
+	if enabled:
+		calibrate_motion_wheel()
+	else:
+		motion_steer = 0.0
+
+func calibrate_motion_wheel():
+	var accel = Input.get_accelerometer()
+	if accel.length() > 1.0:
+		motion_center_angle = atan2(accel.x, -accel.y)
+		motion_sensor_live = true
+	motion_steer = 0.0
+
+func _update_motion_steering(delta: float):
+	var accel = Input.get_accelerometer()
+	motion_sensor_live = accel.length() > 1.0
+	if not motion_sensor_live:
+		motion_steer = move_toward(motion_steer, 0.0, delta * 2.0)
+		return
+	# Gravity gives an absolute steering-wheel angle while the phone is held
+	# roughly upright. Calibration removes whatever landscape orientation the
+	# user naturally chooses.
+	var angle = atan2(accel.x, -accel.y)
+	var relative = wrapf(angle - motion_center_angle, -PI, PI)
+	var target = clamp(relative / deg_to_rad(38.0), -1.0, 1.0)
+	var gyro = Input.get_gyroscope()
+	# A little Z-axis gyro lead removes the sluggish feeling when the wheel is
+	# turned quickly, while the accelerometer prevents long-term drift.
+	target = clamp(target + gyro.z * 0.055, -1.0, 1.0)
+	motion_steer = lerp(motion_steer, target, 1.0 - exp(-delta * 10.0))
