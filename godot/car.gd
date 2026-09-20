@@ -120,15 +120,27 @@ func _physics_process(delta):
 	var input_throttle = Input.get_action_strength("throttle") - Input.get_action_strength("brake")
 	var input_steer = Input.get_action_strength("steer_right") - Input.get_action_strength("steer_left")
 	var pads = Input.get_connected_joypads()
+	var handbrake_pressed := false
 	if not pads.is_empty():
 		var pad = int(pads[0])
 		var joy_steer = Input.get_joy_axis(pad, JOY_AXIS_LEFT_X)
 		if abs(joy_steer) > 0.12:
 			input_steer = joy_steer
-		if Input.is_joy_button_pressed(pad, JOY_BUTTON_A):
+		var trigger_r = clamp((Input.get_joy_axis(pad, JOY_AXIS_TRIGGER_RIGHT) + 1.0) * 0.5, 0.0, 1.0)
+		var trigger_l = clamp((Input.get_joy_axis(pad, JOY_AXIS_TRIGGER_LEFT) + 1.0) * 0.5, 0.0, 1.0)
+		if trigger_r > 0.05 or trigger_l > 0.05:
+			input_throttle = trigger_r - trigger_l
+		elif Input.is_joy_button_pressed(pad, JOY_BUTTON_A):
 			input_throttle = 1.0
 		elif Input.is_joy_button_pressed(pad, JOY_BUTTON_B):
 			input_throttle = -1.0
+		handbrake_pressed = Input.is_joy_button_pressed(pad, JOY_BUTTON_X)
+		var look_x = Input.get_joy_axis(pad, JOY_AXIS_RIGHT_X)
+		var look_y = Input.get_joy_axis(pad, JOY_AXIS_RIGHT_Y)
+		if abs(look_x) > 0.16 or abs(look_y) > 0.16:
+			camera_yaw = clamp(camera_yaw - look_x * delta * 1.8, -1.05, 1.05)
+			camera_pitch = clamp(camera_pitch - look_y * delta * 1.25, -0.18, 0.22)
+			camera_idle = 0.0
 	if touching:
 		var touch_delta = (touch_now - touch_origin) / 120.0
 		input_steer = clamp(touch_delta.x, -1.0, 1.0)
@@ -158,7 +170,10 @@ func _physics_process(delta):
 	var reversing_limit = speed_limit * 0.38
 	var target_speed = 0.0
 	var rate = drag * (1.0 if on_road else 1.38)
-	if input_throttle > 0.04:
+	if handbrake_pressed:
+		target_speed = 0.0
+		rate = braking * 1.35
+	elif input_throttle > 0.04:
 		if speed < -0.7: target_speed = 0.0; rate = braking
 		else: target_speed = speed_limit; rate = acceleration
 	elif input_throttle < -0.04:
