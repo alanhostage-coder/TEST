@@ -7,7 +7,7 @@ signal map_ready(data)
 const OVERPASS_URL := "https://overpass-api.de/api/interpreter"
 const POSTCODES_URL := "https://api.postcodes.io/postcodes/"
 const START_POSTCODE := "RH15 2BZ"
-const CACHE_PATH := "user://pua_map_stream_rh15_2bz_v2.json"
+const CACHE_PATH := "user://pua_map_stream_rh15_2bz_v3.json"
 const CACHE_MAX_AGE_SECONDS := 604800
 # Burgess Hill fallback only matters if postcode resolution is unavailable.
 const FALLBACK_LAT := 50.9570
@@ -17,6 +17,8 @@ const HALF_LON := 0.0100
 const MIN_POINT_GAP_METERS := 0.75
 const MAX_ROADS := 220
 const MAX_BUILDINGS := 320
+const MAX_LINEAR_FEATURES := 260
+const MAX_POINT_FEATURES := 220
 
 var center_lat := FALLBACK_LAT
 var center_lon := FALLBACK_LON
@@ -29,6 +31,8 @@ var data := {
 	"center_lon": FALLBACK_LON,
 	"roads": [],
 	"buildings": [],
+	"linear_features": [],
+	"point_features": [],
 	"updated_unix": 0
 }
 
@@ -110,7 +114,7 @@ func _fetch_osm():
 	var north = center_lat + HALF_LAT
 	var east = center_lon + HALF_LON
 	var bbox = "%.6f,%.6f,%.6f,%.6f" % [south, west, north, east]
-	var query = '[out:json][timeout:15];(way[highway~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|service|track)$"](%s);way[building](%s););out tags geom qt;' % [bbox, bbox]
+	var query = '[out:json][timeout:15];(way[highway~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|service|track)$"](%s);way[building](%s);way[barrier~"^(hedge|fence|wall)$"](%s);way[highway~"^(footway|path|cycleway)$"](%s);node[natural=tree](%s);node[highway~"^(traffic_signals|crossing|bus_stop)$"](%s););out tags geom qt;' % [bbox, bbox, bbox, bbox, bbox, bbox]
 	var url = OVERPASS_URL + "?data=" + query.uri_encode()
 	var headers = PackedStringArray([
 		"Accept: application/json",
@@ -135,28 +139,73 @@ func _on_request_completed(result: int, response_code: int, _headers, body: Pack
 		return
 	var roads: Array = []
 	var buildings: Array = []
+	var linear_features: Array = []
+	var point_features: Array = []
 	for element in elements:
 		if not element is Dictionary:
 			continue
 		var tags = element.get("tags", {})
-		var geometry = element.get("geometry", [])
-		if not tags is Dictionary or not geometry is Array or geometry.size() < 2:
+		if not tags is Dictionary:
 			continue
-		if tags.has("highway") and roads.size() < MAX_ROADS:
+		var element_type = str(element.get("type", ""))
+		if element_type == "node":
+			if point_features.size() >= MAX_POINT_FEATURES:
+				continue
+			var point_kind := ""
+			if str(tags.get("natural", "")) == "tree":
+				point_kind = "tree"
+			else:
+				var highway = str(tags.get("highway", ""))
+				if highway in ["traffic_signals", "crossing", "bus_stop"]:
+					point_kind = highway
+			if point_kind != "" and element.has("lat") and element.has("lon"):
+				var p = _lat_lon_to_local(float(element.get("lat", center_lat)), float(element.get("lon", center_lon)))
+				point_features.append({
+					"kind": point_kind,
+					"point": [p.x, p.y],
+					"name": str(tags.get("name", "")),
+					"crossing": str(tags.get("crossing", ""))
+				})
+			continue
+
+		var geometry = element.get("geometry", [])
+		if not geometry is Array or geometry.size() < 2:
+			continue
+		var highway_kind = str(tags.get("highway", ""))
+		if highway_kind in ["motorway", "trunk", "primary", "secondary", "tertiary", "residential", "unclassified", "living_street", "service", "track"] and roads.size() < MAX_ROADS:
 			var points = _geometry_to_points(geometry, MIN_POINT_GAP_METERS)
 			if points.size() >= 2:
 				roads.append({
-					"kind": str(tags.get("highway", "road")),
+					"kind": highway_kind,
 					"name": str(tags.get("name", "")),
 					"width": _road_width_from_tags(tags),
 					"lanes": int(str(tags.get("lanes", "0")).to_int()),
 					"oneway": str(tags.get("oneway", "no")),
+					"surface": str(tags.get("surface", "")),
+					"sidewalk": str(tags.get("sidewalk", "")),
+					"lit": str(tags.get("lit", "")),
+					"maxspeed": str(tags.get("maxspeed", "")),
 					"points": points
 				})
 		elif tags.has("building") and buildings.size() < MAX_BUILDINGS:
 			var building = _building_from_geometry(tags, geometry)
 			if not building.is_empty():
 				buildings.append(building)
+		elif linear_features.size() < MAX_LINEAR_FEATURES:
+			var linear_kind := ""
+			var barrier = str(tags.get("barrier", ""))
+			if barrier in ["hedge", "fence", "wall"]:
+				linear_kind = barrier
+			elif highway_kind in ["footway", "path", "cycleway"]:
+				linear_kind = highway_kind
+			if linear_kind != "":
+				var feature_points = _geometry_to_points(geometry, MIN_POINT_GAP_METERS)
+				if feature_points.size() >= 2:
+					linear_features.append({
+						"kind": linear_kind,
+						"surface": str(tags.get("surface", "")),
+						"points": feature_points
+					})
 	data = {
 		"source": "live",
 		"start_postcode": resolved_postcode,
@@ -164,6 +213,8 @@ func _on_request_completed(result: int, response_code: int, _headers, body: Pack
 		"center_lon": center_lon,
 		"roads": roads,
 		"buildings": buildings,
+		"linear_features": linear_features,
+		"point_features": point_features,
 		"updated_unix": int(Time.get_unix_time_from_system())
 	}
 	_save_cache()
