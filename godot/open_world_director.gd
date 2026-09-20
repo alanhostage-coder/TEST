@@ -20,8 +20,10 @@ var vapour_nodes: Array = []
 var situation_root: Node3D
 var situation_signature := ""
 var active_situations: Array = []
+var low_spec_mode := false
 
 func _ready():
+	low_spec_mode = OS.has_feature("thinkpad_low")
 	call_deferred("_bind_scene")
 
 func _bind_scene():
@@ -74,7 +76,7 @@ func _clear_root():
 func _build_parked_life(segments: Array):
 	var made := 0
 	for i in range(segments.size()):
-		if made >= MAX_PARKED:
+		if made >= (12 if low_spec_mode else MAX_PARKED):
 			break
 		if i % 4 != 1:
 			continue
@@ -104,7 +106,7 @@ func _build_roaming_life(segments: Array):
 	# streamed road network a pulse while keeping mobile CPU/GPU cost predictable.
 	var made := 0
 	for i in range(0, segments.size(), 9):
-		if made >= MAX_ROAMERS:
+		if made >= (4 if low_spec_mode else MAX_ROAMERS):
 			break
 		var seg = segments[i]
 		if not seg is Array or seg.size() < 3:
@@ -181,7 +183,8 @@ func _make_parked_vehicle(seed: int) -> Node3D:
 
 func _build_wet_ground_memory(segments: Array):
 	var wetness = float(car.get_meta("world_wetness", 0.0))
-	var count = int(lerp(8.0, float(MAX_PUDDLES), clamp(wetness, 0.0, 1.0)))
+	var puddle_cap = 12 if low_spec_mode else MAX_PUDDLES
+	var count = int(lerp(4.0, float(puddle_cap), clamp(wetness, 0.0, 1.0)))
 	for i in range(min(count, segments.size())):
 		var seg = segments[(i * 7 + 3) % segments.size()]
 		if not seg is Array or seg.size() < 2:
@@ -202,7 +205,7 @@ func _build_wet_ground_memory(segments: Array):
 
 func _build_industrial_vapour(segments: Array):
 	# Cheap found-photo atmosphere: translucent drifting cards around industrial edges.
-	var anchors = [Vector3(135, 8, -165), Vector3(185, 18, 110), Vector3(-115, 5, -80)]
+	var anchors = [Vector3(135, 8, -165)] if low_spec_mode else [Vector3(135, 8, -165), Vector3(185, 18, 110), Vector3(-115, 5, -80)]
 	for i in range(anchors.size()):
 		for j in range(3):
 			var vapour = MeshInstance3D.new()
@@ -238,7 +241,7 @@ func _build_road_clutter(segments: Array):
 	var seed = abs(int(car.get_meta("pua_api_world_seed", 1)))
 	var made := 0
 	for i in range(segments.size()):
-		if made >= MAX_ROAD_CLUTTER:
+		if made >= (18 if low_spec_mode else MAX_ROAD_CLUTTER):
 			break
 		if (i + seed) % 5 != 0:
 			continue
@@ -313,7 +316,8 @@ func _build_situations(segments: Array):
 	situation_root.name = "UnexplainedSituations"
 	root.add_child(situation_root)
 	var seed = abs(int(car.get_meta("pua_api_world_seed", 1)))
-	var count = min(MAX_SITUATIONS, max(3, int(segments.size() / 18)))
+	var situation_cap = 4 if low_spec_mode else MAX_SITUATIONS
+	var count = min(situation_cap, max(2 if low_spec_mode else 3, int(segments.size() / 18)))
 	for n in range(count):
 		var index = (seed + n * 37 + n * n * 11) % segments.size()
 		var seg = segments[index]
