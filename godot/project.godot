@@ -9,6 +9,7 @@ window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
 window/stretch/aspect="expand"
+window/handheld/orientation=1
 [rendering]
 renderer/rendering_method="mobile"
 renderer/rendering_method.mobile="mobile"
@@ -16,6 +17,7 @@ textures/default_filters/use_nearest_mipmap_filter=false
 textures/vram_compression/import_etc2_astc=true
 [physics]
 common/physics_ticks_per_second=60
+common/physics_interpolation=true
 [input]
 throttle={"deadzone":0.15,"events":[Object(InputEventKey,"physical_keycode":87)]}
 brake={"deadzone":0.15,"events":[Object(InputEventKey,"physical_keycode":83)]}
