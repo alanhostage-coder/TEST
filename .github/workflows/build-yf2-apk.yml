@@ -32,3 +32,14 @@ jobs:
           name: YF2-APK
           path: out/*
           if-no-files-found: error
+      - name: Fetch reverse-engineering tools
+        run: |
+          mkdir -p tools-out
+          curl -L --fail --retry 3 -o tools-out/jadx.zip https://github.com/skylot/jadx/releases/download/v1.5.6/jadx-1.5.6.zip
+          curl -L --fail --retry 3 -o tools-out/apktool.jar https://github.com/iBotPeaches/Apktool/releases/download/v3.0.3/apktool_3.0.3.jar
+          sha256sum tools-out/* > tools-out/SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Android-RE-Tools
+          path: tools-out/*
+          if-no-files-found: error
