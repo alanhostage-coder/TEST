@@ -2,6 +2,10 @@ extends Node3D
 
 var cells := {}
 var traffic := []
+var patrol
+var patrol_axis := 0
+var patrol_dir := 1.0
+var patrol_interest := 0.0
 const CELL := 90.0
 
 var asphalt_mat
@@ -16,6 +20,7 @@ func _ready():
 	_make_ground()
 	_make_landmarks()
 	_spawn_traffic()
+	_spawn_patrol()
 	for x in range(-1, 2):
 		for y in range(-2, 1):
 			_build_cell(Vector2i(x, y))
@@ -23,6 +28,7 @@ func _ready():
 func _process(delta):
 	var car = $Car
 	_update_traffic(delta)
+	_update_patrol(delta, car)
 	_update_atmosphere(car)
 	var c = Vector2i(floor(car.global_position.x / CELL), floor(car.global_position.z / CELL))
 	for x in range(c.x - 2, c.x + 3):
@@ -239,6 +245,87 @@ func _update_traffic(delta):
 				node.position.x = -360.0
 			elif node.position.x < -360.0:
 				node.position.x = 360.0
+
+func _spawn_patrol():
+	patrol = AnimatableBody3D.new()
+	patrol.name = "Patrol"
+	var mesh = MeshInstance3D.new()
+	var body = BoxMesh.new()
+	body.size = Vector3(1.92, 0.82, 4.3)
+	mesh.mesh = body
+	mesh.material_override = _mat(Color(0.055, 0.075, 0.095), 0.38, 0.42)
+	patrol.add_child(mesh)
+	var collision = CollisionShape3D.new()
+	var shape = BoxShape3D.new()
+	shape.size = Vector3(1.92, 0.82, 4.3)
+	collision.shape = shape
+	patrol.add_child(collision)
+	_visual_box(patrol, Vector3(-0.34, 0.57, 0), Vector3(0.55, 0.12, 0.22), _mat(Color(0.72, 0.05, 0.04), 0.25, 0.15))
+	patrol.get_child(patrol.get_child_count() - 1).name = "BarRed"
+	_visual_box(patrol, Vector3(0.34, 0.57, 0), Vector3(0.55, 0.12, 0.22), _mat(Color(0.05, 0.14, 0.78), 0.25, 0.15))
+	patrol.get_child(patrol.get_child_count() - 1).name = "BarBlue"
+	patrol.position = Vector3(3.2, 0.45, -135.0)
+	patrol.rotation.y = PI
+	add_child(patrol)
+
+func _update_patrol(delta, car):
+	if patrol == null:
+		return
+	var offset = car.global_position - patrol.global_position
+	offset.y = 0.0
+	if offset.length() < 68.0 and (abs(car.speed) > 25.0 or car.impact_kick > 0.45):
+		patrol_interest = 12.0
+	else:
+		patrol_interest = max(0.0, patrol_interest - delta)
+
+	var patrol_speed = 13.0 if patrol_interest > 0.0 else 8.0
+	var axis_position = patrol.position.z if patrol_axis == 0 else patrol.position.x
+	var near_crossing = abs(fposmod(axis_position + 45.0, 90.0) - 45.0) < 2.5
+
+	if patrol_interest > 0.0:
+		if patrol_axis == 0 and near_crossing and abs(offset.x) > 10.0:
+			patrol_axis = 1
+			patrol_dir = sign(offset.x)
+			if patrol_dir == 0.0:
+				patrol_dir = 1.0
+			patrol.position.z = round(patrol.position.z / CELL) * CELL + (3.2 if patrol_dir > 0.0 else -3.2)
+		elif patrol_axis == 1 and near_crossing and abs(offset.z) > 10.0:
+			patrol_axis = 0
+			patrol_dir = sign(offset.z)
+			if patrol_dir == 0.0:
+				patrol_dir = 1.0
+			patrol.position.x = round(patrol.position.x / CELL) * CELL + (-3.2 if patrol_dir > 0.0 else 3.2)
+		elif patrol_axis == 0 and abs(offset.z) > 2.0:
+			patrol_dir = sign(offset.z)
+		elif patrol_axis == 1 and abs(offset.x) > 2.0:
+			patrol_dir = sign(offset.x)
+
+	if patrol_axis == 0:
+		patrol.position.z += patrol_dir * patrol_speed * delta
+		patrol.rotation.y = PI if patrol_dir > 0.0 else 0.0
+		if patrol.position.z > 420.0:
+			patrol.position.z = -420.0
+		elif patrol.position.z < -420.0:
+			patrol.position.z = 420.0
+	else:
+		patrol.position.x += patrol_dir * patrol_speed * delta
+		patrol.rotation.y = -PI / 2.0 if patrol_dir > 0.0 else PI / 2.0
+		if patrol.position.x > 420.0:
+			patrol.position.x = -420.0
+		elif patrol.position.x < -420.0:
+			patrol.position.x = 420.0
+
+	var red = patrol.get_node_or_null("BarRed")
+	var blue = patrol.get_node_or_null("BarBlue")
+	if red and blue:
+		if patrol_interest > 0.0:
+			var flash = int(Time.get_ticks_msec() / 180) % 2 == 0
+			red.visible = flash
+			blue.visible = not flash
+		else:
+			red.visible = true
+			blue.visible = true
+	car.set_meta("patrol_interest", clamp(patrol_interest / 12.0, 0.0, 1.0))
 
 func _update_atmosphere(car):
 	var mast = Vector3(185, 0, 110)
