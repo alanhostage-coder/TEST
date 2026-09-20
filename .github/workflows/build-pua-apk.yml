@@ -46,15 +46,14 @@ jobs:
       - name: Apply world patches
         shell: bash
         run: |
-          for n in 09 10 11 12 13 14 15 16 17 18 19 20 21; do python3 android/.build/patch_${n}.py; done
-          grep -q "build 0.21" android/app/src/main/assets/www/index.html
-          grep -q "MOTION + SOUND" android/app/src/main/assets/www/index.html
+          for n in 09 10 11 12 13 14 15 16 17 18 19 20 21 22; do python3 android/.build/patch_\${n}.py; done
+          grep -q "build 0.22" android/app/src/main/assets/www/index.html
+          grep -q "BOOT RESCUE" android/app/src/main/assets/www/index.html
           grep -q "engine2Osc" android/app/src/main/assets/www/index.html
           grep -q "roadGain" android/app/src/main/assets/www/index.html
-          grep -q "windGain" android/app/src/main/assets/www/index.html
-          grep -q "rainGain" android/app/src/main/assets/www/index.html
           grep -q "window.__puaQuality" android/app/src/main/assets/www/index.html
-          grep -q "versionName '0.21'" android/app/build.gradle
+          grep -q "const MIG18=" android/app/src/main/assets/www/index.html
+          grep -q "versionName '0.22'" android/app/build.gradle
       - name: JavaScript syntax smoke test
         shell: bash
         run: |
@@ -78,10 +77,13 @@ jobs:
           assert "rainGain.gain.setTargetAtTime" in s
           assert "perfAvg=.016" in s
           assert "window.__puaQuality=perfAvg>.029?.68" in s
-          assert "step=(r.kind==='A'?175:235)/quality" in s
-          assert "mood.traffic*(.55+.45*quality)" in s
-          print("0.21 motion-sound checks passed")
+          assert s.index("const CH=900") < s.index("const MIG18=")
+          assert "document.getElementById('start').style.display='none';running=true" in s
+          print("0.22 boot-rescue structural checks passed")
           PY
+      - name: Boot smoke test
+        shell: bash
+        run: node android/.build/boot_smoke.js android/app/src/main/assets/www/index.html
       - name: Build debug APK
         working-directory: android
         run: gradle --no-daemon :app:assembleDebug
@@ -89,17 +91,17 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_21.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_22.apk
       - name: Package built source
         shell: bash
         run: |
-          cp android/app/src/main/assets/www/index.html dist/PUA_0_21_BUILT_INDEX.html
-      - name: Upload mega sprint
+          cp android/app/src/main/assets/www/index.html dist/PUA_0_22_BUILT_INDEX.html
+      - name: Upload boot rescue
         uses: actions/upload-artifact@v4
         with:
-          name: PROCEED-UNTIL-APPREHENDED-0.21-MOTION-SOUND
+          name: PROCEED-UNTIL-APPREHENDED-0.22-BOOT-RESCUE
           path: |
-            dist/PROCEED_UNTIL_APPREHENDED_0_21.apk
-            dist/PUA_0_21_BUILT_INDEX.html
+            dist/PROCEED_UNTIL_APPREHENDED_0_22.apk
+            dist/PUA_0_22_BUILT_INDEX.html
           if-no-files-found: error
           retention-days: 30
