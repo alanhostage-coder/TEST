@@ -19,6 +19,7 @@ var camera_yaw := 0.0
 var camera_pitch := 0.0
 var camera_idle := 0.0
 var impact_kick := 0.0
+var speed_camera_pulse := 0.0
 var distance_driven := 0.0
 var on_road := true
 var persist_timer := 0.0
@@ -143,6 +144,8 @@ func _physics_process(delta):
 			global_position += hit_normal * 0.08
 	impact_kick = move_toward(impact_kick, 0.0, delta * 2.8)
 	_update_visuals(delta, speed_ratio)
+	# A tiny speed-dependent chassis pulse gives fast roads texture without scripted events.
+	speed_camera_pulse = lerp(speed_camera_pulse, speed_ratio * speed_ratio, 1.0 - exp(-delta * 2.0))
 	_update_camera(delta, speed_ratio)
 	previous_position = global_position
 	persist_timer += delta
@@ -201,7 +204,8 @@ func _update_camera(delta, speed_ratio):
 	camera_look_ahead = lerp(camera_look_ahead, bend_preview, 1.0 - exp(-delta * 2.5))
 	var shake = sin(Time.get_ticks_msec() * 0.04) * impact_kick * 0.14
 	var lateral = steer_smoothed * 1.28 + camera_lag.x
-	var chase_height = 2.35 + speed_ratio * 0.62 + shake
+	var road_texture = sin(distance_driven * 0.72) * speed_camera_pulse * 0.035
+	var chase_height = 2.35 + speed_ratio * 0.62 + shake + road_texture
 	var chase_distance = 7.7 + speed_ratio * 3.7 + camera_lag.z
 	rig.position.x = lerp(rig.position.x, lateral, 1.0 - exp(-delta * 3.0))
 	rig.position.y = lerp(rig.position.y, chase_height, 1.0 - exp(-delta * 2.2))
