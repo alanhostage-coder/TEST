@@ -1,0 +1,25 @@
+name: Validate PUA Godot
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'godot/**', '.github/workflows/validate-godot.yml' ]
+  workflow_dispatch:
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Install Godot 4
+        run: |
+          wget -q https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_linux.x86_64.zip
+          unzip -q Godot_v4.5.1-stable_linux.x86_64.zip
+          sudo mv Godot_v4.5.1-stable_linux.x86_64 /usr/local/bin/godot
+      - name: Headless import and parse
+        run: |
+          godot --headless --path godot --editor --quit
+          godot --headless --path godot --quit-after 2
+      - name: Greybeard invariants
+        run: |
+          grep -q 'renderer/rendering_method="mobile"' godot/project.godot
+          grep -q 'move_and_slide' godot/car.gd
+          grep -q '_build_cell' godot/world.gd
