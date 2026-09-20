@@ -25,10 +25,12 @@ jobs:
           echo "ANDROID_HOME=$SDKROOT" >> "$GITHUB_ENV"
           echo "ANDROID_SDK_ROOT=$SDKROOT" >> "$GITHUB_ENV"
           echo "GODOT_ANDROID_SDK_ROOT=$SDKROOT" >> "$GITHUB_ENV"
-          mkdir -p ~/.config/godot
-          printf '[gd_resource format=3]\n\n[resource]\nexport/android/android_sdk_path = "%s"\n' "$SDKROOT" > ~/.config/godot/editor_settings-4.5.tres
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          mkdir -p "$HOME/Android"
+          ln -sfn "$SDKROOT" "$HOME/Android/Sdk"
+          command -v adb
+          ls -la "$SDKROOT/platform-tools/adb"
       - name: Install Godot and export templates
         run: |
           wget -q https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_linux.x86_64.zip
@@ -42,6 +44,7 @@ jobs:
         run: |
           godot --headless --path godot --editor --quit
           godot --headless --path godot --quit-after 2
+          test -d "$HOME/Android/Sdk/platform-tools"
       - name: Export Android APK
         run: |
           mkdir -p dist
