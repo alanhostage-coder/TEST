@@ -28,6 +28,9 @@ var camera_yaws := [0.0, 0.0, 0.0]
 var button: Button
 var save_button: Button
 var reset_button: Button
+var drive_button: Button
+var centre_button: Button
+var drive_enabled := false
 var title: Label
 
 func _ready():
@@ -65,6 +68,22 @@ func _build_buttons():
 	reset_button.modulate = Color(1, 1, 1, 0.66)
 	reset_button.pressed.connect(_reset_calibration)
 	add_child(reset_button)
+
+	drive_button = Button.new()
+	drive_button.text = "DRIVE"
+	drive_button.position = Vector2(18, 94)
+	drive_button.size = Vector2(112, 38)
+	drive_button.modulate = Color(1, 1, 1, 0.82)
+	drive_button.pressed.connect(_toggle_drive)
+	add_child(drive_button)
+
+	centre_button = Button.new()
+	centre_button.text = "CENTRE"
+	centre_button.position = Vector2(18, 138)
+	centre_button.size = Vector2(112, 38)
+	centre_button.modulate = Color(1, 1, 1, 0.72)
+	centre_button.pressed.connect(_centre_wheel)
+	add_child(centre_button)
 
 	title = Label.new()
 	title.position = Vector2(145, 54)
@@ -143,8 +162,17 @@ func _set_mode(value: int):
 		source_camera.current = not active
 	if car:
 		car.set_process_input(mode != 2)
+		var roof = car.get_node_or_null("Roof")
+		if roof:
+			roof.visible = mode == 0
+	if mode != 1 and drive_enabled:
+		drive_enabled = false
+		if car and car.has_method("set_motion_drive_enabled"):
+			car.set_motion_drive_enabled(false)
 	save_button.visible = mode == 2
 	reset_button.visible = mode == 2
+	drive_button.visible = mode == 1
+	centre_button.visible = mode == 1
 	active_plane = -1
 	active_corner = -1
 	if mode == 0:
@@ -152,7 +180,8 @@ func _set_mode(value: int):
 		title.text = ""
 	elif mode == 1:
 		button.text = "CAB"
-		title.text = "PARKVIEW BAY · OUTWARD VIEW"
+		drive_button.text = "DRIVE"
+		title.text = "PARKVIEW BAY · OPEN-TOP DRIVER VIEW"
 	else:
 		button.text = "CAL"
 		title.text = "DRAG CORNERS · SAVE WHEN LINES MEET SHUTTER EDGES"
@@ -197,7 +226,9 @@ func _process(_delta):
 	if mode == 0 or not car:
 		return
 	var cab_transform = car.global_transform
-	cab_transform.origin = car.to_global(Vector3(0.0, 1.48, -2.18))
+	# Right-hand-drive open-top seating position: the world should feel as if the
+	# viewer is sitting in the car, not watching a bumper camera.
+	cab_transform.origin = car.to_global(Vector3(0.42, 1.22, -0.34))
 	for i in range(3):
 		var t = cab_transform
 		# The yaw centres are derived from each plane's horizontal FOV, so adjacent
@@ -282,3 +313,24 @@ func _update_camera_frustums():
 	var left_offset = (float(hfov[0]) + float(hfov[1])) * 0.5
 	var right_offset = (float(hfov[1]) + float(hfov[2])) * 0.5
 	camera_yaws = [-left_offset, 0.0, right_offset]
+
+
+func _toggle_drive():
+	if mode != 1 or not car:
+		return
+	drive_enabled = not drive_enabled
+	if car.has_method("set_motion_drive_enabled"):
+		car.set_motion_drive_enabled(drive_enabled)
+	drive_button.text = "DRIVING" if drive_enabled else "DRIVE"
+	if drive_enabled:
+		title.text = "TILT PHONE TO STEER · AUTO THROTTLE · CENTRE TO RECALIBRATE"
+	else:
+		title.text = "PARKVIEW BAY · OPEN-TOP DRIVER VIEW"
+
+func _centre_wheel():
+	if not car:
+		return
+	if car.has_method("calibrate_motion_wheel"):
+		car.calibrate_motion_wheel()
+	if drive_enabled:
+		title.text = "STEERING CENTRED · TILT PHONE LIKE A WHEEL"
