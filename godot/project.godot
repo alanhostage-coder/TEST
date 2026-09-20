@@ -3,6 +3,7 @@ config/name="PROCEED UNTIL APPREHENDED"
 run/main_scene="res://world.tscn"
 [autoload]
 CameraDirector="*res://camera_director.gd"
+OpenWorldDirector="*res://open_world_director.gd"
 [display]
 window/size/viewport_width=1280
 window/size/viewport_height=720
