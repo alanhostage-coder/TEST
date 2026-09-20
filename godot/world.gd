@@ -19,6 +19,7 @@ var api_detail_pressure := 0.70
 var api_radio_instability := 0.20
 var api_moment := "none"
 const CELL := 90.0
+const ROAD_MICRO_STEP := 6.5
 var low_spec_mode := false
 
 var asphalt_mat
@@ -35,6 +36,8 @@ var pavement_mat
 var kerb_mat
 var sandstone_warm_mat
 var soot_stone_cool_mat
+var brick_mat
+var render_mat
 
 func _ready():
 	low_spec_mode = OS.has_feature("thinkpad_low")
@@ -84,6 +87,8 @@ func _make_materials():
 	kerb_mat = _mat(Color(0.34, 0.345, 0.335), 0.94, 0.0)
 	sandstone_warm_mat = _mat(Color(0.39, 0.355, 0.295), 0.93, 0.0)
 	soot_stone_cool_mat = _mat(Color(0.215, 0.225, 0.225), 0.95, 0.0)
+	brick_mat = _mat(Color(0.39, 0.20, 0.14), 0.92, 0.0)
+	render_mat = _mat(Color(0.63, 0.61, 0.54), 0.93, 0.0)
 
 func _mat(color: Color, roughness: float, metallic: float):
 	var m = StandardMaterial3D.new()
@@ -184,6 +189,125 @@ func _visual_box(parent: Node3D, pos: Vector3, size: Vector3, material):
 	mesh.material_override = material
 	mesh.position = pos
 	parent.add_child(mesh)
+
+func _road_micro_detail(parent: Node3D, a: Vector2, b: Vector2, width: float, seed: int, budget: int) -> int:
+	if budget <= 0:
+		return 0
+	var delta = b - a
+	var length = delta.length()
+	if length < ROAD_MICRO_STEP:
+		return 0
+	var tangent = delta.normalized()
+	var normal = Vector2(-tangent.y, tangent.x)
+	var count = min(budget, max(1, int(floor(length / ROAD_MICRO_STEP))))
+	for i in range(count):
+		var t = (float(i) + 0.5) / float(count)
+		var p = a.lerp(b, t)
+		var kind = abs(seed + i * 13) % 4
+		if kind == 0:
+			var side = -1.0 if (seed + i) % 2 == 0 else 1.0
+			var edge = p + normal * side * (width * 0.5 - 0.18)
+			var drain = MeshInstance3D.new()
+			var dm = BoxMesh.new()
+			dm.size = Vector3(0.38, 0.018, 0.62)
+			drain.mesh = dm
+			drain.position = Vector3(edge.x, 0.098, edge.y)
+			drain.rotation.y = atan2(tangent.x, tangent.y)
+			drain.material_override = metal_mat
+			drain.visibility_range_end = 95.0
+			parent.add_child(drain)
+		elif kind == 1:
+			var patch = MeshInstance3D.new()
+			var pm = PlaneMesh.new()
+			pm.size = Vector2(0.9 + float((seed + i) % 3) * 0.45, 1.5 + float((seed + i * 2) % 3) * 0.55)
+			patch.mesh = pm
+			patch.position = Vector3(p.x, 0.091, p.y)
+			patch.rotation.y = atan2(tangent.x, tangent.y) + float(((seed + i) % 5) - 2) * 0.035
+			patch.material_override = _mat(Color(0.035, 0.038, 0.041), 0.46, 0.03)
+			patch.visibility_range_end = 105.0
+			parent.add_child(patch)
+		elif kind == 2:
+			var side = -1.0 if (seed + i) % 2 == 0 else 1.0
+			var verge = p + normal * side * (width * 0.5 + 1.0)
+			var weed = MeshInstance3D.new()
+			var qm = QuadMesh.new()
+			qm.size = Vector2(0.20, 0.40)
+			weed.mesh = qm
+			weed.position = Vector3(verge.x, 0.20, verge.y)
+			weed.rotation.y = atan2(normal.x, normal.y) + float(i) * 0.37
+			weed.material_override = _mat(Color(0.15, 0.21, 0.08), 0.98, 0.0)
+			weed.visibility_range_end = 72.0
+			parent.add_child(weed)
+	return count
+
+func _osm_building_material(building: Dictionary, seed: int):
+	var tagged = str(building.get("material", "")).to_lower()
+	if "brick" in tagged:
+		return brick_mat
+	if "concrete" in tagged:
+		return concrete_mat
+	if "stone" in tagged:
+		return soot_stone_mat if seed % 2 == 0 else sandstone_mat
+	if "render" in tagged or "stucco" in tagged or "plaster" in tagged:
+		return render_mat
+	match seed % 5:
+		0, 1:
+			return brick_mat
+		2:
+			return render_mat
+		3:
+			return soot_stone_cool_mat
+		_:
+			return sandstone_warm_mat
+
+func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float, seed: int) -> bool:
+	var footprint = building.get("footprint", [])
+	if not footprint is Array or footprint.size() < 3:
+		return false
+	var poly = PackedVector2Array()
+	for point in footprint:
+		if not point is Array or point.size() < 2:
+			continue
+		poly.append(Vector2(float(point[0]), float(point[1])))
+	if poly.size() < 3:
+		return false
+	var tris = Geometry2D.triangulate_polygon(poly)
+	if tris.size() < 3:
+		return false
+	var st = SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for t in range(0, tris.size(), 3):
+		var p0 = poly[int(tris[t])]
+		var p1 = poly[int(tris[t + 1])]
+		var p2 = poly[int(tris[t + 2])]
+		st.add_vertex(Vector3(p0.x, height, p0.y))
+		st.add_vertex(Vector3(p1.x, height, p1.y))
+		st.add_vertex(Vector3(p2.x, height, p2.y))
+	for i in range(poly.size()):
+		var p0 = poly[i]
+		var p1 = poly[(i + 1) % poly.size()]
+		st.add_vertex(Vector3(p0.x, 0.0, p0.y))
+		st.add_vertex(Vector3(p1.x, 0.0, p1.y))
+		st.add_vertex(Vector3(p1.x, height, p1.y))
+		st.add_vertex(Vector3(p0.x, 0.0, p0.y))
+		st.add_vertex(Vector3(p1.x, height, p1.y))
+		st.add_vertex(Vector3(p0.x, height, p0.y))
+	st.generate_normals()
+	var mesh = st.commit()
+	if mesh == null:
+		return false
+	var body = StaticBody3D.new()
+	body.name = "OSMFootprint_%d" % seed
+	var visual = MeshInstance3D.new()
+	visual.mesh = mesh
+	visual.material_override = _osm_building_material(building, seed)
+	visual.visibility_range_end = 360.0 if not low_spec_mode else 220.0
+	body.add_child(visual)
+	var collision = CollisionShape3D.new()
+	collision.shape = mesh.create_trimesh_shape()
+	body.add_child(collision)
+	parent.add_child(body)
+	return true
 
 func _vehicle_visual(parent: Node3D, seed: int, patrol_style := false):
 	# Low-cost recognisable vehicle silhouette: separate lower body, glazed cabin,
@@ -531,6 +655,10 @@ func _on_map_ready(map_data: Dictionary):
 	if roads.is_empty() and buildings.is_empty():
 		return
 	map_mode_active = true
+	for legacy_name in ["DockEdge", "GarageCourt", "Transmitter"]:
+		var legacy = get_node_or_null(legacy_name)
+		if legacy:
+			legacy.visible = false
 	for t in traffic:
 		if t.has("node") and is_instance_valid(t["node"]):
 			t["node"].visible = false
@@ -550,8 +678,9 @@ func _on_map_ready(map_data: Dictionary):
 	map_lamps.clear()
 	var street_edge_budget := 0
 	var marking_budget := 0
-	var street_edge_limit := 72 if low_spec_mode else 150
-	var marking_limit := 38 if low_spec_mode else 70
+	var street_edge_limit := 90 if low_spec_mode else 240
+	var marking_limit := 55 if low_spec_mode else 130
+	var micro_budget := 110 if low_spec_mode else 320
 
 	for road in roads:
 		if not road is Dictionary:
@@ -573,6 +702,8 @@ func _on_map_ready(map_data: Dictionary):
 			var mid = (a + b) * 0.5
 			var angle = atan2(road_delta.x, road_delta.y)
 			_road_rotated(map_root, Vector3(mid.x, 0.035, mid.y), length + 1.0, width, angle)
+			if micro_budget > 0:
+				micro_budget -= _road_micro_detail(map_root, a, b, width, int(abs(a.x * 11.0 + a.y * 17.0 + b.x * 23.0 + b.y * 29.0)), micro_budget)
 			if street_edge_budget < street_edge_limit and length > 7.0 and kind not in ["motorway", "trunk", "track"]:
 				_street_edges_rotated(map_root, Vector3(mid.x, 0.035, mid.y), length + 0.6, width, angle, kind)
 				street_edge_budget += 1
@@ -595,7 +726,10 @@ func _on_map_ready(map_data: Dictionary):
 		var cz = float(center[1])
 		var seed = int(abs(cx * 17.0 + cz * 31.0 + sx * 11.0 + sz * 7.0))
 		var kind = str(building.get("kind", "yes"))
-		_add_edinburgh_building(map_root, Vector3(cx, 0.0, cz), Vector3(sx, h, sz), seed, kind)
+		var exact_radius = 135.0 if low_spec_mode else 260.0
+		var exact = Vector2(cx, cz).length() <= exact_radius and _add_exact_osm_building(map_root, building, h, seed)
+		if not exact:
+			_add_edinburgh_building(map_root, Vector3(cx, 0.0, cz), Vector3(sx, h, sz), seed, kind)
 
 	_add_map_furniture(map_root)
 	_add_verge_life(map_root)
@@ -607,29 +741,70 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_road_count", roads.size())
 		car.set_meta("map_building_count", buildings.size())
 		car.set_meta("map_road_segments", map_segments)
-		_snap_car_to_map_road(car, roads)
+		_snap_car_to_map_junction(car, roads)
 
 
-func _snap_car_to_map_road(car, roads: Array):
-	var current = Vector2(car.global_position.x, car.global_position.z)
-	var best = current
-	var best_dist = INF
-	for road in roads:
+func _snap_car_to_map_junction(car, roads: Array):
+	var junctions := {}
+	var fallback := Vector2.ZERO
+	var fallback_dist := INF
+	for road_index in range(roads.size()):
+		var road = roads[road_index]
 		if not road is Dictionary:
 			continue
 		var points = road.get("points", [])
-		for point in points:
+		for point_index in range(points.size()):
+			var point = points[point_index]
 			if not point is Array or point.size() < 2:
 				continue
 			var p = Vector2(float(point[0]), float(point[1]))
-			var d = current.distance_squared_to(p)
-			if d < best_dist:
-				best_dist = d
-				best = p
-	if best_dist < INF:
-		car.global_position.x = best.x
-		car.global_position.z = best.y
-		car.global_position.y = max(car.global_position.y, 0.58)
+			var d = p.length_squared()
+			if d < fallback_dist:
+				fallback_dist = d
+				fallback = p
+			var key = "%d:%d" % [int(round(p.x * 2.0)), int(round(p.y * 2.0))]
+			if not junctions.has(key):
+				junctions[key] = {"p": p, "roads": {}, "heading": Vector2.ZERO}
+			var item = junctions[key]
+			var memberships: Dictionary = item["roads"]
+			memberships[str(road_index)] = true
+			item["roads"] = memberships
+			if item["heading"] == Vector2.ZERO:
+				if point_index + 1 < points.size():
+					var next = points[point_index + 1]
+					if next is Array and next.size() >= 2:
+						item["heading"] = Vector2(float(next[0]), float(next[1])) - p
+				elif point_index > 0:
+					var prev = points[point_index - 1]
+					if prev is Array and prev.size() >= 2:
+						item["heading"] = p - Vector2(float(prev[0]), float(prev[1]))
+			junctions[key] = item
+
+	var best = fallback
+	var best_heading = Vector2(0, -1)
+	var best_dist = INF
+	for item in junctions.values():
+		var memberships: Dictionary = item["roads"]
+		if memberships.size() < 2:
+			continue
+		var p: Vector2 = item["p"]
+		var d = p.length_squared()
+		if d < best_dist:
+			best_dist = d
+			best = p
+			best_heading = item["heading"]
+
+	if best_heading.length() < 0.1:
+		best_heading = Vector2(0, -1)
+	best_heading = best_heading.normalized()
+	var spawn = best + best_heading * 2.4
+	car.global_position.x = spawn.x
+	car.global_position.z = spawn.y
+	car.global_position.y = max(car.global_position.y, 0.58)
+	car.rotation.y = atan2(-best_heading.x, -best_heading.y)
+	car.set_meta("map_spawn_junction", [best.x, best.y])
+	car.set_meta("map_spawn_heading", [best_heading.x, best_heading.y])
+
 
 
 func _spawn_map_agents():
