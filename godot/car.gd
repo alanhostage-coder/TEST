@@ -15,6 +15,13 @@ var touching := false
 var impact_kick := 0.0
 var distance_driven := 0.0
 var on_road := true
+var persist_timer := 0.0
+
+func _ready():
+	_load_state()
+
+func _exit_tree():
+	_save_state()
 
 func _input(event):
 	if event is InputEventScreenTouch and event.position.x < get_viewport().get_visible_rect().size.x * 0.58:
@@ -79,6 +86,10 @@ func _physics_process(delta):
 	impact_kick = move_toward(impact_kick, 0.0, delta * 2.8)
 	_update_visuals(delta, speed_ratio)
 	_update_camera(delta, speed_ratio)
+	persist_timer += delta
+	if persist_timer >= 5.0:
+		persist_timer = 0.0
+		_save_state()
 
 func _is_near_road() -> bool:
 	var local_x = abs(fposmod(global_position.x + 45.0, 90.0) - 45.0)
@@ -102,3 +113,20 @@ func _update_camera(delta, speed_ratio):
 	rig.rotation.y = lerp_angle(rig.rotation.y, -steer_smoothed * 0.075, 1.0 - exp(-delta * 3.2))
 	rig.rotation.z = lerp_angle(rig.rotation.z, -steer_smoothed * speed_ratio * 0.018, 1.0 - exp(-delta * 4.0))
 	$CameraRig/Camera3D.fov = lerp($CameraRig/Camera3D.fov, 66.0 + speed_ratio * 8.0, 1.0 - exp(-delta * 2.0))
+
+func _save_state():
+	var cfg = ConfigFile.new()
+	cfg.set_value("car", "position", global_position)
+	cfg.set_value("car", "rotation_y", rotation.y)
+	cfg.set_value("car", "distance", distance_driven)
+	cfg.save("user://pua_state.cfg")
+
+func _load_state():
+	var cfg = ConfigFile.new()
+	if cfg.load("user://pua_state.cfg") != OK:
+		return
+	var saved_position = cfg.get_value("car", "position", global_position)
+	if saved_position is Vector3:
+		global_position = saved_position
+	rotation.y = float(cfg.get_value("car", "rotation_y", rotation.y))
+	distance_driven = float(cfg.get_value("car", "distance", 0.0))
