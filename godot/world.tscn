@@ -17,7 +17,9 @@ background_mode = 1
 background_color = Color(0.12, 0.145, 0.16, 1)
 ambient_light_source = 3
 ambient_light_color = Color(0.46, 0.50, 0.52, 1)
-ambient_light_energy = 0.62
+ambient_light_energy = 0.58
+tonemap_mode = 2
+tonemap_exposure = 1.03
 fog_enabled = true
 fog_light_color = Color(0.37, 0.41, 0.42, 1)
 fog_density = 0.0075
@@ -65,7 +67,7 @@ script = ExtResource("8")
 environment = SubResource("environment")
 
 [node name="Sun" type="DirectionalLight3D" parent="."]
-rotation_degrees = Vector3(-18, -32, 0)
+rotation_degrees = Vector3(-21, -34, 0)
 light_energy = 0.68
 light_color = Color(0.94, 0.84, 0.72, 1)
 shadow_enabled = true
