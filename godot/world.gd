@@ -9,6 +9,7 @@ var concrete_mat
 var ground_mat
 var garage_mat
 var metal_mat
+var marking_mat
 
 func _ready():
 	_make_materials()
@@ -35,6 +36,7 @@ func _make_materials():
 	ground_mat = _mat(Color(0.16, 0.18, 0.14), 0.95, 0.0)
 	garage_mat = _mat(Color(0.24, 0.25, 0.25), 0.72, 0.02)
 	metal_mat = _mat(Color(0.17, 0.19, 0.20), 0.48, 0.32)
+	marking_mat = _mat(Color(0.72, 0.70, 0.62), 0.74, 0.0)
 
 func _mat(color: Color, roughness: float, metallic: float):
 	var m = StandardMaterial3D.new()
@@ -69,6 +71,35 @@ func _road(parent: Node3D, pos: Vector3, size: Vector3):
 	mesh.position = pos
 	parent.add_child(mesh)
 
+func _road_rotated(parent: Node3D, pos: Vector3, length: float, width: float, angle: float):
+	var mesh = MeshInstance3D.new()
+	var bm = BoxMesh.new()
+	bm.size = Vector3(width, 0.07, length)
+	mesh.mesh = bm
+	mesh.material_override = asphalt_mat
+	mesh.position = pos
+	mesh.rotation.y = angle
+	parent.add_child(mesh)
+
+func _visual_box(parent: Node3D, pos: Vector3, size: Vector3, material):
+	var mesh = MeshInstance3D.new()
+	var bm = BoxMesh.new()
+	bm.size = size
+	mesh.mesh = bm
+	mesh.material_override = material
+	mesh.position = pos
+	parent.add_child(mesh)
+
+func _road_detail(parent: Node3D, seed: int):
+	for k in range(-3, 4):
+		_visual_box(parent, Vector3(0, 0.075, float(k) * 12.0), Vector3(0.18, 0.025, 5.0), marking_mat)
+		_visual_box(parent, Vector3(float(k) * 12.0, 0.08, 0), Vector3(5.0, 0.025, 0.18), marking_mat)
+	for corner in [Vector3(-10, 2.8, -10), Vector3(10, 2.8, -10), Vector3(-10, 2.8, 10), Vector3(10, 2.8, 10)]:
+		_visual_box(parent, corner, Vector3(0.16, 5.6, 0.16), metal_mat)
+	if seed % 3 == 0:
+		var turn = -1.0 if seed % 2 == 0 else 1.0
+		_road_rotated(parent, Vector3(22.0 * turn, 0.035, 22.0), 42.0, 6.5, turn * PI / 4.0)
+
 func _build_cell(c: Vector2i):
 	if cells.has(c):
 		return
@@ -80,6 +111,7 @@ func _build_cell(c: Vector2i):
 	var seed = abs(c.x * 92821 + c.y * 68917)
 	_road(root, Vector3(0, 0.02, 0), Vector3(15, 0.08, CELL))
 	_road(root, Vector3(0, 0.025, 0), Vector3(CELL, 0.08, 15))
+	_road_detail(root, seed)
 	for i in range(8):
 		var side = -1.0 if i % 2 == 0 else 1.0
 		var along = -34.0 + float((seed + i * 19) % 68)
