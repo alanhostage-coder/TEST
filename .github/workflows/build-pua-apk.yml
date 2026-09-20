@@ -17,9 +17,9 @@ jobs:
     timeout-minutes: 25
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -46,14 +46,15 @@ jobs:
       - name: Apply world patches
         shell: bash
         run: |
-          for n in 09 10 11 12 13 14 15 16 17 18 19; do python3 android/.build/patch_${n}.py; done
-          grep -q "build 0.19" android/app/src/main/assets/www/index.html
-          grep -q "STREET LEVEL" android/app/src/main/assets/www/index.html
-          grep -q "function drawRoad18" android/app/src/main/assets/www/index.html
-          grep -q "function drawStreetLife19" android/app/src/main/assets/www/index.html
-          grep -q "function drawPlayerCar19" android/app/src/main/assets/www/index.html
-          grep -q "const grip=onRoad?1:" android/app/src/main/assets/www/index.html
-          grep -q "versionName '0.19'" android/app/build.gradle
+          for n in 09 10 11 12 13 14 15 16 17 18 19 20; do python3 android/.build/patch_${n}.py; done
+          grep -q "build 0.20" android/app/src/main/assets/www/index.html
+          grep -q "WORLD COHERENCE" android/app/src/main/assets/www/index.html
+          grep -q "function district20" android/app/src/main/assets/www/index.html
+          grep -q "function drawStreetLife20" android/app/src/main/assets/www/index.html
+          grep -q "function drawJunctions20" android/app/src/main/assets/www/index.html
+          grep -q "function drawPlayerCar20" android/app/src/main/assets/www/index.html
+          grep -q "const nr20=nearestRoadPoint18" android/app/src/main/assets/www/index.html
+          grep -q "versionName '0.20'" android/app/build.gradle
       - name: JavaScript syntax smoke test
         shell: bash
         run: |
@@ -71,15 +72,19 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           s=Path('android/app/src/main/assets/www/index.html').read_text()
-          assert "kind:'A'" in s
-          assert "drawStreetLife19(chunks,cam,w)" in s
-          assert "drawPlayerCar19(p,cam)" in s
-          assert "const grip=onRoad?1:" in s
+          assert "drawStreetLife20(chunks,cam,w,sun)" in s
+          assert "drawJunctions20(chunks,cam)" in s
+          assert "drawPlayerCar20(p,cam,sun)" in s
+          assert "nr20.d<82" in s
+          assert "window.__puaCamV" in s
+          assert "cat's-eye points" in s
+          assert "district20(b.x,b.y)" in s
           assert "lane=(r.kind==='A'?r.w*.18:r.w*.14)*dir" in s
-          assert "mid.depth>2100" in s
           draw=s[s.index("function draw(){"):]
-          assert "drawWetWorld(cam,speed,w)" not in draw[:draw.index("function drawHud")]
-          print("0.19 mega-sprint structural checks passed")
+          draw=draw[:draw.index("function drawHud")]
+          assert "drawStreetLife19(chunks,cam,w)" not in draw
+          assert "drawPlayerCar19(p,cam)" not in draw
+          print("0.20 world-coherence checks passed")
           PY
       - name: Build debug APK
         working-directory: android
@@ -88,17 +93,17 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_19.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_20.apk
       - name: Package built source
         shell: bash
         run: |
-          cp android/app/src/main/assets/www/index.html dist/PUA_0_19_BUILT_INDEX.html
+          cp android/app/src/main/assets/www/index.html dist/PUA_0_20_BUILT_INDEX.html
       - name: Upload mega sprint
         uses: actions/upload-artifact@v4
         with:
-          name: PROCEED-UNTIL-APPREHENDED-0.19-MEGA-SPRINT
+          name: PROCEED-UNTIL-APPREHENDED-0.20-WORLD-COHERENCE
           path: |
-            dist/PROCEED_UNTIL_APPREHENDED_0_19.apk
-            dist/PUA_0_19_BUILT_INDEX.html
+            dist/PROCEED_UNTIL_APPREHENDED_0_20.apk
+            dist/PUA_0_20_BUILT_INDEX.html
           if-no-files-found: error
           retention-days: 30
