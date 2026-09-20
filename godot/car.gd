@@ -61,7 +61,8 @@ func _physics_process(delta):
 	var travel_sign = sign(speed) if abs(speed) > 0.1 else 1.0
 	rotate_y(-steer_smoothed * steer_rate * steering_at_speed * steering_authority * delta * travel_sign)
 	var desired_velocity = -global_transform.basis.z * speed
-	var grip = 10.5 if on_road else 4.2
+	var wetness = clamp(float(get_meta("world_wetness", 0.0)), 0.0, 1.0)
+	var grip = (lerp(10.5, 7.2, wetness)) if on_road else lerp(4.2, 3.4, wetness)
 	velocity = velocity.lerp(desired_velocity, 1.0 - exp(-delta * grip))
 	var before = global_position
 	move_and_slide()
