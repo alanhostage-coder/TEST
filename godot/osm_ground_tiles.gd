@@ -18,6 +18,7 @@ var _pending := Vector2i(-1, -1)
 var _center_lat := 0.0
 var _center_lon := 0.0
 var _signature := ""
+var _loaded_tile_count := 0
 
 func _ready():
 	_root = Node3D.new()
@@ -31,13 +32,22 @@ func _bind_map_stream():
 		return
 	if not _map_stream.map_ready.is_connected(_on_map_ready):
 		_map_stream.map_ready.connect(_on_map_ready)
+	if not _map_stream.location_ready.is_connected(_on_location_ready):
+		_map_stream.location_ready.connect(_on_location_ready)
 	var existing = _map_stream.get("data")
 	if existing is Dictionary and (existing.get("roads", []).size() > 0 or existing.get("buildings", []).size() > 0):
 		_on_map_ready(existing)
 
 func _on_map_ready(map_data: Dictionary):
-	_center_lat = float(map_data.get("center_lat", 0.0))
-	_center_lon = float(map_data.get("center_lon", 0.0))
+	_on_location_ready(
+		float(map_data.get("center_lat", 0.0)),
+		float(map_data.get("center_lon", 0.0)),
+		str(map_data.get("start_postcode", ""))
+	)
+
+func _on_location_ready(latitude: float, longitude: float, _postcode: String = ""):
+	_center_lat = latitude
+	_center_lon = longitude
 	if abs(_center_lat) < 0.001 and abs(_center_lon) < 0.001:
 		return
 	var sig = "%.6f:%.6f:%d" % [_center_lat, _center_lon, TILE_ZOOM]
@@ -47,7 +57,8 @@ func _on_map_ready(map_data: Dictionary):
 	_clear_tiles()
 	_prepare_cache()
 	_queue_context_tiles()
-	# CI/headless validation must not depend on an external tile server.
+	# Start the recognisable map as soon as postcode coordinates resolve; do not
+	# wait for the slower Overpass geometry request to finish first.
 	if DisplayServer.get_name() != "headless":
 		_fetch_next()
 	var car = get_node_or_null("../Car")
@@ -55,10 +66,12 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("osm_ground_overlay", true)
 		car.set_meta("osm_ground_source", "OpenStreetMap standard tiles")
 		car.set_meta("osm_ground_zoom", TILE_ZOOM)
+		car.set_meta("osm_ground_tiles_loaded", _loaded_tile_count)
 
 func _clear_tiles():
 	_tile_queue.clear()
 	_pending = Vector2i(-1, -1)
+	_loaded_tile_count = 0
 	if _request and is_instance_valid(_request):
 		_request.cancel_request()
 		_request.queue_free()
@@ -72,16 +85,21 @@ func _prepare_cache():
 func _queue_context_tiles():
 	var centre = _lat_lon_to_tile(_center_lat, _center_lon)
 	var radius = TILE_RADIUS_LOW_SPEC if OS.has_feature("thinkpad_low") else TILE_RADIUS_ANDROID
-	for dy in range(-radius, radius + 1):
-		for dx in range(-radius, radius + 1):
-			var tile = Vector2i(centre.x + dx, centre.y + dy)
-			var path = _cache_path(tile)
-			if FileAccess.file_exists(path):
-				var image = Image.load_from_file(path)
-				if image and not image.is_empty():
-					_add_tile(tile, image)
+	# Centre first, then expand in square rings. A fresh install therefore gets
+	# the postcode-centre street map before spending time on peripheral tiles.
+	for ring in range(radius + 1):
+		for dy in range(-ring, ring + 1):
+			for dx in range(-ring, ring + 1):
+				if max(abs(dx), abs(dy)) != ring:
 					continue
-			_tile_queue.append(tile)
+				var tile = Vector2i(centre.x + dx, centre.y + dy)
+				var path = _cache_path(tile)
+				if FileAccess.file_exists(path):
+					var image = Image.load_from_file(path)
+					if image and not image.is_empty():
+						_add_tile(tile, image)
+						continue
+				_tile_queue.append(tile)
 
 func _fetch_next():
 	if _request or _tile_queue.is_empty():
@@ -93,7 +111,7 @@ func _fetch_next():
 	_request.request_completed.connect(_on_tile_received)
 	var headers = PackedStringArray([
 		"Accept: image/png",
-		"User-Agent: ProceedUntilApprehended/0.64 (personal Godot prototype; cached OSM context)"
+		"User-Agent: ProceedUntilApprehended/0.66 (personal Godot prototype; cached OSM context)"
 	])
 	var err = _request.request(TILE_URL % [TILE_ZOOM, _pending.x, _pending.y], headers, HTTPClient.METHOD_GET)
 	if err != OK:
@@ -177,3 +195,7 @@ func _add_tile(tile: Vector2i, image: Image):
 	instance.material_override = material
 	instance.visibility_range_end = 1200.0
 	_root.add_child(instance)
+	_loaded_tile_count += 1
+	var car = get_node_or_null("../Car")
+	if car:
+		car.set_meta("osm_ground_tiles_loaded", _loaded_tile_count)

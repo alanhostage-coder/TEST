@@ -37,4 +37,7 @@ jobs:
           grep -q 'directive_changed' godot/world.gd
           grep -q 'OSMGroundTiles' godot/world.tscn
           grep -q 'tile.openstreetmap.org' godot/osm_ground_tiles.gd
+          grep -q 'signal location_ready' godot/map_stream.gd
+          grep -q '_on_location_ready' godot/osm_ground_tiles.gd
+          grep -q 'for ring in range(radius + 1)' godot/osm_ground_tiles.gd
           grep -q 'window/handheld/orientation=0' godot/project.godot

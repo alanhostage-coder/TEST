@@ -1,6 +1,7 @@
 extends Node
 
 signal map_ready(data)
+signal location_ready(latitude, longitude, postcode)
 
 # Low-bandwidth OSM slice centred on a UK postcode. The postcode is resolved once,
 # then the resulting road/building geometry is simplified and cached locally.
@@ -45,6 +46,7 @@ func _ready():
 		center_lat = float(data.get("center_lat", FALLBACK_LAT))
 		center_lon = float(data.get("center_lon", FALLBACK_LON))
 		resolved_postcode = str(data.get("start_postcode", START_POSTCODE))
+		location_ready.emit(center_lat, center_lon, resolved_postcode)
 		map_ready.emit(data)
 	if not cache_fresh:
 		_resolve_start_postcode()
@@ -77,12 +79,13 @@ func _resolve_start_postcode():
 	var compact = START_POSTCODE.replace(" ", "").uri_encode()
 	var headers = PackedStringArray([
 		"Accept: application/json",
-		"User-Agent: ProceedUntilApprehended/0.58 (Godot Android; postcode-seeded OSM)"
+		"User-Agent: ProceedUntilApprehended/0.66 (Godot Android; postcode-seeded OSM)"
 	])
 	var err = _postcode_request.request(POSTCODES_URL + compact, headers, HTTPClient.METHOD_GET)
 	if err != OK:
 		_postcode_request.queue_free()
 		_postcode_request = null
+		location_ready.emit(center_lat, center_lon, resolved_postcode)
 		_fetch_osm()
 
 func _on_postcode_resolved(result: int, response_code: int, _headers, body: PackedByteArray):
@@ -100,6 +103,7 @@ func _on_postcode_resolved(result: int, response_code: int, _headers, body: Pack
 					center_lat = lat
 					center_lon = lon
 					resolved_postcode = str(postcode_result.get("postcode", START_POSTCODE))
+	location_ready.emit(center_lat, center_lon, resolved_postcode)
 	_fetch_osm()
 
 func _fetch_osm():
@@ -118,7 +122,7 @@ func _fetch_osm():
 	var url = OVERPASS_URL + "?data=" + query.uri_encode()
 	var headers = PackedStringArray([
 		"Accept: application/json",
-		"User-Agent: ProceedUntilApprehended/0.58 (Godot Android; postcode-seeded cached OSM geometry)"
+		"User-Agent: ProceedUntilApprehended/0.66 (Godot Android; postcode-seeded cached OSM geometry)"
 	])
 	var err = _request.request(url, headers, HTTPClient.METHOD_GET)
 	if err != OK:
