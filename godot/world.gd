@@ -38,6 +38,10 @@ var sandstone_warm_mat
 var soot_stone_cool_mat
 var brick_mat
 var render_mat
+var hedge_mat
+var gravel_mat
+var paving_mat
+var path_mat
 
 func _ready():
 	low_spec_mode = OS.has_feature("thinkpad_low")
@@ -89,6 +93,10 @@ func _make_materials():
 	soot_stone_cool_mat = _mat(Color(0.215, 0.225, 0.225), 0.95, 0.0)
 	brick_mat = _mat(Color(0.39, 0.20, 0.14), 0.92, 0.0)
 	render_mat = _mat(Color(0.63, 0.61, 0.54), 0.93, 0.0)
+	hedge_mat = _mat(Color(0.075, 0.16, 0.055), 0.98, 0.0)
+	gravel_mat = _mat(Color(0.28, 0.27, 0.24), 0.96, 0.0)
+	paving_mat = _mat(Color(0.30, 0.30, 0.29), 0.91, 0.0)
+	path_mat = _mat(Color(0.18, 0.19, 0.17), 0.94, 0.0)
 
 func _mat(color: Color, roughness: float, metallic: float):
 	var m = StandardMaterial3D.new()
@@ -180,6 +188,114 @@ func _street_edges_rotated(parent: Node3D, pos: Vector3, length: float, width: f
 		kerb.rotation.y = angle
 		kerb.visibility_range_end = 145.0
 		parent.add_child(kerb)
+
+func _road_material_for(surface: String):
+	var s = surface.to_lower()
+	if s in ["gravel", "fine_gravel", "unpaved", "compacted"]:
+		return gravel_mat
+	if s in ["paving_stones", "sett", "cobblestone", "concrete"]:
+		return paving_mat
+	return asphalt_mat
+
+func _road_rotated_material(parent: Node3D, pos: Vector3, length: float, width: float, angle: float, material):
+	var mesh = MeshInstance3D.new()
+	var bm = BoxMesh.new()
+	bm.size = Vector3(width, 0.07, length)
+	mesh.mesh = bm
+	mesh.material_override = material
+	mesh.position = pos
+	mesh.rotation.y = angle
+	parent.add_child(mesh)
+
+func _add_mapped_linear_features(parent: Node3D, features: Array):
+	var cap = 110 if low_spec_mode else 240
+	var made := 0
+	for feature in features:
+		if made >= cap or not feature is Dictionary:
+			break
+		var points = feature.get("points", [])
+		var kind = str(feature.get("kind", ""))
+		if not points is Array or points.size() < 2:
+			continue
+		for i in range(points.size() - 1):
+			if made >= cap:
+				break
+			if not points[i] is Array or not points[i + 1] is Array:
+				continue
+			var a = Vector2(float(points[i][0]), float(points[i][1]))
+			var b = Vector2(float(points[i + 1][0]), float(points[i + 1][1]))
+			var d = b - a
+			var length = d.length()
+			if length < 0.8:
+				continue
+			var mid = (a + b) * 0.5
+			var angle = atan2(d.x, d.y)
+			if kind == "hedge":
+				_visual_box(parent, Vector3(mid.x, 0.72, mid.y), Vector3(0.65, 1.44, length + 0.25), hedge_mat)
+				var node = parent.get_child(parent.get_child_count() - 1)
+				if node is MeshInstance3D:
+					node.rotation.y = angle
+					node.visibility_range_end = 180.0 if not low_spec_mode else 110.0
+			elif kind == "fence":
+				_visual_box(parent, Vector3(mid.x, 0.62, mid.y), Vector3(0.10, 1.18, length + 0.18), metal_mat)
+				var node = parent.get_child(parent.get_child_count() - 1)
+				if node is MeshInstance3D:
+					node.rotation.y = angle
+					node.visibility_range_end = 150.0 if not low_spec_mode else 95.0
+			elif kind == "wall":
+				_visual_box(parent, Vector3(mid.x, 0.58, mid.y), Vector3(0.28, 1.16, length + 0.18), concrete_mat)
+				var node = parent.get_child(parent.get_child_count() - 1)
+				if node is MeshInstance3D:
+					node.rotation.y = angle
+					node.visibility_range_end = 170.0 if not low_spec_mode else 105.0
+			elif kind in ["footway", "path", "cycleway"]:
+				var material = paving_mat if str(feature.get("surface", "")).to_lower() in ["paving_stones", "sett", "concrete"] else path_mat
+				_road_rotated_material(parent, Vector3(mid.x, 0.045, mid.y), length + 0.30, 1.55 if kind == "cycleway" else 1.18, angle, material)
+			made += 1
+
+func _add_mapped_point_features(parent: Node3D, features: Array):
+	var cap = 95 if low_spec_mode else 180
+	var made := 0
+	for feature in features:
+		if made >= cap or not feature is Dictionary:
+			break
+		var point = feature.get("point", [])
+		if not point is Array or point.size() < 2:
+			continue
+		var p = Vector3(float(point[0]), 0.0, float(point[1]))
+		var kind = str(feature.get("kind", ""))
+		if kind == "tree":
+			var trunk = MeshInstance3D.new()
+			var tm = CylinderMesh.new()
+			tm.top_radius = 0.12
+			tm.bottom_radius = 0.18
+			tm.height = 2.2
+			tm.radial_segments = 7
+			trunk.mesh = tm
+			trunk.position = p + Vector3(0, 1.1, 0)
+			trunk.material_override = _mat(Color(0.16, 0.10, 0.055), 0.96, 0.0)
+			trunk.visibility_range_end = 150.0 if not low_spec_mode else 90.0
+			parent.add_child(trunk)
+			var crown = MeshInstance3D.new()
+			var sm = SphereMesh.new()
+			sm.radius = 1.25
+			sm.height = 2.5
+			sm.radial_segments = 8 if not low_spec_mode else 6
+			sm.rings = 5 if not low_spec_mode else 3
+			crown.mesh = sm
+			crown.position = p + Vector3(0, 3.0, 0)
+			crown.material_override = hedge_mat
+			crown.visibility_range_end = 165.0 if not low_spec_mode else 95.0
+			parent.add_child(crown)
+		elif kind == "traffic_signals":
+			_visual_box(parent, p + Vector3(0, 1.55, 0), Vector3(0.12, 3.1, 0.12), metal_mat)
+			_visual_box(parent, p + Vector3(0, 2.75, 0), Vector3(0.34, 0.72, 0.24), roof_mat)
+		elif kind == "bus_stop":
+			_visual_box(parent, p + Vector3(0, 1.25, 0), Vector3(0.09, 2.5, 0.09), metal_mat)
+			_visual_box(parent, p + Vector3(0, 2.35, 0), Vector3(0.52, 0.42, 0.10), marking_mat)
+		elif kind == "crossing":
+			_visual_box(parent, p + Vector3(0, 0.48, 0), Vector3(0.11, 0.96, 0.11), metal_mat)
+		made += 1
 
 func _visual_box(parent: Node3D, pos: Vector3, size: Vector3, material):
 	var mesh = MeshInstance3D.new()
@@ -652,6 +768,8 @@ func _bind_map_stream():
 func _on_map_ready(map_data: Dictionary):
 	var roads = map_data.get("roads", [])
 	var buildings = map_data.get("buildings", [])
+	var linear_features = map_data.get("linear_features", [])
+	var point_features = map_data.get("point_features", [])
 	if roads.is_empty() and buildings.is_empty():
 		return
 	map_mode_active = true
@@ -688,6 +806,9 @@ func _on_map_ready(map_data: Dictionary):
 		var points = road.get("points", [])
 		var width = float(road.get("width", 5.0))
 		var kind = str(road.get("kind", "road"))
+		var surface = str(road.get("surface", ""))
+		var sidewalk = str(road.get("sidewalk", "")).to_lower()
+		var road_material = _road_material_for(surface)
 		for i in range(points.size() - 1):
 			if not points[i] is Array or not points[i + 1] is Array:
 				continue
@@ -701,10 +822,10 @@ func _on_map_ready(map_data: Dictionary):
 				continue
 			var mid = (a + b) * 0.5
 			var angle = atan2(road_delta.x, road_delta.y)
-			_road_rotated(map_root, Vector3(mid.x, 0.035, mid.y), length + 1.0, width, angle)
+			_road_rotated_material(map_root, Vector3(mid.x, 0.035, mid.y), length + 1.0, width, angle, road_material)
 			if micro_budget > 0:
 				micro_budget -= _road_micro_detail(map_root, a, b, width, int(abs(a.x * 11.0 + a.y * 17.0 + b.x * 23.0 + b.y * 29.0)), micro_budget)
-			if street_edge_budget < street_edge_limit and length > 7.0 and kind not in ["motorway", "trunk", "track"]:
+			if street_edge_budget < street_edge_limit and length > 7.0 and kind not in ["motorway", "trunk", "track"] and sidewalk not in ["no", "none"]:
 				_street_edges_rotated(map_root, Vector3(mid.x, 0.035, mid.y), length + 0.6, width, angle, kind)
 				street_edge_budget += 1
 			if marking_budget < marking_limit and length > 9.0 and width >= 5.8:
@@ -731,8 +852,11 @@ func _on_map_ready(map_data: Dictionary):
 		if not exact:
 			_add_edinburgh_building(map_root, Vector3(cx, 0.0, cz), Vector3(sx, h, sz), seed, kind)
 
-	_add_map_furniture(map_root)
-	_add_verge_life(map_root)
+	_add_mapped_linear_features(map_root, linear_features)
+	_add_mapped_point_features(map_root, point_features)
+	if linear_features.is_empty() and point_features.is_empty():
+		_add_map_furniture(map_root)
+		_add_verge_life(map_root)
 	_spawn_map_agents()
 
 	var car = get_node_or_null("Car")
@@ -740,6 +864,8 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_data_source", map_data.get("source", "offline"))
 		car.set_meta("map_road_count", roads.size())
 		car.set_meta("map_building_count", buildings.size())
+		car.set_meta("map_linear_feature_count", linear_features.size())
+		car.set_meta("map_point_feature_count", point_features.size())
 		car.set_meta("map_road_segments", map_segments)
 		_snap_car_to_map_junction(car, roads)
 
