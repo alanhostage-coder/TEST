@@ -808,6 +808,7 @@ func _on_map_ready(map_data: Dictionary):
 		var points = road.get("points", [])
 		var width = float(road.get("width", 5.0))
 		var kind = str(road.get("kind", "road"))
+		var oneway = str(road.get("oneway", "no")).to_lower()
 		var surface = str(road.get("surface", ""))
 		var sidewalk = str(road.get("sidewalk", "")).to_lower()
 		var road_material = _road_material_for(surface)
@@ -833,7 +834,7 @@ func _on_map_ready(map_data: Dictionary):
 			if marking_budget < marking_limit and length > 9.0 and width >= 5.8:
 				_live_road_markings(map_root, Vector3(mid.x, 0.035, mid.y), length, width, angle, kind)
 				marking_budget += 1
-			map_segments.append([[a.x, a.y], [b.x, b.y], width, kind])
+			map_segments.append([[a.x, a.y], [b.x, b.y], width, kind, oneway])
 
 	for building in buildings:
 		if not building is Dictionary:
@@ -859,7 +860,12 @@ func _on_map_ready(map_data: Dictionary):
 	if linear_features.is_empty() and point_features.is_empty():
 		_add_map_furniture(map_root)
 		_add_verge_life(map_root)
-	_spawn_map_agents()
+	# OpenWorldDirector owns moving live-map traffic from 0.57 onward.
+	# Keep this legacy system empty to avoid duplicate cars and wasted CPU.
+	for agent in map_agents:
+		if agent.has("node") and is_instance_valid(agent["node"]):
+			agent["node"].queue_free()
+	map_agents.clear()
 
 	var car = get_node_or_null("Car")
 	if car:
