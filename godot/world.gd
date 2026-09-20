@@ -123,6 +123,24 @@ func _road_rotated(parent: Node3D, pos: Vector3, length: float, width: float, an
 	mesh.rotation.y = angle
 	parent.add_child(mesh)
 
+func _live_road_markings(parent: Node3D, pos: Vector3, length: float, width: float, angle: float, kind: String):
+	if width < 5.8 or kind in ["service", "track", "path", "living_street"]:
+		return
+	var dash_count = clamp(int(length / 11.0), 1, 5)
+	var tangent = Vector2(sin(angle), cos(angle))
+	for i in range(dash_count):
+		var t = (float(i) + 0.5) / float(dash_count) - 0.5
+		var p = Vector2(pos.x, pos.z) + tangent * t * length * 0.82
+		var dash = MeshInstance3D.new()
+		var dm = BoxMesh.new()
+		dm.size = Vector3(0.12, 0.018, min(3.2, length / float(dash_count) * 0.48))
+		dash.mesh = dm
+		dash.material_override = marking_mat
+		dash.position = Vector3(p.x, 0.091, p.y)
+		dash.rotation.y = angle
+		dash.visibility_range_end = 135.0
+		parent.add_child(dash)
+
 func _street_edges_rotated(parent: Node3D, pos: Vector3, length: float, width: float, angle: float, kind: String):
 	# Pavement and kerb strips give roads a believable cross-section. Kept shallow,
 	# uncollided and distance-capped so the mobile renderer gets the silhouette cues
@@ -526,6 +544,7 @@ func _on_map_ready(map_data: Dictionary):
 	map_segments.clear()
 	map_lamps.clear()
 	var street_edge_budget := 0
+	var marking_budget := 0
 
 	for road in roads:
 		if not road is Dictionary:
@@ -550,6 +569,9 @@ func _on_map_ready(map_data: Dictionary):
 			if street_edge_budget < 150 and length > 7.0 and kind not in ["motorway", "trunk", "track"]:
 				_street_edges_rotated(map_root, Vector3(mid.x, 0.035, mid.y), length + 0.6, width, angle, kind)
 				street_edge_budget += 1
+			if marking_budget < 70 and length > 9.0 and width >= 5.8:
+				_live_road_markings(map_root, Vector3(mid.x, 0.035, mid.y), length, width, angle, kind)
+				marking_budget += 1
 			map_segments.append([[a.x, a.y], [b.x, b.y], width, kind])
 
 	for building in buildings:
