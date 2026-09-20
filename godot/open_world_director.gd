@@ -25,9 +25,11 @@ var roaming_agents: Array = []
 var roaming_graph := {}
 var low_spec_mode := false
 var projector_max_mode := false
+var pc_max_mode := false
 
 func _ready():
 	projector_max_mode = OS.has_feature("projector_max")
+	pc_max_mode = OS.has_feature("pc_max")
 	low_spec_mode = OS.has_feature("thinkpad_low") or projector_max_mode
 	call_deferred("_bind_scene")
 
@@ -85,7 +87,7 @@ func _clear_root():
 func _build_parked_life(segments: Array):
 	var made := 0
 	for i in range(segments.size()):
-		if made >= (7 if projector_max_mode else (12 if low_spec_mode else MAX_PARKED)):
+		if made >= (7 if projector_max_mode else (12 if low_spec_mode else (36 if pc_max_mode else MAX_PARKED))):
 			break
 		if i % 4 != 1:
 			continue
@@ -153,7 +155,7 @@ func _build_roaming_life(segments: Array):
 	# The graph removes the old full-road scan every time an agent reaches a junction.
 	_build_roaming_graph(segments)
 	var made := 0
-	var cap = 4 if projector_max_mode else (5 if low_spec_mode else 12)
+	var cap = 4 if projector_max_mode else (5 if low_spec_mode else (16 if pc_max_mode else 12))
 	for i in range(0, segments.size(), 5):
 		if made >= cap:
 			break
@@ -312,8 +314,8 @@ func _make_parked_vehicle(seed: int) -> Node3D:
 
 func _build_wet_ground_memory(segments: Array):
 	var wetness = float(car.get_meta("world_wetness", 0.0))
-	var puddle_cap = 6 if projector_max_mode else (12 if low_spec_mode else MAX_PUDDLES)
-	var puddle_floor = 2.0 if projector_max_mode else 4.0
+	var puddle_cap = 6 if projector_max_mode else (12 if low_spec_mode else (36 if pc_max_mode else MAX_PUDDLES))
+	var puddle_floor = 2.0 if projector_max_mode else (6.0 if pc_max_mode else 4.0)
 	var count = int(lerp(puddle_floor, float(puddle_cap), clamp(wetness, 0.0, 1.0)))
 	for i in range(min(count, segments.size())):
 		var seg = segments[(i * 7 + 3) % segments.size()]
@@ -371,7 +373,7 @@ func _build_road_clutter(segments: Array):
 	var seed = abs(int(car.get_meta("pua_api_world_seed", 1)))
 	var made := 0
 	for i in range(segments.size()):
-		if made >= (10 if projector_max_mode else (18 if low_spec_mode else MAX_ROAD_CLUTTER)):
+		if made >= (10 if projector_max_mode else (18 if low_spec_mode else (48 if pc_max_mode else MAX_ROAD_CLUTTER))):
 			break
 		if (i + seed) % 5 != 0:
 			continue
@@ -446,8 +448,8 @@ func _build_situations(segments: Array):
 	situation_root.name = "UnexplainedSituations"
 	root.add_child(situation_root)
 	var seed = abs(int(car.get_meta("pua_api_world_seed", 1)))
-	var situation_cap = 2 if projector_max_mode else (4 if low_spec_mode else MAX_SITUATIONS)
-	var minimum_situations = 1 if projector_max_mode else (2 if low_spec_mode else 3)
+	var situation_cap = 2 if projector_max_mode else (4 if low_spec_mode else (9 if pc_max_mode else MAX_SITUATIONS))
+	var minimum_situations = 1 if projector_max_mode else (2 if low_spec_mode else (4 if pc_max_mode else 3))
 	var count = min(situation_cap, max(minimum_situations, int(segments.size() / 18)))
 	for n in range(count):
 		var index = (seed + n * 37 + n * n * 11) % segments.size()
