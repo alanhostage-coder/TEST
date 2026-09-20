@@ -5,6 +5,7 @@ const CELL := 90.0
 
 func _ready():
 	_make_ground()
+	_make_landmarks()
 	for x in range(-1,2):
 		for y in range(-2,1):
 			_build_cell(Vector2i(x,y))
@@ -55,3 +56,18 @@ func _make_ground():
 	var mesh=MeshInstance3D.new(); var plane=BoxMesh.new(); plane.size=Vector3(1200,0.4,1200); mesh.mesh=plane
 	var col=CollisionShape3D.new(); var shape=BoxShape3D.new(); shape.size=Vector3(1200,0.4,1200); col.shape=shape
 	ground.position=Vector3(0,-0.24,0); ground.add_child(mesh); ground.add_child(col); add_child(ground)
+
+func _make_landmarks():
+	# One memorable industrial edge, visible from several approaches.
+	var dock=Node3D.new(); dock.name="DockEdge"; dock.position=Vector3(135,0,-165); add_child(dock)
+	_box(dock,Vector3(0,4,0),Vector3(44,8,18))
+	_box(dock,Vector3(17,13,-2),Vector3(3,26,3))
+	_box(dock,Vector3(-14,2.5,18),Vector3(24,5,12))
+	# Garage court: enough room to enter, turn around and leave.
+	var court=Node3D.new(); court.name="GarageCourt"; court.position=Vector3(-115,0,-80); add_child(court)
+	for x in [-22.0,-11.0,0.0,11.0,22.0]:
+		_box(court,Vector3(x,2.0,-18),Vector3(9,4,7))
+	# Tall transmitter gives orientation without a map marker.
+	var mast=Node3D.new(); mast.name="Transmitter"; mast.position=Vector3(185,0,110); add_child(mast)
+	_box(mast,Vector3(0,24,0),Vector3(1.2,48,1.2))
+	_box(mast,Vector3(0,45,0),Vector3(9,0.5,0.5))
