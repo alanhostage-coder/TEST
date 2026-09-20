@@ -31,9 +31,11 @@ jobs:
 
       - name: Strict project parse
         run: |
-          set -o pipefail
-          godot --headless --verbose --path godot --editor --quit 2>&1 | tee /tmp/pua-godot.log
-          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/pua-godot.log
+          godot --headless --verbose --path godot --editor --quit > /tmp/pua-godot.log 2>&1
+          cat /tmp/pua-godot.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/pua-godot.log; then
+            exit 1
+          fi
 
       - name: Export Android debug APK
         run: |
