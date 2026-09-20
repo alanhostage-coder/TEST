@@ -46,7 +46,7 @@ jobs:
       - name: Apply world patches
         shell: bash
         run: |
-          for n in 09 10 11 12 13 14 15 16 17 18 19 20 21 22; do python3 android/.build/patch_\${n}.py; done
+          for n in 09 10 11 12 13 14 15 16 17 18 19 20 21 22; do python3 android/.build/patch_${n}.py; done
           grep -q "build 0.22" android/app/src/main/assets/www/index.html
           grep -q "BOOT RESCUE" android/app/src/main/assets/www/index.html
           grep -q "engine2Osc" android/app/src/main/assets/www/index.html
