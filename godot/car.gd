@@ -75,6 +75,16 @@ func _input(event):
 func _physics_process(delta):
 	var input_throttle = Input.get_action_strength("throttle") - Input.get_action_strength("brake")
 	var input_steer = Input.get_action_strength("steer_right") - Input.get_action_strength("steer_left")
+	var pads = Input.get_connected_joypads()
+	if not pads.is_empty():
+		var pad = int(pads[0])
+		var joy_steer = Input.get_joy_axis(pad, JOY_AXIS_LEFT_X)
+		if abs(joy_steer) > 0.12:
+			input_steer = joy_steer
+		if Input.is_joy_button_pressed(pad, JOY_BUTTON_A):
+			input_throttle = 1.0
+		elif Input.is_joy_button_pressed(pad, JOY_BUTTON_B):
+			input_throttle = -1.0
 	if touching:
 		var touch_delta = (touch_now - touch_origin) / 120.0
 		input_steer = clamp(touch_delta.x, -1.0, 1.0)
