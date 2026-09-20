@@ -124,6 +124,66 @@ func _visual_box(parent: Node3D, pos: Vector3, size: Vector3, material):
 	mesh.position = pos
 	parent.add_child(mesh)
 
+func _vehicle_visual(parent: Node3D, seed: int, patrol_style := false):
+	# Low-cost recognisable vehicle silhouette: separate lower body, glazed cabin,
+	# wheel volumes and light lenses. Still procedural, but no longer reads as a box.
+	var palette = [
+		Color(0.11, 0.12, 0.13),
+		Color(0.24, 0.25, 0.24),
+		Color(0.38, 0.12, 0.09),
+		Color(0.10, 0.18, 0.24),
+		Color(0.28, 0.29, 0.30),
+		Color(0.12, 0.22, 0.16)
+	]
+	var paint = Color(0.045, 0.065, 0.085) if patrol_style else palette[abs(seed) % palette.size()]
+	var paint_mat = _mat(paint, 0.42, 0.24)
+	var tyre_mat = _mat(Color(0.025, 0.027, 0.028), 0.92, 0.02)
+	var light_mat = _mat(Color(0.88, 0.82, 0.62), 0.18, 0.05)
+	var tail_mat = _mat(Color(0.62, 0.035, 0.022), 0.24, 0.05)
+	var van = seed % 6 == 0
+
+	var lower = MeshInstance3D.new()
+	var lower_mesh = BoxMesh.new()
+	lower_mesh.size = Vector3(1.82, 0.55 if not van else 0.72, 4.08 if not van else 4.55)
+	lower.mesh = lower_mesh
+	lower.position.y = 0.02 if not van else 0.12
+	lower.material_override = paint_mat
+	parent.add_child(lower)
+
+	var cabin = MeshInstance3D.new()
+	var cabin_mesh = BoxMesh.new()
+	cabin_mesh.size = Vector3(1.48, 0.62 if not van else 1.05, 1.82 if not van else 2.25)
+	cabin.mesh = cabin_mesh
+	cabin.position = Vector3(0, 0.55 if not van else 0.78, 0.02 if not van else 0.22)
+	cabin.material_override = glass_mat
+	parent.add_child(cabin)
+
+	if not van:
+		var roof = MeshInstance3D.new()
+		var roof_mesh = BoxMesh.new()
+		roof_mesh.size = Vector3(1.42, 0.10, 1.56)
+		roof.mesh = roof_mesh
+		roof.position = Vector3(0, 0.89, 0.08)
+		roof.material_override = paint_mat
+		parent.add_child(roof)
+
+	for z in [-1.30, 1.30]:
+		for x in [-0.91, 0.91]:
+			var wheel = MeshInstance3D.new()
+			var wheel_mesh = CylinderMesh.new()
+			wheel_mesh.top_radius = 0.30
+			wheel_mesh.bottom_radius = 0.30
+			wheel_mesh.height = 0.18
+			wheel.mesh = wheel_mesh
+			wheel.position = Vector3(x, -0.13, z if not van else z * 1.10)
+			wheel.rotation.z = PI * 0.5
+			wheel.material_override = tyre_mat
+			parent.add_child(wheel)
+
+	for x in [-0.55, 0.55]:
+		_visual_box(parent, Vector3(x, 0.12, -2.055 if not van else -2.29), Vector3(0.32, 0.16, 0.055), light_mat)
+		_visual_box(parent, Vector3(x, 0.13, 2.055 if not van else 2.29), Vector3(0.28, 0.15, 0.055), tail_mat)
+
 func _road_detail(parent: Node3D, seed: int):
 	for k in range(-3, 4):
 		_visual_box(parent, Vector3(0, 0.075, float(k) * 12.0), Vector3(0.18, 0.025, 5.0), marking_mat)
@@ -231,13 +291,7 @@ func _spawn_traffic():
 	for i in range(14):
 		var car = AnimatableBody3D.new()
 		car.name = "Traffic_%02d" % i
-		var mesh = MeshInstance3D.new()
-		var body = BoxMesh.new()
-		body.size = Vector3(1.8, 0.78, 4.0)
-		mesh.mesh = body
-		var shade = 0.12 + float((i * 17) % 30) / 100.0
-		mesh.material_override = _mat(Color(shade, shade * 0.95, shade * 0.9), 0.46, 0.18)
-		car.add_child(mesh)
+		_vehicle_visual(car, i)
 		var collision = CollisionShape3D.new()
 		var collision_shape = BoxShape3D.new()
 		collision_shape.size = Vector3(1.8, 0.78, 4.0)
@@ -277,12 +331,7 @@ func _update_traffic(delta):
 func _spawn_patrol():
 	patrol = AnimatableBody3D.new()
 	patrol.name = "Patrol"
-	var mesh = MeshInstance3D.new()
-	var body = BoxMesh.new()
-	body.size = Vector3(1.92, 0.82, 4.3)
-	mesh.mesh = body
-	mesh.material_override = _mat(Color(0.055, 0.075, 0.095), 0.38, 0.42)
-	patrol.add_child(mesh)
+	_vehicle_visual(patrol, 911, true)
 	var collision = CollisionShape3D.new()
 	var shape = BoxShape3D.new()
 	shape.size = Vector3(1.92, 0.82, 4.3)
@@ -516,13 +565,7 @@ func _spawn_map_agents():
 	for i in range(count):
 		var body = AnimatableBody3D.new()
 		body.name = "MapTraffic_%02d" % i
-		var mesh = MeshInstance3D.new()
-		var car_mesh = BoxMesh.new()
-		car_mesh.size = Vector3(1.78, 0.76, 3.9)
-		mesh.mesh = car_mesh
-		var shade = 0.10 + float((i * 23) % 34) / 100.0
-		mesh.material_override = _mat(Color(shade, shade * 0.96, shade * 0.91), 0.44, 0.20)
-		body.add_child(mesh)
+		_vehicle_visual(body, i + 200)
 		var collision = CollisionShape3D.new()
 		var shape = BoxShape3D.new()
 		shape.size = Vector3(1.78, 0.76, 3.9)
@@ -674,6 +717,8 @@ func _add_edinburgh_building(parent: Node3D, base: Vector3, size: Vector3, seed:
 			var x = -sx * 0.5 + sx * (float(slot) + 0.5) / float(front_slots)
 			_visual_box(parent, base + Vector3(x, y, -sz * 0.505), Vector3(window_w, window_h, 0.08), glass_mat)
 			_visual_box(parent, base + Vector3(x, y, sz * 0.505), Vector3(window_w, window_h, 0.08), glass_mat)
+			if not industrial:
+				_visual_box(parent, base + Vector3(x, y - window_h * 0.5 - 0.07, -sz * 0.518), Vector3(window_w + 0.20, 0.10, 0.16), stone)
 		for slot in range(side_slots):
 			if (slot * 3 + floor + seed) % 8 == 0:
 				continue
@@ -686,6 +731,19 @@ func _add_edinburgh_building(parent: Node3D, base: Vector3, size: Vector3, seed:
 		for floor in range(1, storeys):
 			var course_y = min(h - 0.25, float(floor) * 3.0)
 			_visual_box(parent, base + Vector3(0, course_y, -sz * 0.512), Vector3(sx, 0.10, 0.08), sandstone_mat)
+
+	# A projecting cornice, parapet and occasional rainwater pipe make the OSM
+	# footprint read as an actual street elevation instead of a textured cuboid.
+	if not industrial and h > 6.5:
+		_visual_box(parent, base + Vector3(0, h - 0.38, -sz * 0.525), Vector3(sx + 0.18, 0.22, 0.24), stone)
+		_visual_box(parent, base + Vector3(0, h + 0.18, -sz * 0.505), Vector3(sx + 0.12, 0.34, 0.18), roof_mat)
+		var pipe_x = -sx * 0.46 if seed % 2 == 0 else sx * 0.46
+		_visual_box(parent, base + Vector3(pipe_x, h * 0.48, -sz * 0.54), Vector3(0.10, h * 0.92, 0.10), metal_mat)
+	elif industrial:
+		var ribs = clamp(int(sx / 6.0), 2, 8)
+		for r in range(ribs):
+			var rx = -sx * 0.5 + sx * (float(r) + 0.5) / float(ribs)
+			_visual_box(parent, base + Vector3(rx, h * 0.50, -sz * 0.512), Vector3(0.09, h * 0.88, 0.10), metal_mat)
 
 	# Ground floor variety: close-set garages/shops for industrial edges; recessed doors for tenements.
 	if industrial:
