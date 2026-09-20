@@ -6,6 +6,7 @@ const MAX_PARKED := 28
 const MAX_ROAMERS := 9
 const MAX_PUDDLES := 30
 const MAX_SITUATIONS := 7
+const MAX_ROAD_CLUTTER := 36
 const SITUATION_RADIUS := 145.0
 const REBUILD_INTERVAL := 3.0
 
@@ -63,6 +64,7 @@ func _try_build_from_live_roads():
 	_build_wet_ground_memory(segments)
 	_build_industrial_vapour(segments)
 	_build_situations(segments)
+	_build_road_clutter(segments)
 
 func _clear_root():
 	vapour_nodes.clear()
@@ -199,6 +201,77 @@ func _update_vapour(delta):
 		node.position = base + Vector3(sin(t * 0.21 + phase) * 2.4, fmod(t * drift + phase * 1.7, 7.0), cos(t * 0.17 + phase) * 1.4)
 		node.scale = Vector3.ONE * (0.82 + 0.18 * sin(t * 0.13 + phase))
 
+
+
+func _build_road_clutter(segments: Array):
+	# Mundane scale cues do more for realism than expensive effects: drains, patched
+	# asphalt, bollards and verge weeds are sparse, deterministic and cheap.
+	var seed = abs(int(car.get_meta("pua_api_world_seed", 1)))
+	var made := 0
+	for i in range(segments.size()):
+		if made >= MAX_ROAD_CLUTTER:
+			break
+		if (i + seed) % 5 != 0:
+			continue
+		var seg = segments[i]
+		if not seg is Array or seg.size() < 3:
+			continue
+		var a = Vector2(float(seg[0][0]), float(seg[0][1]))
+		var b = Vector2(float(seg[1][0]), float(seg[1][1]))
+		var d = b - a
+		if d.length() < 10.0:
+			continue
+		var tangent = d.normalized()
+		var normal = Vector2(-tangent.y, tangent.x)
+		var width = float(seg[2])
+		var t = 0.16 + float((seed + i * 29) % 68) / 100.0
+		var p = a.lerp(b, t)
+		var kind = (seed + i * 7) % 4
+		if kind == 0:
+			var patch = MeshInstance3D.new()
+			var pm = PlaneMesh.new()
+			pm.size = Vector2(1.2 + float(i % 4) * 0.65, 2.1 + float((i + 2) % 5) * 0.7)
+			patch.mesh = pm
+			patch.position = Vector3(p.x, 0.086, p.y)
+			patch.rotation.y = atan2(tangent.x, tangent.y) + float((i % 3) - 1) * 0.08
+			patch.material_override = _material(Color(0.035, 0.039, 0.041), 0.43, 0.02)
+			root.add_child(patch)
+		elif kind == 1:
+			var side = -1.0 if i % 2 == 0 else 1.0
+			var edge = p + normal * side * (width * 0.5 - 0.22)
+			var drain = MeshInstance3D.new()
+			var dm = BoxMesh.new()
+			dm.size = Vector3(0.42, 0.025, 0.72)
+			drain.mesh = dm
+			drain.position = Vector3(edge.x, 0.095, edge.y)
+			drain.rotation.y = atan2(tangent.x, tangent.y)
+			drain.material_override = _material(Color(0.055, 0.06, 0.06), 0.50, 0.55)
+			root.add_child(drain)
+		elif kind == 2:
+			var side = -1.0 if i % 2 == 0 else 1.0
+			var edge = p + normal * side * (width * 0.5 + 0.7)
+			var bollard = MeshInstance3D.new()
+			var bm = CylinderMesh.new()
+			bm.top_radius = 0.08
+			bm.bottom_radius = 0.11
+			bm.height = 0.82
+			bollard.mesh = bm
+			bollard.position = Vector3(edge.x, 0.41, edge.y)
+			bollard.material_override = _material(Color(0.16, 0.17, 0.17), 0.62, 0.20)
+			root.add_child(bollard)
+		else:
+			var side = -1.0 if i % 2 == 0 else 1.0
+			var edge = p + normal * side * (width * 0.5 + 0.45)
+			for j in range(3):
+				var weed = MeshInstance3D.new()
+				var qm = QuadMesh.new()
+				qm.size = Vector2(0.16 + j * 0.05, 0.30 + j * 0.09)
+				weed.mesh = qm
+				weed.position = Vector3(edge.x + normal.x * j * 0.12, 0.16, edge.y + normal.y * j * 0.12)
+				weed.rotation.y = atan2(normal.x, normal.y) + j * 0.55
+				weed.material_override = _material(Color(0.12, 0.16, 0.075), 0.95, 0.0)
+				root.add_child(weed)
+		made += 1
 
 func _build_situations(segments: Array):
 	# Unannounced world situations: things the player notices rather than activates.
