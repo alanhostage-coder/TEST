@@ -387,6 +387,76 @@ func _osm_building_material(building: Dictionary, seed: int):
 		_:
 			return sandstone_warm_mat
 
+func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height: float, seed: int, building: Dictionary):
+	# Keep the mapped polygon authoritative. Detail is attached directly to its real
+	# wall edges, never to a replacement bounding box. PC Max only, and only near
+	# the spawn, so the extra street-level read does not leak into low-spec targets.
+	if not pc_max_mode or low_spec_mode or poly.size() < 3:
+		return
+	var centroid := Vector2.ZERO
+	for p in poly:
+		centroid += p
+	centroid /= float(poly.size())
+	if centroid.length() > 125.0:
+		return
+	var kind = str(building.get("kind", "yes")).to_lower()
+	var industrial = kind in ["industrial", "warehouse", "commercial", "retail"]
+	var floors = clamp(int(floor(height / 3.0)), 1, 3)
+	var door_edge = abs(seed) % poly.size()
+	var edge_budget := 0
+	for edge_index in range(poly.size()):
+		if edge_budget >= 6:
+			break
+		var p0 = poly[edge_index]
+		var p1 = poly[(edge_index + 1) % poly.size()]
+		var delta = p1 - p0
+		var length = delta.length()
+		if length < 4.2:
+			continue
+		var tangent = delta / length
+		var angle = atan2(tangent.x, tangent.y)
+		var edge_mid = (p0 + p1) * 0.5
+		var slots = clamp(int(floor(length / (5.8 if industrial else 3.6))), 1, 4)
+
+		# A dark plinth and a thin roofline make the exact footprint meet the street
+		# and sky cleanly without altering its mapped position.
+		_visual_box(body, Vector3(edge_mid.x, min(0.42, height * 0.08), edge_mid.y), Vector3(0.10, min(0.84, height * 0.16), length * 0.96), roof_mat)
+		var plinth = body.get_child(body.get_child_count() - 1)
+		if plinth is MeshInstance3D:
+			plinth.rotation.y = angle
+			plinth.visibility_range_end = 155.0
+		if height > 5.8:
+			_visual_box(body, Vector3(edge_mid.x, height - 0.18, edge_mid.y), Vector3(0.12, 0.26, length * 0.97), roof_mat)
+			var cornice = body.get_child(body.get_child_count() - 1)
+			if cornice is MeshInstance3D:
+				cornice.rotation.y = angle
+				cornice.visibility_range_end = 165.0
+
+		for floor_index in range(floors):
+			var y = 1.75 + float(floor_index) * 2.85
+			if y > height - 0.65:
+				continue
+			for slot in range(slots):
+				var t = (float(slot) + 0.5) / float(slots)
+				var p = p0.lerp(p1, t)
+				var panel_w = min(1.45 if industrial else 1.05, max(0.72, length / float(slots) * 0.46))
+				var panel_h = 1.25 if industrial else 1.32
+				var panel_y = y
+				var panel_mat = glass_mat
+				# One plausible recessed entrance on one mapped wall only. Everything else
+				# remains quiet fenestration so geometry, not decoration, does the work.
+				if edge_index == door_edge and floor_index == 0 and slot == abs(seed / 7) % slots and not industrial:
+					panel_w = min(1.25, max(0.9, length / float(slots) * 0.55))
+					panel_h = 2.15
+					panel_y = 1.08
+					panel_mat = roof_mat
+				_visual_box(body, Vector3(p.x, panel_y, p.y), Vector3(0.075, panel_h, panel_w), panel_mat)
+				var panel = body.get_child(body.get_child_count() - 1)
+				if panel is MeshInstance3D:
+					panel.rotation.y = angle
+					panel.visibility_range_end = 145.0
+		edge_budget += 1
+
 func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float, seed: int) -> bool:
 	var footprint = building.get("footprint", [])
 	if not footprint is Array or footprint.size() < 3:
@@ -433,6 +503,7 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 	var collision = CollisionShape3D.new()
 	collision.shape = mesh.create_trimesh_shape()
 	body.add_child(collision)
+	_add_exact_osm_facade_detail(body, poly, height, seed, building)
 	parent.add_child(body)
 	return true
 
