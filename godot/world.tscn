@@ -162,3 +162,52 @@ theme_override_colors/font_color = Color(1, 1, 1, 0.46)
 theme_override_font_sizes/font_size = 11
 text = "© OpenStreetMap contributors"
 horizontal_alignment = 2
+
+
+[node name="ParkviewCredit" type="Panel" parent="HUD"]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.08
+anchor_right = 0.5
+anchor_bottom = 0.08
+offset_left = -220.0
+offset_top = 0.0
+offset_right = 220.0
+offset_bottom = 86.0
+mouse_filter = 2
+
+[node name="Title" type="Label" parent="HUD/ParkviewCredit"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 8.0
+offset_bottom = 34.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.92)
+theme_override_font_sizes/font_size = 20
+text = "PARKVIEW"
+horizontal_alignment = 1
+
+[node name="Byline" type="Label" parent="HUD/ParkviewCredit"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 34.0
+offset_bottom = 54.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.72)
+theme_override_font_sizes/font_size = 12
+text = "PROCEED UNTIL APPREHENDED · by A Parley"
+horizontal_alignment = 1
+
+[node name="ShoutOut" type="Label" parent="HUD/ParkviewCredit"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_top = 56.0
+offset_bottom = 78.0
+grow_horizontal = 2
+theme_override_colors/font_color = Color(1, 1, 1, 0.58)
+theme_override_font_sizes/font_size = 11
+text = "shout out Emily · Rhea · Jasper · Magnus · Rudi"
+horizontal_alignment = 1
