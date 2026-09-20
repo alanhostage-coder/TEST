@@ -11,6 +11,13 @@ var weather_sun_energy := 0.68
 var map_root: Node3D
 var map_segments: Array = []
 var map_agents: Array = []
+var map_lamps: Array = []
+var api_traffic_factor := 0.85
+var api_traffic_speed_factor := 0.95
+var api_lamp_factor := 1.0
+var api_detail_pressure := 0.70
+var api_radio_instability := 0.20
+var api_moment := "none"
 const CELL := 90.0
 
 var asphalt_mat
@@ -32,6 +39,7 @@ func _ready():
 	_spawn_patrol()
 	_bind_world_state()
 	_bind_map_stream()
+	_bind_pua_api()
 	for x in range(-1, 2):
 		for y in range(-2, 1):
 			_build_cell(Vector2i(x, y))
@@ -351,7 +359,10 @@ func _update_atmosphere(car):
 	var mast = Vector3(185, 0, 110)
 	var distance = car.global_position.distance_to(mast)
 	var radio_strength = clamp(1.0 - distance / 430.0, 0.0, 1.0)
+	var radio_flutter = 1.0 - api_radio_instability * 0.08 * (0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.0043))
+	radio_strength *= radio_flutter
 	car.set_meta("radio_signal", radio_strength)
+	car.set_meta("pua_api_moment", api_moment)
 	$Sun.light_energy = weather_sun_energy * lerp(0.94, 1.06, radio_strength)
 	var beacon = get_node_or_null("Transmitter/Beacon")
 	if beacon:
@@ -420,6 +431,7 @@ func _on_map_ready(map_data: Dictionary):
 	map_root.name = "OpenMapWorld"
 	add_child(map_root)
 	map_segments.clear()
+	map_lamps.clear()
 
 	for road in roads:
 		if not road is Dictionary:
@@ -529,8 +541,16 @@ func _spawn_map_agents():
 		_place_map_agent(agent)
 
 func _update_map_agents(delta):
-	for agent in map_agents:
+	if map_agents.is_empty():
+		return
+	var visible_count = clamp(int(round(float(map_agents.size()) * api_traffic_factor)), 3, map_agents.size())
+	for index in range(map_agents.size()):
+		var agent = map_agents[index]
 		if not agent.has("node") or not is_instance_valid(agent["node"]):
+			continue
+		var node = agent["node"]
+		node.visible = index < visible_count
+		if not node.visible:
 			continue
 		var seg_index = int(agent.get("seg", 0))
 		if seg_index < 0 or seg_index >= map_segments.size():
@@ -541,7 +561,8 @@ func _update_map_agents(delta):
 		var length = max(2.0, a.distance_to(b))
 		var t = float(agent.get("t", 0.0))
 		var direction = float(agent.get("dir", 1.0))
-		t += direction * float(agent.get("speed", 9.0)) * delta / length
+		var live_speed = float(agent.get("speed", 9.0)) * api_traffic_speed_factor
+		t += direction * live_speed * delta / length
 		if t >= 1.0:
 			agent["t"] = 1.0
 			_choose_next_map_segment(agent, b, seg_index)
@@ -551,6 +572,7 @@ func _update_map_agents(delta):
 		else:
 			agent["t"] = t
 		_place_map_agent(agent)
+
 
 func _choose_next_map_segment(agent: Dictionary, junction: Vector2, current_index: int):
 	var candidates: Array = []
@@ -612,6 +634,7 @@ func _add_map_furniture(parent: Node3D):
 			lamp.omni_range = 10.0
 			lamp.shadow_enabled = false
 			parent.add_child(lamp)
+			map_lamps.append(lamp)
 		placed += 1
 
 
@@ -620,7 +643,7 @@ func _add_edinburgh_building(parent: Node3D, base: Vector3, size: Vector3, seed:
 	var h = size.y
 	var sz = size.z
 	var industrial = kind in ["industrial", "warehouse", "commercial", "retail"] or sx > 28.0 or sz > 28.0
-	var detailed = industrial or seed % 3 == 0
+	var detailed = industrial or (seed % 100) < int(clamp(api_detail_pressure, 0.35, 1.0) * 48.0)
 	var stone = soot_stone_mat if seed % 3 != 0 else sandstone_mat
 	if industrial:
 		stone = _mat(Color(0.27, 0.285, 0.29), 0.84, 0.03)
@@ -683,3 +706,31 @@ func _add_edinburgh_building(parent: Node3D, base: Vector3, size: Vector3, seed:
 			_visual_box(parent, base + Vector3(x, h + 0.85, z), Vector3(0.55, 1.7, 0.55), roof_mat)
 	if industrial and seed % 3 == 0:
 		_visual_box(parent, base + Vector3(sx * 0.22, h + 0.7, -sz * 0.12), Vector3(3.6, 1.4, 2.6), metal_mat)
+
+
+func _bind_pua_api():
+	var api = get_node_or_null("PUAAPI")
+	if not api:
+		return
+	if api.has_signal("directive_changed"):
+		api.directive_changed.connect(_on_pua_directive)
+	if api.has_method("get_directive"):
+		_on_pua_directive(api.get_directive())
+
+func _on_pua_directive(directive: Dictionary):
+	api_traffic_factor = clamp(float(directive.get("traffic_factor", 0.85)), 0.25, 1.35)
+	api_traffic_speed_factor = clamp(float(directive.get("traffic_speed_factor", 0.95)), 0.65, 1.10)
+	api_lamp_factor = clamp(float(directive.get("lamp_factor", 1.0)), 0.45, 2.0)
+	api_detail_pressure = clamp(float(directive.get("detail_pressure", 0.70)), 0.35, 1.0)
+	api_radio_instability = clamp(float(directive.get("radio_instability", 0.20)), 0.0, 1.0)
+	api_moment = str(directive.get("moment", "none"))
+	for lamp in map_lamps:
+		if is_instance_valid(lamp):
+			lamp.light_energy = 0.72 * api_lamp_factor
+	var garage_light = get_node_or_null("GarageCourt/GarageLight")
+	if garage_light:
+		garage_light.light_energy = 2.2 * api_lamp_factor
+	var car = get_node_or_null("Car")
+	if car:
+		car.set_meta("pua_api_traffic", api_traffic_factor)
+		car.set_meta("pua_api_world_seed", int(directive.get("world_seed", 1)))
