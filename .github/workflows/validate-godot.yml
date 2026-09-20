@@ -16,8 +16,11 @@ jobs:
           sudo mv Godot_v4.5.1-stable_linux.x86_64 /usr/local/bin/godot
       - name: Headless import and parse
         run: |
-          godot --headless --path godot --editor --quit
-          godot --headless --path godot --quit-after 2
+          set -o pipefail
+          godot --headless --path godot --editor --quit 2>&1 | tee /tmp/godot-editor.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/godot-editor.log
+          godot --headless --path godot --quit-after 2 2>&1 | tee /tmp/godot-run.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/godot-run.log
       - name: Greybeard invariants
         run: |
           grep -q 'renderer/rendering_method="mobile"' godot/project.godot
