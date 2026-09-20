@@ -92,10 +92,16 @@ jobs:
         run: |
           mkdir -p dist
           cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_18.apk
-      - name: Upload APK
+      - name: Package build inspection
+        shell: bash
+        run: |
+          cp android/app/src/main/assets/www/index.html dist/PUA_0_18_BUILT_INDEX.html
+      - name: Upload APK and built source
         uses: actions/upload-artifact@v4
         with:
-          name: PROCEED-UNTIL-APPREHENDED-0.18-APK
-          path: dist/PROCEED_UNTIL_APPREHENDED_0_18.apk
+          name: PROCEED-UNTIL-APPREHENDED-0.18-INSPECTION
+          path: |
+            dist/PROCEED_UNTIL_APPREHENDED_0_18.apk
+            dist/PUA_0_18_BUILT_INDEX.html
           if-no-files-found: error
           retention-days: 30
