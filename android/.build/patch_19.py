@@ -1,48 +1,45 @@
 from pathlib import Path
+import base64,zlib
 p=Path('android/app/src/main/assets/www/index.html');s=p.read_text()
-# Advance build identity without disturbing the 0.18 driver-world systems.
-s=s.replace('build 0.18 DRIVER WORLD','build 0.19 FORTH LIFE').replace('build 0.18 · DRIVER WORLD','build 0.19 · FORTH LIFE')
-# Add deterministic, world-anchored ambient life. No missions, score, completion or identity processing.
-js=r'''
-function drawForthLife19(cam,speed,w){
-  const t=state.playSeconds,fx=cam.fx,fy=cam.fy,rx=-fy,ry=fx;
-  ctx.save();
-  // Repeating roadside clusters are anchored to world distance so they persist as you roam.
-  const along=state.x*fx+state.y*fy,base=Math.floor(along/240)*240;
-  for(let k=-2;k<9;k++){
-    const d=base+k*240-along,side=((k+Math.floor(base/240))&1)?1:-1;
-    if(d<35||d>cam.far*.92)continue;
-    const lateral=side*(104+hash(k,Math.floor(base/240),seed^0x191)*70);
-    const wx=state.x+fx*d+rx*lateral,wy=state.y+fy*d+ry*lateral;
-    const pr=project(wx,wy,0,cam);if(!pr)continue;const q=Math.max(.10,pr.scale);
-    // garages / workshops, wet concrete apron, sodium practicals
-    ctx.globalAlpha=Math.min(.82,.20+q*.55);ctx.fillStyle='#4a4d48';ctx.fillRect(pr.x-30*q,pr.y-23*q,60*q,23*q);
-    ctx.fillStyle='#272b29';ctx.fillRect(pr.x-20*q,pr.y-17*q,25*q,17*q);ctx.fillStyle='rgba(214,151,77,.42)';ctx.fillRect(pr.x+15*q,pr.y-15*q,3*q,3*q);
-    ctx.fillStyle='rgba(150,158,151,.12)';ctx.fillRect(pr.x-38*q,pr.y,76*q,7*q);
-    // parked vehicle or anonymous pedestrian silhouette: environmental only, no face/identity data.
-    if(hash(k,7,seed^0x192)>.43){ctx.fillStyle='#555c59';ctx.fillRect(pr.x+side*18*q,pr.y-5*q,15*q,5*q);ctx.fillStyle='#171a19';ctx.fillRect(pr.x+side*20*q,pr.y-1*q,3*q,2*q)}
-    if(hash(k,9,seed^0x193)>.68){ctx.fillStyle='rgba(28,30,29,.68)';ctx.fillRect(pr.x-side*10*q,pr.y-9*q,2.2*q,9*q);ctx.beginPath();ctx.arc(pr.x-side*10*q,pr.y-10*q,1.7*q,0,Math.PI*2);ctx.fill()}
-  }
-  // Slow Forth-side freight movement in the middle distance, independent of the player.
-  for(let j=0;j<3;j++){
-    const cyc=(t*(.22+j*.035)+hash(j,44,seed^0x194)*180)%180,d=420+j*185;
-    const side=j%2?1:-1,lateral=side*(250+cyc*2.2),wx=state.x+fx*d+rx*lateral,wy=state.y+fy*d+ry*lateral,pr=project(wx,wy,0,cam);if(!pr)continue;const q=Math.max(.08,pr.scale);
-    ctx.globalAlpha=.26;ctx.fillStyle='#3d4544';ctx.fillRect(pr.x-18*q,pr.y-7*q,36*q,7*q);ctx.fillStyle='rgba(224,176,96,.45)';ctx.fillRect(pr.x-side*15*q,pr.y-5*q,2*q,1.4*q);
-  }
-  // Chimney/yard vapour rises locally rather than becoming a full-screen fog filter.
-  for(let i=0;i<5;i++){const d=260+i*170,lateral=(i%2?1:-1)*(190+i*13),pr=project(state.x+fx*d+rx*lateral,state.y+fy*d+ry*lateral,18,cam);if(!pr)continue;const q=Math.max(.08,pr.scale),pulse=(t*.7+i*11)%28;ctx.globalAlpha=.045*(1-pulse/34);ctx.fillStyle='#d0d2cb';ctx.beginPath();ctx.arc(pr.x+Math.sin(t*.18+i)*8*q,pr.y-pulse*q,8*q+pulse*.3*q,0,Math.PI*2);ctx.fill()}
-  ctx.restore();
-}
-'''
-if '</script>' not in s: raise SystemExit('script close missing')
-s=s.replace('</script>',js+'\n</script>',1)
-# Insert the pass immediately after the 0.18 road pass call, using the final call occurrence (not function declaration).
-needle='drawRoad18(chunks,cam,w);'
-pos=s.rfind(needle)
-if pos<0: raise SystemExit('0.18 road call missing')
-s=s[:pos+len(needle)]+'drawForthLife19(cam,speed,w);'+s[pos+len(needle):]
-# Add a little camera-body response via CSS-independent runtime values only; existing camera remains authoritative.
-s=s.replace('build 0.18','build 0.19')
+def dec(x):return zlib.decompress(base64.b64decode(x)).decode()
+def rf(src,name,new):
+ k='function '+name+'(';i=src.find(k);j=src.find('{',i);d=0
+ if i<0:raise SystemExit(name+' missing')
+ while j<len(src):
+  if src[j]=='{':d+=1
+  elif src[j]=='}':
+   d-=1
+   if d==0:return src[:i]+new+src[j+1:]
+  j+=1
+ raise SystemExit(name+' close missing')
+STREET=dec('eNq1V22P2jgQ/t5f4VOlkhfjjZ0XwtK06peTTtqTqutJ/VD1pLwY4uJN2MQsiY797zdOQoCFbatK9wGIPZOZxzPPeIbltkiVKAuUVfHuk6o4V3diyencSPNtsa5xGt/jnfnvK4TSsqgVyuL7TfRnrHJyHzeGg/tHURgUG7s3b3akikWx3zumRWa+3W+lstxm/R4NTXOhjamG1PEjN7rVsqyM3nyKyiXqXXdOe5nkClUichaVeJuSqoyzmkherFQOO7Y9aB4gVtGg86USX3HWRBVp2BS+KM5aWLR60VJ8158jbzelMrIGhOZ+T/G2ibLm5g5v2yhr4bdooum2xUUbbRucx3IJJnYW8ReD05sb9BFOcs8LhW5QHlcZqvNyKzNeAegkAUyoFgp92wK2cqtqkXGkco40RjIYOUagE0MQvkwppl/HoyEkRcENfQq7aCytZRkajT0zsT6OXbQXuw27qsuu6a5FkUVRNPkweR/e+liL3znvJ6+DWZAE3uQWnlgQBM5EU8Jc/BAWZVdx9dsXwAZtdkWb4km1SmKDOT7WHzqnmNDAPAfydEaBWvFNdHYmOnNuGfNxWm4LdSQw7Qm8lCUk4O5Gv2eONg/U08wD4uk3F6d0O3hTKjKETVzfzuM6N1KSNhZ1bYHhqbUotSuBa86zf5wGwEMVuI5505sbLf0EAQ7u8ujEjaOtW3R28Daf2drA0R87ydVYxKJWURdg4yxILLxlnmkb+TsyY++Zd+tcebmrJ2pnjaXUmEVtEXfFBZK2k7Qnkk20qcpvPFVGg1vs9JkTS+O3jQlGlSi2/NLRwzFNxAnxhtRpLPkZIjChsXpnUepK8lNaqhptgJxQlDs44jTRBdrdC10BwlUHoZZQqVwpTs7eH+IMafVYn1OBT3PompYXmtYDljwuImPQOI+7Z06Jb1oz62FxbhtuvpUsk1h+kJs8jsYLlAQh8JrZDxYB44vuhlRVueafVCt5NHntBm7mziadRFfdZ5Gp/CRGIWbWQ/9iwlei+AgSo1/fl4/879LYkAbC2JqjiX7P1sfQgmmuTh0b5iX0pZCyBwSBD0O4INzMi92lviC8wGfeAPA5Ai6l2NT8uTs8wncxdQH+cYPhuV5PCfXx0Gc+/mGx3pyGcQ3ej9xOA8ha79qG1Fx4O1nP9Jqwn3L+xGXNBzZ6/iUb76Brok1Z6w6huOSrKt7ksCE5QZ/j6h5JrVAWskUCevFWSs3BTOjWXL/ETTd4Vr40vIX2CoR7mWO+5pjTccy/yjHfjd3wZY7NMCXer7HsJwgGAXw2MbwDxPu9Hjr6wJ5TcGgMkCMaephShonHzOsEjKv0BMUx0ZRQzIiunJcS/fRColl45dq5jyF34y1Ti1UBKU9KKWEueCGRdPbdlAVwKurplF3NmBd7mRd+71agxP/fMnYtH3Q+h0bNoFE7mPiHfGitv3QHAMNTb6zCKWDDIXw6jKeRfvX8qf/tvyHUv/Mi5TWKiwztIOg1SngXc6gHmLQqEUuUbIXMRLGq0Uo89kPXrqxkhmK0qqD/ZhxmNd1UyNmomeiGn+hRczRwGDeTy3EziU70viTia9fYEnLEsd+PDdtO+j597BO++Vbf98/b4DAOD0RIy9pISKwrAtfDXg3kGPc20IcSPZYG4bmFhsJ+M01jS+vgVi/baT0sG6al9ijVy9YepAdD3YQHwzOMzA0DHSgXb5jJghmeMQzfMC88G8gOwVxDLNdvvcVaB26Yl6L1jXs6E1DbgAm9gdEIhghYwITedovrk8L3x4OLEumQenPsu9gHRgaB+XK1BPjXK4WOZXaolSNjn4b/PBWvVVl1ZfT0Hz12B3I=')
+SKY=dec('eNp1k01T2zAQhu/8ij20IDmKsB3shEndQ3toD/RQ0plcEbYcaXAkRlZwzMd/71pJIZDpwR9a7Wr3fXZVb0zptTVQOdEt7vrfG9Fo3yeXpBRr1rF2Y+jTCUDpt7wVD5LQOa7Oz+Gbs6KCsrGbClolmwfZMjDWg4C2dFIa8Np4Dleil67F43WNex4qXdfSSePBCS9bEKYCJ9dCGzBSOPBKgrJOP1rDh7zWtH6XpvglvOJrsSUx2/1qQxLWnZ52PDg8P8eUMl+0Hk/m943oFxLjq3YoWdckOH3lyUVQBFBbRxrpQRfxXH/J5no02u/8y9sXSIHvy4kIT2cjHfEkoWxbEOIjkvAkWKYUP8uITxL6mSyjhF9klI7RkKas64olxk7iwTPOMsqUKn6iJU6zYIrzAPUt7aoYcCNF1HEtKi2aHw4/CI1sWc8u2PDuuohnKZ2vuKiq77axbuHtPbK5catbQfKcTTM2nbJPTyFREB/yv9Cbo6iEnb2PiukZnQ9V1LppFr5vZLF6XV/LEisZhwoy1o+ViiZDPUgDtUU5DWpeTnYPDssfhe1t9Ep5uB0ajvN20GfAUnBCNPbNlBI67ZXdeKjFnYTbxtr12yCoQzRXepiYVzQxO2jWeDJj7wyjZEbn6gjWTnaaxixNcpZc5jvlHx15nu65Hrru0fJ4kkV4UQJY9R+yRynew1Uf6B6JWbJsFsZkcHOy9dbhZTx5+QvlSCjp')
+CAR=dec('eNqNVNFu2jAUfe9XpOoDDjMmdhKSqGLSNGnSHiZV237ACQ6NZJLUdmlR6b/v2i5QILQTApxr33Puub459WNbmaZrg4XiT3eSb4T6zhUtUI8rvgpfroKgqdF1v91e92Td6KaUIlTCPKr2tupabYKH+S9u7smKPyOSMewfmhYxkqS4J7rikBFibYRQc224EcStt9sI616Ihc/npUZ+dx3eAmtlnonma4HCW7s0irdawjbqyTPAbnxYdTYFTRzimERJOt4XQD38NA0dIMjw+F37o+uMk+Zp6kbKP2YjxXykliVHEbYfwtJw5EhKsWzaO4B9q0VI2fRawDk2fsApfO2/zXHcdz/HzB+0wOiwfOO4qeoqL5NhbK4qwJ0kABiTxMFeBlVCm07ZFvkbAUWvVx9qiqNPNTk9VlD2oSjgmU4Ds4EazilvWMRiRkf7hN+iMmhCc4CcUPixymbjh/D4AE3O9j1N2S02AW8XsOiMpXOTZ6PAxRc8zevRSZvt5qDSVbcWfzs0YRFw0F0NsmldlM5sCcVpuHCFxSdhGg2HsyGMY75Kdlq8q+rQ1dNWzupZmYrhVtprim3F8aFXS8m1Dr4ESnAV6Hsh66H7yeI4zkYfNshrZqetcA2y9EfhfDBK6THGf6t2M0vzDLMowrSYYUKz8LQHqQO3zXY873pgeCMDyVe9DqZBb23jEkUR4yTHcYFJwc4I/DAku5ecDEwsHThxgYsxhhmdYZoDW5afsbnhZ+6lz72n7OTox9JIETwJA7daS+Ece/8aQPhgwRF+53/oScCDUCgkijctOG4IXghGCClfCc3DF1vBUnYll99kf8/nsDEmlJ1Z1oJVOc8+sw47MTT1V3HZOnYWtXevq9d/+V8DSw==')
+BUILDING=dec('eNp1VltvozgUfp9fwapSg4PjgMEkbUpGO7PS7stKo5lK+1BlJQNOQKUQYZJgdfLf99hAbjt9iY99Ps7183HWuzJp8qq00pofvuzyIs3LjR3jhL+h90+WlVSlbCxebqKY8J8/XVBEf/MmI0klbThGWPYHMi+7g6wF7GFMGM4USBlIi5OlbSOjl5eYtJOEj7PWkfCrcEzUREvdqVphjXBuEM4HiMkNwrlATG4Qk0vEirzxrb2PloeqLtLn6kdSC1Ha+xd3hfcv3soUAenY87UNgRNZvQl7Gy1/25J9LvO4EAjVotnV5aLLTiaRxtUi3SXCtjneomjJnS2RCS8EdtE0wKnYNtkHMKMzsAW4lMkTcSkbXJxq+Nefz5Edk7xMd7Kpc158puGjHyDHpnOHzccxaRBuqq1xolOEkO339nFLWqzgV03AwrgP6ogQXvNUdE18461NKMXexIQyhQqQNa/HZDY3hUialki+F7bZTafWV67TznhaHaxYrKtaWE0mrLhnktVUQJ4kq2orb/RGKzd1tStTa1vwUpBTVjI7h0BxJwKlaIh1tDIZEz+EWGUbSaDUjGKpjETpQke1KaqYF78X24xHOp8x8cLFFqx8qwplv0ApdFv1Ao3VxTAScEiaonQ7YJA6Dlr3Suv22hUe3XmuF3j+6FSRW9/nVh14UURXrYLGNUvC2OfRXUhDn6Wjx9Ed89kDA4OPnTbUynnosblRzljMwhHCKa9fr42N7vx1wAJPw2B9CPwRrqtqfYuaBTM/5BoVPoQ8pCMd4UfFAeYMi7taYZ0Cuqmk14Fph6LDNysT4gUYjk08eFRvYm5Tn2JKA+w9zDFxQzQaLpdMlsTzzcAZKrfmiYheuiCGkC5c68iAHm10IgohRH8zEB7IDmwBMrUXzP4lJC/V2UrnkKjeJVHGhjrbGLiAB8ogfDhE2s9Ex4OzTG+U3qiFyQfyOxyWnnt/n2Ww9FkOeSZVIc/uGb69A+uiqmowMPVmCKKtq8MF3D/DvUt4lvXwIm+ijnDzRe8W7qhdiMaq68hd1PWTtgir46BBkySgSZInHRqsoHmHHDIuMxt2F25gwEJE9fURFEQKkf7rtt4XDy3JzEWQaZOXO2Eu6jovih+NKkQEwUFNOrNg5vwZhc8Y/dyTRo+jBxd7lGFCAwQs7s8xzAZgE/EpGp1MfxdJY+tOOIfD2CYedRIYHbNwqrPpuu1kGWio69Qw2Jg71RVAF5UkFFo6Ju6cXZ160Fs4hboe+1LC/PsDkpbWFKbXrmkEiPCUloLXpwkoSQ/uaQ7z/P26DNd31eTm+9ifYR8SZuyUcBDigGJ/3h3+OmES+IavEx0q9XUe1y8FjMtHfdVwB0D6nbkEdMGBXL2KLrzOuQcD15vB1Q19DEXt/Rd5Kf7JU3jPvMXAnleQX5+CxavmTcdxpaKLoJzXsSkkY8ZGLDZ5+Q3KDG+K3r9Ve/FcXWWkFDq5u1SF7KTqIrbR8dg1R/8euyfqOwwg89g00Ke9KBvTJP2WW+e8rV2ZN6ZXNwW5vzfDifZMvWX/h9T3gcMhHSqQtNEwWlqnHy2dQAfBB0H/P0jUCaoGqBqgaoAq/R/hmkddoxjFbIYZXIvZ/65F0k4CeEnBxWSu19OPYbSG1kI28Ibb6NPxP3iBMVw=')
+TRAFFIC=dec('eNp9VcFu2zgQvfcrDAStRJlmJVqyvXaYIMcF2kWxya3oArREW0pliiGZREKaf98haadx6haGLWo4b2bemyG9uZelbTo5qjR/vNF8s2nKuKzv5XeDS75DT+9Go7KTxo52XVexx0631WdYxQhbZiy3gqiWD9cCnCqTkHSaAk4b9vXbCqCbTscBXo66zSgERs7aCjvSDUtXujkvie54ZUgr5NbWYBmPfeJDas32Hl918w1XPdOkpxP4yXA1wMvgXoYMf2Kfua1JPajOxlUPm+jHjwzLnk2q4eMnLAdW9fBccyMA9r2RFWMsuoou6TLDZXcvbYiw432cYr/UYK1ih0icAsQGjRBa+QIPVG6Bye25D7G6fSn/QKBqNKu5qeOSlP1YN/h2DKsBGyGq/9I+LzJ0QYrLbDnJsFFgZCBkMf4jpECgdoFVzWLvd4u957HTDI1t4iMmUAN6n2GlmKrP00tVj7OlqldHdbZcChYfKaPJY0KyxTI8c+TiYN+BbFz1iVJj2ScOh30nwDh44xCMKozMTXddaiFk3OPBz9Uhb7OJFXloTLNuBXKDQ9Q9kHlyfgrzpfGwK7lthcf2LilJc1/G4JIdXlxULPlOLIW0jR3+gaUXD3tJnIIIm5pXYrnXC+bM77+oNfddiM7ms3k159EyOiuqWTGbRxgSPCNf8vO78PW1mk7bOOZ4jdjFmihSCWXrCT+s0JsjwLU/BIA8Gu+7n0MHSoex2zUypiR3ZwmimZKDPAg/PrJsltzhumZzUiR3q9L2xPAHESO/hOGUpoVDGQdcv8cPYVt39rDHg2XbdmveXrWq5q+KoAucTQLS8/gI2pIN1wmZ7xvnsJumba/t0AoW6e2aw4FxH0JzFPnYa7Ft5BcIui9OtG2jjAA/6moHMhCPApeEzKjH+gq+/J3QAHAJ4tMJz2hKc0qjF79/RWnjiQuZL/DExYSzMYUseXKHjr2cE9xSvzidyOM08CNzktCuexA3Xcha5DgN1raRL9acujRHdp89P2ku6CFG2XZGvMr0RyVm03R6UomMBpKLhdd6uvBa54vfUoUpv0gvQzfptMCUZjibQ0/nFMFpCPZ0hqFd+V9gXaDohLR5yFosMAVpM/KbDuzdsvStmxbGdloc+MIN8WoUz+k0/fAh/PEYCwGlMOaCEoqeTs0kLYBF7pjk2DHf19vBRR8tVA9/arIzipcibFjR26u22UoWlXCLCP2T3w1s+ULcFYPfHK9Jlh2qfxUCqtQ2ChfG8//M1lFF')
+CSS=dec('eNqNUE1Pg0AQvfdXjPECDaV8FErhokZO9qSN9wXWZVPYIdutYgj/XQRqidroYZKXmTdv3rwZwHIOlmlv4Gn3GMc72MbP8RbmyxnATUkzTkDL8ZXKUKCgOhCRgVYhF6prpUjkgepNxwW4VvmxTO4x3TdvPFN56LhOVUc55SxXob3yq7qdEO/IgY7ETXDm9RgrknL1HpruKkpQZlQuUixQhpIlRHM8zziVadv6VPVBYDKqTq/3uKAvHXI7pLDqQfvNuEkFI4xmU4tfXoJgoJv97DZVHMV56gRXvKxQKiLURdnfV9c/Vz+tNglJ90ziUWTD356xNvzuY0f/KxTL9U6pFMguCvn/ENKjktSLMVHLGjJrZx/etLTU')
+s=s.replace('build 0.18 DRIVER WORLD','build 0.19 STREET LEVEL').replace('build 0.18 · DRIVER WORLD','build 0.19 · STREET LEVEL')
+s=rf(s,'drawBuilding',BUILDING);s=rf(s,'drawTraffic',TRAFFIC)
+a='function drawBuilding(b,cam){';i=s.find(a)
+if i<0:raise SystemExit('drawBuilding insert anchor missing')
+s=s[:i]+STREET+'\n'+SKY+'\n'+CAR+'\n'+s[i:]
+s=s.replace("back=state.onFoot?118:168+speed*5.2","back=state.onFoot?112:178+speed*5.8",1)
+s=s.replace("height:state.onFoot?82:105+speed*2.1+bump","height:state.onFoot?79:99+speed*1.8+bump",1)
+s=s.replace("horizon:H*(state.onFoot?.34:.30-Math.min(.012,speed*.0013))","horizon:H*(state.onFoot?.335:.292-Math.min(.010,speed*.0011))",1)
+old="ctx.lineTo(0,cam.horizon+48);ctx.fill();ctx.strokeStyle='rgba(48,54,51,.52)'";new="ctx.lineTo(0,cam.horizon+48);ctx.fill();drawSkyQuality19(cam,w,sun);ctx.strokeStyle='rgba(48,54,51,.52)'"
+if old not in s:raise SystemExit('sky draw anchor missing')
+s=s.replace(old,new,1)
+old='drawRoadside18(chunks,cam,w);drawTraffic(chunks,cam);drawWetWorld(cam,speed,w);drawForthWeather(cam,speed,w);';new='drawStreetLife19(chunks,cam,w);drawTraffic(chunks,cam);drawForthWeather(cam,speed,w);'
+if old not in s:raise SystemExit('street call anchor missing')
+s=s.replace(old,new,1)
+old="const p=worldToScreen(state.x,state.y,cam);if(p.visible){const q=Math.max(.72,Math.min(2.35,p.scale));ctx.save();ctx.translate(p.x,p.y);if(state.onFoot){ctx.fillStyle='rgba(0,0,0,.25)';ctx.beginPath();ctx.ellipse(0,2*q,5*q,2*q,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#cfc8b4';ctx.beginPath();ctx.arc(0,-4*q,3.4*q,0,Math.PI*2);ctx.fill()}else{ctx.fillStyle='rgba(0,0,0,.28)';ctx.beginPath();ctx.ellipse(0,4*q,20*q,7*q,0,0,Math.PI*2);ctx.fill();ctx.fillStyle='#b8b09a';ctx.beginPath();ctx.moveTo(-18*q,0);ctx.lineTo(-14*q,-10*q);ctx.lineTo(13*q,-10*q);ctx.lineTo(19*q,0);ctx.closePath();ctx.fill();ctx.fillStyle='#273235';ctx.fillRect(-8*q,-9*q,16*q,5*q);ctx.fillStyle='rgba(190,53,42,.82)';ctx.fillRect(-15*q,-2*q,4*q,2*q);ctx.fillRect(11*q,-2*q,4*q,2*q);ctx.fillStyle='#77715f';ctx.fillRect(-17*q,1*q,34*q,2*q)}ctx.restore()}"
+if old not in s:raise SystemExit('player car anchor missing')
+s=s.replace(old,"const p=worldToScreen(state.x,state.y,cam);drawPlayerCar19(p,cam)",1)
+old="const grip=ground.water?.18:(onRoad?1:.48),max=ground.water?.9:(onRoad?7.6:3.2),ss=";new="const grip=onRoad?1:(ground.water?.18:.48),max=onRoad?7.6:(ground.water?.9:3.2),ss="
+if old not in s:raise SystemExit('physics authority anchor missing')
+s=s.replace(old,new,1)
+s=s.replace('</style>',CSS+'\n</style>',1)
+s=s.replace('The road network now persists properly from district to district, buildings sit on actual streets, the camera has more weight, traffic belongs to the roads, and the phone controls stay out of the picture until your thumb asks for them.','Street-level pass: pavements, lamps, signs, trees, fencing, building shadows, lane-separated traffic and a more convincing player car now sit on the persistent road world. Road physics now follow the actual road rather than hidden terrain noise.')
 p.write_text(s)
 bp=Path('android/app/build.gradle');b=bp.read_text().replace('versionCode 18','versionCode 19').replace("versionName '0.18'","versionName '0.19'");bp.write_text(b)
-print('patched build 0.19 FORTH LIFE',len(s))
+print('patched build 0.19 STREET LEVEL',len(s))
