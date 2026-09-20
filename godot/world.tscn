@@ -7,7 +7,8 @@
 [ext_resource path="res://world_state.gd" type="Script" id="5"]
 [ext_resource path="res://map_stream.gd" type="Script" id="6"]
 [ext_resource path="res://bay_projection.gd" type="Script" id="7"]
-[ext_resource path="res://pua_api.gd" type="Script" id="8"]\n[ext_resource path="res://osm_ground_tiles.gd" type="Script" id="9"]
+[ext_resource path="res://pua_api.gd" type="Script" id="8"]
+[ext_resource path="res://osm_ground_tiles.gd" type="Script" id="9"]
 
 [sub_resource type="BoxShape3D" id="road_shape"]
 size = Vector3(60, 0.5, 240)
@@ -62,6 +63,9 @@ script = ExtResource("6")
 
 [node name="PUAAPI" type="Node" parent="."]
 script = ExtResource("8")
+
+[node name="OSMGroundTiles" type="Node3D" parent="."]
+script = ExtResource("9")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("environment")
