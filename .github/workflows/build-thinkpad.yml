@@ -52,6 +52,7 @@ jobs:
         run: |
           grep -q 'renderer/rendering_method="mobile"' godot/project.godot
           grep -q 'thinkpad_low' godot/export_presets.cfg
+          grep -q 'projector_max' godot/export_presets.cfg
           grep -q 'move_and_slide' godot/car.gd
           grep -q 'map_road_segments' godot/world.gd
 
@@ -59,42 +60,87 @@ jobs:
         run: |
           mkdir -p build/thinkpad
           EXPORT_DIR="$(readlink -f build/thinkpad)"
-          godot --headless --verbose --path godot --export-release "Windows Desktop" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_57_THINKPAD.exe"
-          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_57_THINKPAD.exe"
-          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_57_THINKPAD.exe"
+          godot --headless --verbose --path godot --export-release "Windows Desktop" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_58_THINKPAD.exe"
+          godot --headless --verbose --path godot --export-release "Windows Projector Max" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_58_PROJECTOR_MAX.exe"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_58_THINKPAD.exe"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_58_PROJECTOR_MAX.exe"
+          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_58_THINKPAD.exe" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_58_PROJECTOR_MAX.exe"
           cd "$EXPORT_DIR"
           cat > PLAY_PUA_THINKPAD.cmd <<'EOF'
           @echo off
           cd /d "%~dp0"
-          PROCEED_UNTIL_APPREHENDED_0_57_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 960x540
+          PROCEED_UNTIL_APPREHENDED_0_58_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 960x540
           EOF
           cat > PLAY_PUA_POTATO.cmd <<'EOF'
           @echo off
           cd /d "%~dp0"
-          PROCEED_UNTIL_APPREHENDED_0_57_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 800x450
+          PROCEED_UNTIL_APPREHENDED_0_58_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 800x450
+          EOF
+          cat > PLAY_PUA_PROJECTOR_MAX.cmd <<'EOF'
+          @echo off
+          cd /d "%~dp0"
+          PROCEED_UNTIL_APPREHENDED_0_58_PROJECTOR_MAX.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 1024x576
+          EOF
+          cat > PLAY_PUA_PROJECTOR_SAFE.cmd <<'EOF'
+          @echo off
+          cd /d "%~dp0"
+          PROCEED_UNTIL_APPREHENDED_0_58_PROJECTOR_MAX.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 800x450
+          EOF
+          cat > PLAY_PUA_PROJECTOR_FULLSCREEN.cmd <<'EOF'
+          @echo off
+          cd /d "%~dp0"
+          PROCEED_UNTIL_APPREHENDED_0_58_PROJECTOR_MAX.exe --rendering-method gl_compatibility --rendering-driver opengl3 --fullscreen
           EOF
           cat > README-THINKPAD.txt <<'EOF'
-          PROCEED UNTIL APPREHENDED 0.57 - THINKPAD LOW SPEC
+          PROCEED UNTIL APPREHENDED 0.58 - THINKPAD LOW SPEC
 
-          Double-click PLAY_PUA_THINKPAD.cmd first.
-          If it struggles, use PLAY_PUA_POTATO.cmd.
-
-          ThinkPad mode intentionally uses simpler world budgets and lower-resolution
-          Bay Window rendering while keeping the live postcode map, driving and PUA systems.
+          PLAY_PUA_THINKPAD.cmd = normal low-spec game.
+          PLAY_PUA_POTATO.cmd = emergency 800x450 fallback.
+          RH15 2BZ map fidelity, Bay Window calibration and controller support remain.
           EOF
-          sha256sum PROCEED_UNTIL_APPREHENDED_0_57_THINKPAD.exe > SHA256.txt
-          zip -9 PUA-0.57-UK-LANE-TRAFFIC-THINKPAD.zip PROCEED_UNTIL_APPREHENDED_0_57_THINKPAD.exe PLAY_PUA_THINKPAD.cmd PLAY_PUA_POTATO.cmd README-THINKPAD.txt SHA256.txt
+          cat > README-PROJECTOR-MAX.txt <<'EOF'
+          PROCEED UNTIL APPREHENDED 0.58 - PROJECTOR MAX
+
+          This build boots directly into the three-pane Bay Window cockpit renderer.
+          Start with PLAY_PUA_PROJECTOR_MAX.cmd.
+          Use CAL to align the three warped panes to the closed bay-window shutters.
+          Use PLAY_PUA_PROJECTOR_SAFE.cmd if the old ThinkPad drops frames.
+          Use PLAY_PUA_PROJECTOR_FULLSCREEN.cmd when the projector is the active display.
+
+          Projector Max preserves the real RH15 2BZ roads, junctions and building geometry.
+          It cuts distant decorative load, ambient vehicles, vapour and extra scene density
+          so more of the old machine's budget goes into the three simultaneous window views.
+          EOF
+          sha256sum PROCEED_UNTIL_APPREHENDED_0_58_THINKPAD.exe > SHA256-THINKPAD.txt
+          sha256sum PROCEED_UNTIL_APPREHENDED_0_58_PROJECTOR_MAX.exe > SHA256-PROJECTOR-MAX.txt
+          zip -9 PUA-0.58-THINKPAD.zip PROCEED_UNTIL_APPREHENDED_0_58_THINKPAD.exe PLAY_PUA_THINKPAD.cmd PLAY_PUA_POTATO.cmd README-THINKPAD.txt SHA256-THINKPAD.txt
+          zip -9 PUA-0.58-PROJECTOR-MAX.zip PROCEED_UNTIL_APPREHENDED_0_58_PROJECTOR_MAX.exe PLAY_PUA_PROJECTOR_MAX.cmd PLAY_PUA_PROJECTOR_SAFE.cmd PLAY_PUA_PROJECTOR_FULLSCREEN.cmd README-PROJECTOR-MAX.txt SHA256-PROJECTOR-MAX.txt
 
       - name: Upload portable ThinkPad build
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.57-UK-LANE-TRAFFIC-THINKPAD
+          name: PUA-0.58-THINKPAD
           path: |
-            build/thinkpad/PROCEED_UNTIL_APPREHENDED_0_57_THINKPAD.exe
+            build/thinkpad/PROCEED_UNTIL_APPREHENDED_0_58_THINKPAD.exe
             build/thinkpad/PLAY_PUA_THINKPAD.cmd
             build/thinkpad/PLAY_PUA_POTATO.cmd
             build/thinkpad/README-THINKPAD.txt
-            build/thinkpad/SHA256.txt
-            build/thinkpad/PUA-0.57-UK-LANE-TRAFFIC-THINKPAD.zip
+            build/thinkpad/SHA256-THINKPAD.txt
+            build/thinkpad/PUA-0.58-THINKPAD.zip
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Upload Projector Max build
+        uses: actions/upload-artifact@v4
+        with:
+          name: PUA-0.58-PROJECTOR-MAX
+          path: |
+            build/thinkpad/PROCEED_UNTIL_APPREHENDED_0_58_PROJECTOR_MAX.exe
+            build/thinkpad/PLAY_PUA_PROJECTOR_MAX.cmd
+            build/thinkpad/PLAY_PUA_PROJECTOR_SAFE.cmd
+            build/thinkpad/PLAY_PUA_PROJECTOR_FULLSCREEN.cmd
+            build/thinkpad/README-PROJECTOR-MAX.txt
+            build/thinkpad/SHA256-PROJECTOR-MAX.txt
+            build/thinkpad/PUA-0.58-PROJECTOR-MAX.zip
           if-no-files-found: error
           retention-days: 30
