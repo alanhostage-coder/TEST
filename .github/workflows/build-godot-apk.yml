@@ -6,67 +6,47 @@ on:
     paths:
       - 'godot/**'
       - '.github/workflows/build-godot-apk.yml'
+
 jobs:
   android:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
+    container:
+      image: barichello/godot-ci:4.5.1
     steps:
-      - uses: actions/checkout@v5
-      - name: Java 17
-        uses: actions/setup-java@v5
-        with:
-          distribution: temurin
-          java-version: '17'
-      - name: Android SDK 35
-        uses: android-actions/setup-android@v3
-        with:
-          packages: 'platform-tools platforms;android-35 build-tools;35.0.0'
-          accept-android-sdk-licenses: 'true'
-          log-accepted-android-sdk-licenses: 'false'
-      - name: Expose Godot SDK path
+      - uses: actions/checkout@v4
+
+      - name: Prepare Godot CI environment
         run: |
-          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
-          echo "GODOT_ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
-          mkdir -p "$HOME/Android"
-          ln -sfn "$ANDROID_HOME" "$HOME/Android/Sdk"
-          test -x "$ANDROID_HOME/platform-tools/adb"
-          test -d "$ANDROID_HOME/platforms/android-35"
-      - name: Install Godot and export templates
+          mkdir -p "$HOME/.config/godot"
+          mkdir -p "$HOME/.local/share/godot/export_templates"
+          if [ -d /root/.config/godot ]; then
+            cp -a /root/.config/godot/. "$HOME/.config/godot/"
+          fi
+          if [ -d /root/.local/share/godot/export_templates/4.5.1.stable ]; then
+            cp -a /root/.local/share/godot/export_templates/4.5.1.stable "$HOME/.local/share/godot/export_templates/"
+          fi
+          godot --version
+          test -d "$HOME/.local/share/godot/export_templates/4.5.1.stable"
+
+      - name: Strict project parse
         run: |
-          wget -q https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_linux.x86_64.zip
-          wget -q https://github.com/godotengine/godot/releases/download/4.5.1-stable/Godot_v4.5.1-stable_export_templates.tpz
-          unzip -q Godot_v4.5.1-stable_linux.x86_64.zip
-          sudo mv Godot_v4.5.1-stable_linux.x86_64 /usr/local/bin/godot
-          mkdir -p ~/.local/share/godot/export_templates/4.5.1.stable
-          unzip -q Godot_v4.5.1-stable_export_templates.tpz -d /tmp/templates
-          cp -r /tmp/templates/templates/* ~/.local/share/godot/export_templates/4.5.1.stable/
-      - name: Create Godot debug keystore
+          set -o pipefail
+          godot --headless --verbose --path godot --editor --quit 2>&1 | tee /tmp/pua-godot.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/pua-godot.log
+
+      - name: Export Android debug APK
         run: |
-          mkdir -p "$HOME/.local/share/godot/keystores"
-          keytool -genkeypair -v \
-            -keystore "$HOME/.local/share/godot/keystores/debug.keystore" \
-            -storepass android \
-            -alias androiddebugkey \
-            -keypass android \
-            -keyalg RSA \
-            -keysize 2048 \
-            -validity 10000 \
-            -dname "CN=Android Debug,O=Abbey Hill,C=GB"
-      - name: Parse project
-        run: |
-          godot --headless --path godot --editor --quit
-          godot --headless --path godot --quit-after 2
-          test -d "$HOME/Android/Sdk/platform-tools"
-      - name: Export Android APK
-        run: |
-          mkdir -p dist
-          godot --headless --editor --path godot --quit
-          godot --headless --path godot --export-debug Android ../dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_28.apk
-          test -s dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_28.apk
+          mkdir -p build/android
+          EXPORT_DIR="$(readlink -f build/android)"
+          godot --headless --verbose --path godot --export-debug "Android" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_28.apk"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_28.apk"
+          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_28.apk"
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: PUA-0.28-GREYBEARD-ANDROID
-          path: dist/PROCEED_UNTIL_APPREHENDED_GODOT_0_28.apk
+          path: build/android/PROCEED_UNTIL_APPREHENDED_0_28.apk
           if-no-files-found: error
           retention-days: 30
