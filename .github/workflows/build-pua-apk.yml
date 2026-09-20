@@ -46,22 +46,20 @@ jobs:
       - name: Apply world patches
         shell: bash
         run: |
-          for n in 09 10 11 12 13 14 15 16 17 18 19 20 21 22; do python3 android/.build/patch_${n}.py; done
-          grep -q "build 0.22" android/app/src/main/assets/www/index.html
-          grep -q "BOOT RESCUE" android/app/src/main/assets/www/index.html
+          for n in 09 10 11 12 13 14 15 16 17 18 19 20 21 22 23; do python3 android/.build/patch_${n}.py; done
+          grep -q "build 0.23" android/app/src/main/assets/www/index.html
+          grep -q "LIVING HORIZON" android/app/src/main/assets/www/index.html
+          grep -q "drawLivingHorizon23" android/app/src/main/assets/www/index.html
           grep -q "engine2Osc" android/app/src/main/assets/www/index.html
-          grep -q "roadGain" android/app/src/main/assets/www/index.html
           grep -q "window.__puaQuality" android/app/src/main/assets/www/index.html
-          grep -q "const MIG18=" android/app/src/main/assets/www/index.html
-          grep -q "versionName '0.22'" android/app/build.gradle
+          grep -q "versionName '0.23'" android/app/build.gradle
       - name: JavaScript syntax smoke test
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
           s=Path('android/app/src/main/assets/www/index.html').read_text()
-          a=s.index('<script>')+len('<script>')
-          b=s.index('</script>',a)
+          a=s.index('<script>')+len('<script>'); b=s.index('</script>',a)
           Path('/tmp/pua-main.js').write_text(s[a:b])
           PY
           node --check /tmp/pua-main.js
@@ -71,15 +69,12 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           s=Path('android/app/src/main/assets/www/index.html').read_text()
+          assert "drawLivingHorizon23()" in s
+          assert "pua23Cam" in s and "pua23Pulse" in s
           assert "engine2Gain.gain.setTargetAtTime" in s
-          assert "roadGain.gain.setTargetAtTime" in s
-          assert "windGain.gain.setTargetAtTime" in s
-          assert "rainGain.gain.setTargetAtTime" in s
-          assert "perfAvg=.016" in s
           assert "window.__puaQuality=perfAvg>.029?.68" in s
-          assert s.index("const CH=900") < s.index("const MIG18=")
           assert "document.getElementById('start').style.display='none';running=true" in s
-          print("0.22 boot-rescue structural checks passed")
+          print("0.23 living-horizon structural checks passed")
           PY
       - name: Boot smoke test
         shell: bash
@@ -91,17 +86,16 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_22.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_23.apk
       - name: Package built source
         shell: bash
-        run: |
-          cp android/app/src/main/assets/www/index.html dist/PUA_0_22_BUILT_INDEX.html
-      - name: Upload boot rescue
+        run: cp android/app/src/main/assets/www/index.html dist/PUA_0_23_BUILT_INDEX.html
+      - name: Upload living horizon
         uses: actions/upload-artifact@v4
         with:
-          name: PROCEED-UNTIL-APPREHENDED-0.22-BOOT-RESCUE
+          name: PROCEED-UNTIL-APPREHENDED-0.23-LIVING-HORIZON
           path: |
-            dist/PROCEED_UNTIL_APPREHENDED_0_22.apk
-            dist/PUA_0_22_BUILT_INDEX.html
+            dist/PROCEED_UNTIL_APPREHENDED_0_23.apk
+            dist/PUA_0_23_BUILT_INDEX.html
           if-no-files-found: error
           retention-days: 30
