@@ -22,6 +22,7 @@ var situation_root: Node3D
 var situation_signature := ""
 var active_situations: Array = []
 var roaming_agents: Array = []
+var roaming_graph := {}
 var low_spec_mode := false
 
 func _ready():
@@ -74,6 +75,7 @@ func _try_build_from_live_roads():
 func _clear_root():
 	vapour_nodes.clear()
 	roaming_agents.clear()
+	roaming_graph.clear()
 	for child in root.get_children():
 		child.queue_free()
 
@@ -105,11 +107,50 @@ func _build_parked_life(segments: Array):
 		made += 1
 
 
+func _junction_key(p: Vector2) -> String:
+	return "%d:%d" % [int(round(p.x * 2.0)), int(round(p.y * 2.0))]
+
+func _build_roaming_graph(segments: Array):
+	roaming_graph.clear()
+	for i in range(segments.size()):
+		var seg = segments[i]
+		if not seg is Array or seg.size() < 2:
+			continue
+		var a = Vector2(float(seg[0][0]), float(seg[0][1]))
+		var b = Vector2(float(seg[1][0]), float(seg[1][1]))
+		var oneway = str(seg[4]).to_lower() if seg.size() > 4 else "no"
+		var allow_a_to_b = oneway not in ["-1", "reverse"]
+		var allow_b_to_a = oneway not in ["yes", "1", "true"]
+		if allow_a_to_b:
+			var key_a = _junction_key(a)
+			if not roaming_graph.has(key_a):
+				roaming_graph[key_a] = []
+			roaming_graph[key_a].append(Vector2i(i, 1))
+		if allow_b_to_a:
+			var key_b = _junction_key(b)
+			if not roaming_graph.has(key_b):
+				roaming_graph[key_b] = []
+			roaming_graph[key_b].append(Vector2i(i, 0))
+
+func _lane_position(seg: Array, target_end: int, progress: float) -> Vector2:
+	var a = Vector2(float(seg[0][0]), float(seg[0][1]))
+	var b = Vector2(float(seg[1][0]), float(seg[1][1]))
+	var centre = a.lerp(b, clamp(progress, 0.0, 1.0))
+	var travel = (b - a) if target_end == 1 else (a - b)
+	if travel.length_squared() < 0.001:
+		return centre
+	var dir = travel.normalized()
+	var left = Vector2(-dir.y, dir.x)
+	var width = float(seg[2]) if seg.size() > 2 else 5.0
+	var lane_offset = clamp(width * 0.22, 0.82, 1.55)
+	return centre + left * lane_offset
+
 func _build_roaming_life(segments: Array):
-	# Road-following ambient traffic. Agents pick connected segment ends instead of
-	# ping-ponging on one road, so junctions produce unscripted turns and local flow.
+	# One live traffic owner, UK left-lane placement and a cached junction graph.
+	# The graph removes the old full-road scan every time an agent reaches a junction.
+	_build_roaming_graph(segments)
 	var made := 0
-	var cap = 5 if low_spec_mode else MAX_ROAMERS
+	var cap = 5 if low_spec_mode else 12
 	for i in range(0, segments.size(), 5):
 		if made >= cap:
 			break
@@ -120,16 +161,27 @@ func _build_roaming_life(segments: Array):
 		var b = Vector2(float(seg[1][0]), float(seg[1][1]))
 		if a.distance_to(b) < 18.0:
 			continue
+		var oneway = str(seg[4]).to_lower() if seg.size() > 4 else "no"
+		var reverse = (i + made) % 3 == 0
+		if oneway in ["yes", "1", "true"]:
+			reverse = false
+		elif oneway in ["-1", "reverse"]:
+			reverse = true
+		var target_end = 0 if reverse else 1
+		var progress = 1.0 if reverse else 0.0
 		var vehicle = _make_parked_vehicle(100 + i)
 		vehicle.name = "Roamer_%02d" % made
 		root.add_child(vehicle)
-		var reverse = (i + made) % 3 == 0
-		var p = b if reverse else a
+		var p = _lane_position(seg, target_end, progress)
 		vehicle.position = Vector3(p.x, 0.43, p.y)
 		roaming_agents.append({
-			"node": vehicle, "segment": i, "target_end": 0 if reverse else 1,
+			"node": vehicle,
+			"segment": i,
+			"target_end": target_end,
+			"progress": progress,
 			"speed": 7.4 + float((i * 13) % 55) * 0.10,
-			"seed": i * 97 + made * 31, "segments": segments
+			"seed": i * 97 + made * 31,
+			"segments": segments
 		})
 		made += 1
 
@@ -148,51 +200,59 @@ func _update_roaming_agents(delta: float):
 		var seg = segments[si]
 		if not seg is Array or seg.size() < 2:
 			continue
+		var a = Vector2(float(seg[0][0]), float(seg[0][1]))
+		var b = Vector2(float(seg[1][0]), float(seg[1][1]))
+		var length = max(1.0, a.distance_to(b))
 		var target_end = int(agent.get("target_end", 1))
-		var target_arr = seg[target_end]
-		var target = Vector2(float(target_arr[0]), float(target_arr[1]))
+		var progress = float(agent.get("progress", 0.0 if target_end == 1 else 1.0))
 		var here = Vector2(node.position.x, node.position.z)
-		var to_target = target - here
-		var dist = to_target.length()
-		var speed = float(agent.get("speed", 8.0))
-		# Nearby traffic eases off instead of ghosting through the player.
 		var player_dist = here.distance_to(player2)
-		if player_dist < 10.0:
-			speed *= clamp((player_dist - 2.8) / 7.2, 0.10, 1.0)
-		if dist > 0.12:
-			var dir = to_target / dist
-			var step = min(dist, speed * delta)
-			node.position.x += dir.x * step
-			node.position.z += dir.y * step
+		var speed = float(agent.get("speed", 8.0))
+		if player_dist < 11.0:
+			speed *= clamp((player_dist - 3.0) / 8.0, 0.08, 1.0)
+
+		var sign_dir = 1.0 if target_end == 1 else -1.0
+		progress += sign_dir * speed * delta / length
+		var reached = progress >= 1.0 if target_end == 1 else progress <= 0.0
+		progress = clamp(progress, 0.0, 1.0)
+		var p = _lane_position(seg, target_end, progress)
+		var travel = (b - a) if target_end == 1 else (a - b)
+		if travel.length_squared() > 0.001:
+			var dir = travel.normalized()
 			var desired = atan2(-dir.x, -dir.y)
-			node.rotation.y = lerp_angle(node.rotation.y, desired, clamp(delta * 5.0, 0.0, 1.0))
-		if dist <= 1.15:
-			var next = _choose_connected_segment(segments, si, target, int(agent.get("seed", 1)))
+			node.rotation.y = lerp_angle(node.rotation.y, desired, clamp(delta * 6.0, 0.0, 1.0))
+		node.position.x = p.x
+		node.position.z = p.y
+		agent["progress"] = progress
+
+		if reached:
+			var junction = b if target_end == 1 else a
+			var next = _choose_connected_segment(segments, si, junction, int(agent.get("seed", 1)))
 			if next.x >= 0:
 				agent["segment"] = next.x
 				agent["target_end"] = next.y
+				agent["progress"] = 0.0 if next.y == 1 else 1.0
 				agent["seed"] = int(agent.get("seed", 1)) + 17
-		node.visible = player_dist < (150.0 if low_spec_mode else 245.0)
+		node.visible = player_dist < (145.0 if low_spec_mode else 235.0)
 
 func _choose_connected_segment(segments: Array, current: int, junction: Vector2, seed: int) -> Vector2i:
+	var raw: Array = roaming_graph.get(_junction_key(junction), [])
 	var candidates: Array[Vector2i] = []
-	var best_gap := 3.25
-	for j in range(segments.size()):
-		if j == current:
-			continue
-		var s = segments[j]
-		if not s is Array or s.size() < 2:
-			continue
-		for endpoint in [0, 1]:
-			var p = Vector2(float(s[endpoint][0]), float(s[endpoint][1]))
-			var gap = p.distance_to(junction)
-			if gap <= best_gap:
-				# target_end is the far end, so the vehicle travels away from the junction.
-				candidates.append(Vector2i(j, 1 - endpoint))
+	for candidate in raw:
+		if candidate is Vector2i and candidate.x != current:
+			candidates.append(candidate)
 	if candidates.is_empty():
-		# Dead end: reverse along the current road.
+		for candidate in raw:
+			if candidate is Vector2i:
+				candidates.append(candidate)
+	if candidates.is_empty():
 		var s = segments[current]
 		var a = Vector2(float(s[0][0]), float(s[0][1]))
+		var oneway = str(s[4]).to_lower() if s.size() > 4 else "no"
+		if oneway in ["yes", "1", "true"]:
+			return Vector2i(-1, -1)
+		if oneway in ["-1", "reverse"]:
+			return Vector2i(-1, -1)
 		return Vector2i(current, 1 if junction.distance_to(a) < 3.25 else 0)
 	return candidates[abs(seed) % candidates.size()]
 
