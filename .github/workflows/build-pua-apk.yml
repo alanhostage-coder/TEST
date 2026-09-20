@@ -54,11 +54,24 @@ jobs:
           python3 android/.build/patch_14.py
           python3 android/.build/patch_15.py
           python3 android/.build/patch_16.py
-          grep -q "build 0.16" android/app/src/main/assets/www/index.html
-          grep -q "FORTH WEATHER" android/app/src/main/assets/www/index.html
-          grep -q "drawEstateStreets" android/app/src/main/assets/www/index.html
+          python3 android/.build/patch_17.py
+          grep -q "build 0.17" android/app/src/main/assets/www/index.html
+          grep -q "CONTROL RESET" android/app/src/main/assets/www/index.html
+          grep -q "function project(x,y,z,cam)" android/app/src/main/assets/www/index.html
           grep -q "drawForthWeather" android/app/src/main/assets/www/index.html
-          grep -q "versionName '0.16'" android/app/build.gradle
+          ! grep -q "horizon=w\*.50" android/app/src/main/assets/www/index.html
+          grep -q "versionName '0.17'" android/app/build.gradle
+      - name: JavaScript syntax smoke test
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          s=Path('android/app/src/main/assets/www/index.html').read_text()
+          a=s.index('<script>')+len('<script>')
+          b=s.index('</script>',a)
+          Path('/tmp/pua-main.js').write_text(s[a:b])
+          PY
+          node --check /tmp/pua-main.js
       - name: Build debug APK
         working-directory: android
         run: gradle --no-daemon :app:assembleDebug
@@ -66,11 +79,11 @@ jobs:
         shell: bash
         run: |
           mkdir -p dist
-          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_16.apk
+          cp android/app/build/outputs/apk/debug/app-debug.apk dist/PROCEED_UNTIL_APPREHENDED_0_17.apk
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PROCEED-UNTIL-APPREHENDED-0.16-APK
-          path: dist/PROCEED_UNTIL_APPREHENDED_0_16.apk
+          name: PROCEED-UNTIL-APPREHENDED-0.17-APK
+          path: dist/PROCEED_UNTIL_APPREHENDED_0_17.apk
           if-no-files-found: error
           retention-days: 30
