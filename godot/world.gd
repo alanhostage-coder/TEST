@@ -22,6 +22,7 @@ const CELL := 90.0
 const ROAD_MICRO_STEP := 6.5
 var low_spec_mode := false
 var projector_max_mode := false
+var pc_max_mode := false
 var map_center_lat := 55.95
 
 var asphalt_mat
@@ -47,6 +48,7 @@ var path_mat
 
 func _ready():
 	projector_max_mode = OS.has_feature("projector_max")
+	pc_max_mode = OS.has_feature("pc_max")
 	low_spec_mode = OS.has_feature("thinkpad_low") or projector_max_mode
 	if projector_max_mode:
 		api_detail_pressure = 0.32
@@ -54,6 +56,9 @@ func _ready():
 	elif low_spec_mode:
 		api_detail_pressure = 0.42
 		$Sun.directional_shadow_max_distance = 82.0
+	elif pc_max_mode:
+		api_detail_pressure = 1.0
+		$Sun.directional_shadow_max_distance = 180.0
 	_make_materials()
 	_make_ground()
 	_make_landmarks()
@@ -214,7 +219,7 @@ func _road_rotated_material(parent: Node3D, pos: Vector3, length: float, width: 
 	parent.add_child(mesh)
 
 func _add_mapped_linear_features(parent: Node3D, features: Array):
-	var cap = 80 if projector_max_mode else (110 if low_spec_mode else 240)
+	var cap = 80 if projector_max_mode else (110 if low_spec_mode else (320 if pc_max_mode else 240))
 	var made := 0
 	for feature in features:
 		if made >= cap or not feature is Dictionary:
@@ -260,7 +265,7 @@ func _add_mapped_linear_features(parent: Node3D, features: Array):
 			made += 1
 
 func _add_mapped_point_features(parent: Node3D, features: Array):
-	var cap = 55 if projector_max_mode else (95 if low_spec_mode else 180)
+	var cap = 55 if projector_max_mode else (95 if low_spec_mode else (240 if pc_max_mode else 180))
 	var made := 0
 	for feature in features:
 		if made >= cap or not feature is Dictionary:
@@ -803,9 +808,9 @@ func _on_map_ready(map_data: Dictionary):
 	map_lamps.clear()
 	var street_edge_budget := 0
 	var marking_budget := 0
-	var street_edge_limit := 70 if projector_max_mode else (90 if low_spec_mode else 240)
-	var marking_limit := 46 if projector_max_mode else (55 if low_spec_mode else 130)
-	var micro_budget := 80 if projector_max_mode else (110 if low_spec_mode else 320)
+	var street_edge_limit := 70 if projector_max_mode else (90 if low_spec_mode else (320 if pc_max_mode else 240))
+	var marking_limit := 46 if projector_max_mode else (55 if low_spec_mode else (180 if pc_max_mode else 130))
+	var micro_budget := 80 if projector_max_mode else (110 if low_spec_mode else (500 if pc_max_mode else 320))
 
 	for road in roads:
 		if not road is Dictionary:
@@ -855,7 +860,7 @@ func _on_map_ready(map_data: Dictionary):
 		var cz = float(center[1])
 		var seed = int(abs(cx * 17.0 + cz * 31.0 + sx * 11.0 + sz * 7.0))
 		var kind = str(building.get("kind", "yes"))
-		var exact_radius = 135.0 if low_spec_mode else 260.0
+		var exact_radius = 135.0 if low_spec_mode else (380.0 if pc_max_mode else 260.0)
 		var exact = Vector2(cx, cz).length() <= exact_radius and _add_exact_osm_building(map_root, building, h, seed)
 		if not exact:
 			_add_edinburgh_building(map_root, Vector3(cx, 0.0, cz), Vector3(sx, h, sz), seed, kind)
