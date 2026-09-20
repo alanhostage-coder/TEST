@@ -620,6 +620,7 @@ func _add_edinburgh_building(parent: Node3D, base: Vector3, size: Vector3, seed:
 	var h = size.y
 	var sz = size.z
 	var industrial = kind in ["industrial", "warehouse", "commercial", "retail"] or sx > 28.0 or sz > 28.0
+	var detailed = industrial or seed % 3 == 0
 	var stone = soot_stone_mat if seed % 3 != 0 else sandstone_mat
 	if industrial:
 		stone = _mat(Color(0.27, 0.285, 0.29), 0.84, 0.03)
@@ -631,8 +632,12 @@ func _add_edinburgh_building(parent: Node3D, base: Vector3, size: Vector3, seed:
 	_visual_box(parent, base + Vector3(0, plinth_h * 0.5, sz * 0.505), Vector3(sx * 0.96, plinth_h, 0.10), roof_mat)
 
 	var storeys = max(1, int(round(h / 3.1)))
-	var front_slots = clamp(int(sx / (4.4 if industrial else 3.2)), 1, 12)
-	var side_slots = clamp(int(sz / (5.0 if industrial else 3.6)), 1, 10)
+	if not detailed:
+		if h > 6.0 and seed % 2 == 0:
+			_visual_box(parent, base + Vector3(sx * 0.18, h + 0.75, sz * 0.16), Vector3(0.52, 1.5, 0.52), roof_mat)
+		return
+	var front_slots = clamp(int(sx / (4.4 if industrial else 3.2)), 1, 9)
+	var side_slots = clamp(int(sz / (5.0 if industrial else 3.6)), 1, 7)
 	var window_w = 1.65 if industrial else 1.05
 	var window_h = 1.15 if industrial else 1.32
 
