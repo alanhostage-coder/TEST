@@ -1,11 +1,20 @@
 extends Control
 
 @onready var car = get_node("../Car")
+@onready var parkview_credit = get_node_or_null("ParkviewCredit")
+var credit_clock := 0.0
 
 func _ready():
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-func _process(_delta):
+func _process(delta):
+	credit_clock += delta
+	if parkview_credit:
+		var alpha = 1.0
+		if credit_clock > 6.0:
+			alpha = clamp(1.0 - (credit_clock - 6.0) / 2.0, 0.0, 1.0)
+		parkview_credit.modulate.a = alpha
+		parkview_credit.visible = alpha > 0.01
 	queue_redraw()
 
 func _draw():
