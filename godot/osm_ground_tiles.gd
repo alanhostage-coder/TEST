@@ -8,7 +8,7 @@ const TILE_CACHE_DIR := "user://pua_osm_tiles"
 const TILE_ZOOM := 16
 const TILE_RADIUS_ANDROID := 2
 const TILE_RADIUS_LOW_SPEC := 1
-const TILE_Y := -0.012
+const TILE_Y := -0.028
 
 var _map_stream: Node
 var _request: HTTPRequest
@@ -183,9 +183,8 @@ func _add_tile(tile: Vector2i, image: Image):
 
 	var material = StandardMaterial3D.new()
 	material.albedo_texture = ImageTexture.create_from_image(image)
-	material.albedo_color = Color(0.72, 0.72, 0.70, 1.0)
+	material.albedo_color = Color(0.38, 0.40, 0.38, 1.0)
 	material.roughness = 1.0
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
 	material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 
