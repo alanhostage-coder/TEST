@@ -493,17 +493,17 @@ func _on_world_state_changed(state: Dictionary):
 	pavement_mat.roughness = lerp(0.90, 0.58, wetness)
 	kerb_mat.roughness = lerp(0.94, 0.68, wetness)
 	concrete_mat.roughness = lerp(0.86, 0.62, wetness)
-	weather_sun_energy = lerp(0.72, 0.34, cloud) * lerp(1.0, 0.84, wetness)
+	weather_sun_energy = lerp(0.95, 0.56, cloud) * lerp(1.0, 0.90, wetness)
 	$Sun.light_energy = weather_sun_energy
 	var env = $WorldEnvironment.environment
 	if env:
 		env.fog_enabled = true
 		var visibility_fog = clamp(1.0 - visibility / 22000.0, 0.0, 0.92)
-		env.fog_density = 0.0045 + visibility_fog * 0.018 + clamp(aqi / 150.0, 0.0, 1.0) * 0.004
-		env.fog_light_color = Color(0.39, 0.42, 0.42).lerp(Color(0.31, 0.34, 0.35), cloud)
-		env.ambient_light_energy = lerp(0.72, 0.46, cloud) * lerp(1.0, 0.90, wetness)
-		env.ambient_light_color = Color(0.47, 0.50, 0.51).lerp(Color(0.34, 0.37, 0.39), cloud)
-		env.tonemap_exposure = lerp(1.08, 0.92, cloud) * lerp(1.0, 0.96, wetness)
+		env.fog_density = 0.0022 + visibility_fog * 0.008 + clamp(aqi / 150.0, 0.0, 1.0) * 0.002
+		env.fog_light_color = Color(0.46, 0.50, 0.51).lerp(Color(0.36, 0.40, 0.42), cloud)
+		env.ambient_light_energy = lerp(0.88, 0.66, cloud) * lerp(1.0, 0.94, wetness)
+		env.ambient_light_color = Color(0.54, 0.57, 0.58).lerp(Color(0.42, 0.46, 0.48), cloud)
+		env.tonemap_exposure = lerp(1.24, 1.08, cloud) * lerp(1.0, 0.98, wetness)
 	var car = get_node_or_null("Car")
 	if car:
 		car.set_meta("world_wetness", wetness)
@@ -591,6 +591,7 @@ func _on_map_ready(map_data: Dictionary):
 		_add_edinburgh_building(map_root, Vector3(cx, 0.0, cz), Vector3(sx, h, sz), seed, kind)
 
 	_add_map_furniture(map_root)
+	_add_verge_life(map_root)
 	_spawn_map_agents()
 
 	var car = get_node_or_null("Car")
@@ -721,6 +722,45 @@ func _place_map_agent(agent: Dictionary):
 	var heading = (b - a).normalized() * float(agent.get("dir", 1.0))
 	node.position = Vector3(p.x, 0.44, p.y)
 	node.rotation.y = atan2(-heading.x, -heading.y)
+
+func _add_verge_life(parent: Node3D):
+	var placed := 0
+	for i in range(map_segments.size()):
+		if placed >= 52:
+			break
+		if i % 4 != 0:
+			continue
+		var segment = map_segments[i]
+		var a = Vector2(float(segment[0][0]), float(segment[0][1]))
+		var b = Vector2(float(segment[1][0]), float(segment[1][1]))
+		var delta = b - a
+		if delta.length() < 14.0:
+			continue
+		var normal = Vector2(-delta.y, delta.x).normalized()
+		var width = float(segment[2])
+		var side = -1.0 if i % 2 == 0 else 1.0
+		var p = a.lerp(b, 0.2 + float((i * 17) % 60) / 100.0) + normal * side * (width * 0.5 + 1.25)
+		for j in range(3 + i % 3):
+			var weed = MeshInstance3D.new()
+			var qm = QuadMesh.new()
+			qm.size = Vector2(0.18 + float(j % 2) * 0.08, 0.34 + float((i + j) % 3) * 0.11)
+			weed.mesh = qm
+			weed.position = Vector3(p.x + normal.x * j * 0.13, 0.18, p.y + normal.y * j * 0.13)
+			weed.rotation.y = atan2(normal.x, normal.y) + float(j) * 0.63
+			weed.material_override = _mat(Color(0.16, 0.22, 0.085), 0.98, 0.0)
+			weed.visibility_range_end = 80.0
+			parent.add_child(weed)
+		if i % 3 == 0:
+			var litter = MeshInstance3D.new()
+			var lm = PlaneMesh.new()
+			lm.size = Vector2(0.28, 0.18)
+			litter.mesh = lm
+			litter.position = Vector3(p.x - normal.x * 0.35, 0.092, p.y - normal.y * 0.35)
+			litter.rotation.y = float(i) * 0.47
+			litter.material_override = _mat(Color(0.46, 0.45, 0.40), 0.88, 0.0)
+			litter.visibility_range_end = 55.0
+			parent.add_child(litter)
+		placed += 1
 
 func _add_map_furniture(parent: Node3D):
 	var placed = 0
