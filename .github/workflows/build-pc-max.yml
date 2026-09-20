@@ -37,16 +37,16 @@ jobs:
 
       - name: Strict project parse
         run: |
-          set -o pipefail
-          godot --headless --verbose --path godot --editor --quit 2>&1 | tee /tmp/pua-pcmax-parse.log
-          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/pua-pcmax-parse.log
+          godot --headless --verbose --path godot --editor --quit > /tmp/pua-pcmax-parse.log 2>&1
+          cat /tmp/pua-pcmax-parse.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/pua-pcmax-parse.log; then exit 1; fi
 
       - name: PUA runtime soak
         run: |
-          set -o pipefail
-          timeout 30s godot --headless --path godot res://pua_soak_test.tscn 2>&1 | tee /tmp/pua-pcmax-soak.log
+          timeout 30s godot --headless --path godot res://pua_soak_test.tscn > /tmp/pua-pcmax-soak.log 2>&1
+          cat /tmp/pua-pcmax-soak.log
           grep -q 'PUA_SOAK_OK' /tmp/pua-pcmax-soak.log
-          ! grep -E 'SCRIPT ERROR|Parse Error|PUA_SOAK_FAIL' /tmp/pua-pcmax-soak.log
+          if grep -E 'SCRIPT ERROR|Parse Error|PUA_SOAK_FAIL' /tmp/pua-pcmax-soak.log; then exit 1; fi
 
       - name: PC Max invariants
         run: |
