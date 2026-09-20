@@ -26,7 +26,9 @@ jobs:
           echo "ANDROID_SDK_ROOT=$SDKROOT" >> "$GITHUB_ENV"
           echo "GODOT_ANDROID_SDK_ROOT=$SDKROOT" >> "$GITHUB_ENV"
           yes | "$SDKMANAGER" --licenses >/dev/null || true
-          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0" || true
+          test -x "$SDKROOT/platform-tools/adb"
+          test -d "$SDKROOT/platforms/android-35"
           mkdir -p "$HOME/Android"
           ln -sfn "$SDKROOT" "$HOME/Android/Sdk"
           command -v adb
