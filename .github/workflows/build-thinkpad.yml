@@ -45,20 +45,20 @@ jobs:
         run: |
           mkdir -p build/thinkpad
           EXPORT_DIR="$(readlink -f build/thinkpad)"
-          godot --headless --verbose --path godot --export-release "Windows Desktop" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_41_THINKPAD.exe"
-          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_41_THINKPAD.exe"
-          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_41_THINKPAD.exe"
+          godot --headless --verbose --path godot --export-release "Windows Desktop" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_42_THINKPAD.exe"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_42_THINKPAD.exe"
+          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_42_THINKPAD.exe"
           cd "$EXPORT_DIR"
-          sha256sum PROCEED_UNTIL_APPREHENDED_0_41_THINKPAD.exe > SHA256.txt
-          zip -9 PUA-0.41-THINKPAD-WINDOWS.zip PROCEED_UNTIL_APPREHENDED_0_41_THINKPAD.exe SHA256.txt
+          sha256sum PROCEED_UNTIL_APPREHENDED_0_42_THINKPAD.exe > SHA256.txt
+          zip -9 PUA-0.42-THINKPAD-WINDOWS.zip PROCEED_UNTIL_APPREHENDED_0_42_THINKPAD.exe SHA256.txt
 
       - name: Upload portable ThinkPad build
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.41-THINKPAD-WINDOWS
+          name: PUA-0.42-THINKPAD-WINDOWS
           path: |
-            build/thinkpad/PROCEED_UNTIL_APPREHENDED_0_41_THINKPAD.exe
+            build/thinkpad/PROCEED_UNTIL_APPREHENDED_0_42_THINKPAD.exe
             build/thinkpad/SHA256.txt
-            build/thinkpad/PUA-0.41-THINKPAD-WINDOWS.zip
+            build/thinkpad/PUA-0.42-THINKPAD-WINDOWS.zip
           if-no-files-found: error
           retention-days: 30
