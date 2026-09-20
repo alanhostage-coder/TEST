@@ -32,7 +32,13 @@ func _exit_tree():
 	_save_state()
 
 func _input(event):
-	var screen_width = get_viewport().get_visible_rect().size.x
+	var screen_size = get_viewport().get_visible_rect().size
+	var screen_width = screen_size.x
+	# Leave the tiny top-left PARKVIEW BAY selector free from the driving gesture.
+	if event is InputEventScreenTouch and event.position.x < 145.0 and event.position.y < 100.0:
+		return
+	if event is InputEventScreenDrag and event.position.x < 145.0 and event.position.y < 100.0:
+		return
 	if event is InputEventScreenTouch:
 		if event.position.x < screen_width * 0.58:
 			touching = event.pressed
