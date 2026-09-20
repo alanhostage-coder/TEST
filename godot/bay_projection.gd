@@ -13,6 +13,7 @@ const CAB_VERTICAL_FOV_DEG := 54.0
 const CAB_PITCH_DEG := -3.2
 const RENDER_SCALE := 0.72
 const LOW_SPEC_RENDER_SCALE := 0.42
+const PROJECTOR_MAX_RENDER_SCALE := 0.48
 const CORNER_PICK_RADIUS := 82.0
 
 var mode := 0 # 0 normal, 1 cab, 2 calibration
@@ -36,8 +37,10 @@ var drive_enabled := false
 var title: Label
 var interior_parts: Array = []
 var steering_ring: Line2D
+var projector_max_mode := false
 
 func _ready():
+	projector_max_mode = OS.has_feature("projector_max")
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	car = get_node_or_null("../Car")
 	if car:
@@ -46,7 +49,7 @@ func _ready():
 	_load_calibration()
 	_build_buttons()
 	_build_views()
-	_set_mode(0)
+	_set_mode(1 if projector_max_mode else 0)
 
 func _build_buttons():
 	button = Button.new()
@@ -119,7 +122,7 @@ func _build_views():
 		var camera = Camera3D.new()
 		camera.current = true
 		camera.near = 0.12
-		camera.far = 420.0 if OS.has_feature("thinkpad_low") else 900.0
+		camera.far = 320.0 if projector_max_mode else (420.0 if OS.has_feature("thinkpad_low") else 900.0)
 		camera.keep_aspect = Camera3D.KEEP_HEIGHT
 		camera.fov = CAB_VERTICAL_FOV_DEG
 		viewport.add_child(camera)
@@ -244,7 +247,7 @@ func _rescale_surfaces():
 		for corner in range(4):
 			warped.append(base[corner] + cal_offsets[i][corner] * size)
 		surfaces[i].polygon = warped
-		var scale = LOW_SPEC_RENDER_SCALE if OS.has_feature("thinkpad_low") else RENDER_SCALE
+		var scale = PROJECTOR_MAX_RENDER_SCALE if projector_max_mode else (LOW_SPEC_RENDER_SCALE if OS.has_feature("thinkpad_low") else RENDER_SCALE)
 		viewports[i].size = Vector2i(max(144, int(w * scale)), max(180, int(size.y * scale)))
 		var uv_size = Vector2(viewports[i].size.x, viewports[i].size.y)
 		surfaces[i].uv = PackedVector2Array([Vector2.ZERO, Vector2(uv_size.x, 0), uv_size, Vector2(0, uv_size.y)])
@@ -262,8 +265,10 @@ func _toggle_calibration():
 func _set_mode(value: int):
 	mode = value
 	var active = mode > 0
-	for surface in surfaces:
-		surface.visible = active
+	for i in range(surfaces.size()):
+		surfaces[i].visible = active
+		if i < viewports.size():
+			viewports[i].render_target_update_mode = SubViewport.UPDATE_ALWAYS if active else SubViewport.UPDATE_DISABLED
 	_set_interior_visible(mode == 1)
 	if source_camera:
 		source_camera.current = not active
@@ -287,10 +292,10 @@ func _set_mode(value: int):
 		cal_button.text = "CAL"
 		title.text = ""
 	elif mode == 1:
-		button.text = "DRIVE VIEW"
+		button.text = "PROJECTOR MAX" if projector_max_mode else "DRIVE VIEW"
 		cal_button.text = "CAL"
 		drive_button.text = "DRIVE"
-		title.text = "BAY WINDOW SIM · FORWARD DRIVER VIEW"
+		title.text = "PROJECTOR MAX · BAY WINDOW DRIVER VIEW" if projector_max_mode else "BAY WINDOW SIM · FORWARD DRIVER VIEW"
 	else:
 		button.text = "EXIT CAL"
 		cal_button.text = "DONE"
