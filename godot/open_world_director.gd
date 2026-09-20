@@ -131,23 +131,52 @@ func _build_roaming_life(segments: Array):
 func _make_parked_vehicle(seed: int) -> Node3D:
 	var vehicle = Node3D.new()
 	vehicle.name = "Parked_%02d" % seed
+	var van = seed % 5 == 0
+	var shade = 0.075 + float((seed * 19) % 23) / 100.0
+	var paint = _material(Color(shade, shade * 0.97, shade * 0.91), 0.50, 0.18)
+	var glass = _material(Color(0.035, 0.055, 0.065), 0.18, 0.18)
+	var tyre = _material(Color(0.022, 0.024, 0.025), 0.94, 0.01)
+
 	var body = MeshInstance3D.new()
 	var mesh = BoxMesh.new()
-	var van = seed % 5 == 0
-	mesh.size = Vector3(1.86, 1.34 if van else 0.78, 4.55 if van else 4.05)
+	mesh.size = Vector3(1.86, 0.66 if not van else 0.86, 4.10 if not van else 4.58)
 	body.mesh = mesh
-	var shade = 0.075 + float((seed * 19) % 23) / 100.0
-	body.material_override = _material(Color(shade, shade * 0.97, shade * 0.91), 0.56, 0.14)
-	body.position.y = 0.30 if van else 0.0
+	body.material_override = paint
+	body.position.y = 0.05 if not van else 0.18
 	vehicle.add_child(body)
+
+	var cabin = MeshInstance3D.new()
+	var cabin_mesh = BoxMesh.new()
+	cabin_mesh.size = Vector3(1.50, 0.58 if not van else 1.02, 1.72 if not van else 2.15)
+	cabin.mesh = cabin_mesh
+	cabin.position = Vector3(0, 0.58 if not van else 0.84, 0.10 if not van else 0.22)
+	cabin.material_override = glass
+	cabin.visibility_range_end = 115.0
+	vehicle.add_child(cabin)
+
 	if not van:
-		var cabin = MeshInstance3D.new()
-		var cabin_mesh = BoxMesh.new()
-		cabin_mesh.size = Vector3(1.52, 0.48, 1.78)
-		cabin.mesh = cabin_mesh
-		cabin.position = Vector3(0, 0.55, 0.12)
-		cabin.material_override = _material(Color(0.045, 0.065, 0.075), 0.22, 0.22)
-		vehicle.add_child(cabin)
+		var roof = MeshInstance3D.new()
+		var roof_mesh = BoxMesh.new()
+		roof_mesh.size = Vector3(1.42, 0.09, 1.50)
+		roof.mesh = roof_mesh
+		roof.position = Vector3(0, 0.88, 0.12)
+		roof.material_override = paint
+		roof.visibility_range_end = 115.0
+		vehicle.add_child(roof)
+
+	for z in [-1.28, 1.28]:
+		for x in [-0.92, 0.92]:
+			var wheel = MeshInstance3D.new()
+			var wheel_mesh = CylinderMesh.new()
+			wheel_mesh.top_radius = 0.29
+			wheel_mesh.bottom_radius = 0.29
+			wheel_mesh.height = 0.17
+			wheel.mesh = wheel_mesh
+			wheel.position = Vector3(x, -0.12, z if not van else z * 1.12)
+			wheel.rotation.z = PI * 0.5
+			wheel.material_override = tyre
+			wheel.visibility_range_end = 80.0
+			vehicle.add_child(wheel)
 	return vehicle
 
 func _build_wet_ground_memory(segments: Array):
