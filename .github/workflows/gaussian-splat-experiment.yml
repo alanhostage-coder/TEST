@@ -1,0 +1,85 @@
+name: PUA Gaussian Splat Experiment
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ experiment/gaussian-splat ]
+    paths:
+      - 'godot/**'
+      - '.github/workflows/gaussian-splat-experiment.yml'
+
+jobs:
+  windows-splat-capability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container:
+      image: barichello/godot-ci:4.5.1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned GDGS 3.3.0 addon
+        run: |
+          apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git
+          git clone --depth 1 --branch v3.3.0 https://github.com/ReconWorldLab/godot-gaussian-splatting.git /tmp/gdgs
+          mkdir -p godot/addons
+          cp -a /tmp/gdgs/addons/gdgs godot/addons/gdgs
+          test -f godot/addons/gdgs/plugin.cfg
+          printf '\n[editor_plugins]\nenabled=PackedStringArray("res://addons/gdgs/plugin.cfg")\n' >> godot/project.godot
+
+      - name: Strict Godot 4.5.1 parse with GDGS
+        run: |
+          godot --version
+          godot --headless --verbose --path godot --editor --quit > /tmp/splat-parse.log 2>&1
+          cat /tmp/splat-parse.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/splat-parse.log
+
+      - name: Existing PUA runtime regression
+        run: |
+          set +e
+          timeout 30s godot --headless --path godot res://pua_soak_test.tscn > /tmp/splat-soak.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/splat-soak.log
+          test "$status" -eq 0
+          grep -q 'PUA_SOAK_OK' /tmp/splat-soak.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|PUA_SOAK_FAIL' /tmp/splat-soak.log
+
+      - name: Verify splat importer against upstream sample
+        run: |
+          mkdir -p godot/splat_probe
+          cp /tmp/gdgs/samples/assets/demo.sog godot/splat_probe/upstream_demo.sog
+          godot --headless --verbose --path godot --editor --quit > /tmp/splat-import.log 2>&1
+          cat /tmp/splat-import.log
+          test -d godot/.godot/imported
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/splat-import.log
+          rm -rf godot/splat_probe
+
+      - name: Prepare Gaussian-capable PC Max export
+        run: |
+          mkdir -p "$HOME/.local/share/godot/export_templates"
+          if [ -d /root/.local/share/godot/export_templates/4.5.1.stable ]; then
+            cp -a /root/.local/share/godot/export_templates/4.5.1.stable "$HOME/.local/share/godot/export_templates/"
+          fi
+          sed -i 's/custom_features="pc_max"/custom_features="pc_max,gaussian_splat"/' godot/export_presets.cfg
+          grep -q 'pc_max,gaussian_splat' godot/export_presets.cfg
+
+      - name: Export Windows Gaussian capability build
+        run: |
+          mkdir -p build/splat
+          godot --headless --verbose --path godot --export-release "Windows PC Max" "$(pwd)/build/splat/PUA_0_76_GAUSSIAN_EXPERIMENT.exe"
+          test -s build/splat/PUA_0_76_GAUSSIAN_EXPERIMENT.exe
+          cat > build/splat/README.txt <<'EOF'
+          PUA Gaussian Splat experiment
+          This proves the Godot/GDGS integration and preserves the normal OSM driving world.
+          No EH15 splat imagery is bundled, so this build does NOT claim photoreal EH15.
+          Add only licensed, georeferenced EH15 capture data as res://splat_assets/eh15_2bz.sog
+          before export. Google imagery and private room photographs are not included.
+          EOF
+          sha256sum build/splat/PUA_0_76_GAUSSIAN_EXPERIMENT.exe > build/splat/SHA256.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PUA-0.76-GAUSSIAN-CAPABILITY-EXPERIMENT
+          path: build/splat/
+          if-no-files-found: error
+          retention-days: 14
