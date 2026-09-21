@@ -30,7 +30,7 @@ jobs:
             cp -a /root/.local/share/godot/export_templates/4.5.1.stable "$HOME/.local/share/godot/export_templates/"
           fi
           apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nsis zip xvfb xauth python3-pil
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nsis zip xvfb xauth python3-pil libfontconfig1 libxcursor1 libxinerama1 libxi6 libxrandr2 libxkbcommon-x11-0 libgl1 libegl1
           godot --version
           makensis -VERSION
           test -d "$HOME/.local/share/godot/export_templates/4.5.1.stable"
@@ -54,7 +54,6 @@ jobs:
 
       - name: Five-surface render proof
         id: projector_proof
-        continue-on-error: true
         run: |
           mkdir -p build/projector-proof
           set +e
@@ -91,12 +90,6 @@ jobs:
           path: build/projector-proof/
           if-no-files-found: error
           retention-days: 30
-
-      - name: Stop on render proof failure
-        if: steps.projector_proof.outcome == 'failure' && steps.projector_proof.conclusion == 'failure'
-        run: |
-          echo "::error::Five-surface render proof failed; diagnostics uploaded."
-          exit 1
 
       - name: PC Max invariants
         run: |
