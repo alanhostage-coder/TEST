@@ -21,7 +21,7 @@ jobs:
 
       - name: Install pinned GDGS 3.3.0 addon
         run: |
-          apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git
+          apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git xvfb xauth
           git clone --depth 1 --branch v3.3.0 https://github.com/ReconWorldLab/godot-gaussian-splatting.git /tmp/gdgs
           mkdir -p godot/addons
           cp -a /tmp/gdgs/addons/gdgs godot/addons/gdgs
@@ -157,15 +157,14 @@ jobs:
           script = ExtResource("1")
           EOF
           set +e
-          timeout 30s godot --path godot --display-driver x11 res://splat_probe/smoke.tscn > /tmp/splat-render.log 2>&1
+          timeout 30s xvfb-run -a godot --path godot --display-driver x11 res://splat_probe/smoke.tscn > /tmp/splat-render.log 2>&1
           status=$?
           set -e
           cat /tmp/splat-render.log
-          if [ "$status" -eq 0 ] && [ -s /tmp/gdgs-smoke.png ]; then
-            cp /tmp/gdgs-smoke.png godot/splat_probe/GDGS_RENDER_SMOKE.png
-          else
-            echo "No graphical display available in this runner; importer/export proof remains valid." > godot/splat_probe/RENDER_NOT_VERIFIED.txt
-          fi
+          test "$status" -eq 0
+          test -s /tmp/gdgs-smoke.png
+          cp /tmp/gdgs-smoke.png godot/splat_probe/GDGS_RENDER_SMOKE.png
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/splat-render.log
 
       - name: Prepare Gaussian-capable PC Max export
         run: |
@@ -196,6 +195,5 @@ jobs:
           path: |
             build/splat/
             godot/splat_probe/GDGS_RENDER_SMOKE.png
-            godot/splat_probe/RENDER_NOT_VERIFIED.txt
           if-no-files-found: error
           retention-days: 14
