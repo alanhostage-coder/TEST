@@ -20,6 +20,10 @@ var stream_enabled := true
 var last_camera_position := Vector3.ZERO
 @export var min_camera_move_m := 1.0
 @export var max_chunk_distance_m := 1000.0
+@export var target_frame_ms := 25.0
+@export var pressure_frames := 12
+var pressure_count := 0
+var adaptive_chunk_cap := -1
 
 func _ready() -> void:
 	viewer = get_viewport().get_camera_3d()
@@ -42,7 +46,17 @@ func _process(delta: float) -> void:
 	if last_camera_position != Vector3.ZERO and viewer.global_position.distance_to(last_camera_position) < min_camera_move_m:
 		return
 	last_camera_position = viewer.global_position
+	var frame_ms := delta * 1000.0
+	if frame_ms > target_frame_ms:
+		pressure_count += 1
+	else:
+		pressure_count = max(0, pressure_count - 1)
+	if pressure_count >= pressure_frames:
+		adaptive_chunk_cap = max(1, (max_loaded_chunks if adaptive_chunk_cap < 0 else adaptive_chunk_cap) - 1)
+		pressure_count = 0
 	var effective_max := max_loaded_chunks
+	if adaptive_chunk_cap > 0:
+		effective_max = min(effective_max, adaptive_chunk_cap)
 	if OS.has_feature("projector_max"):
 		effective_max = min(max_loaded_chunks, projector_max_loaded_chunks)
 	if OS.has_feature("thinkpad_low"):
