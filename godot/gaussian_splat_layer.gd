@@ -61,6 +61,8 @@ func _metadata_is_safe() -> bool:
 		return false
 	if str(meta.get("capture_date", "")).strip_edges() == "":
 		return false
+	if not str(meta.get("capture_quality", "")) in ["draft", "verified"]:
+		return false
 	if not str(meta.get("alignment_status", "")) in ["estimated", "surveyed"]:
 		return false
 	var lat = float(meta.get("origin_lat", 0.0))
