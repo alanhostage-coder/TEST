@@ -494,7 +494,11 @@ func _add_opening_anchor_annotation(parent: Node3D, car: Node, pois: Array, buil
 		label.text = anchor_name
 		label.position = Vector3(float(coordinate[0]), 3.05, float(coordinate[1]))
 		label.font_size = 27 if low_spec_mode else 34
-		label.pixel_size = 0.0041
+		# Slightly larger than ordinary world labels because this one is the single
+		# verified first-impression cue. At the selected EH15 opening distance this
+		# produces a compact, legible projector annotation instead of a two-pixel
+		# trace, while perspective scaling still prevents a screen-filling banner.
+		label.pixel_size = 0.014
 		# Depth-independent rendering makes this unambiguously a map overlay rather
 		# than a claim that a physical sign exists on the facade. Keep ordinary
 		# perspective scaling: fixed_size turns a long business name into a giant
