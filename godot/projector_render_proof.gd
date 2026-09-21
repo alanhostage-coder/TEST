@@ -62,12 +62,21 @@ func run() -> void:
 	osm_overlay._update_location_text(true)
 	osm_overlay._process(0.3)
 	await process_frame
-	if osm_overlay._packaged_overlay_road_count != packaged.get("roads", []).size() \
-	or osm_overlay._packaged_overlay_texture == null \
-	or osm_overlay._overlay_map.texture != osm_overlay._packaged_overlay_texture \
-	or not osm_overlay._overlay_marker.visible \
-	or osm_overlay._overlay_root.position.x < 1600.0:
-		push_error("PUA_PROJECTOR_RENDER_FAIL packaged OSM overlay unavailable")
+	var expected_overlay_x = maxf(8.0, world.get_viewport().get_visible_rect().size.x - osm_overlay._overlay_root.size.x - 14.0)
+	if osm_overlay._packaged_overlay_road_count != packaged.get("roads", []).size():
+		push_error("PUA_PROJECTOR_RENDER_FAIL packaged OSM road count %d/%d" % [osm_overlay._packaged_overlay_road_count, packaged.get("roads", []).size()])
+		quit(2)
+		return
+	if osm_overlay._packaged_overlay_texture == null or osm_overlay._overlay_map.texture != osm_overlay._packaged_overlay_texture:
+		push_error("PUA_PROJECTOR_RENDER_FAIL packaged OSM texture missing")
+		quit(2)
+		return
+	if not osm_overlay._overlay_marker.visible:
+		push_error("PUA_PROJECTOR_RENDER_FAIL packaged OSM car marker hidden at %s" % world.get_node("Car").global_position)
+		quit(2)
+		return
+	if absf(osm_overlay._overlay_root.position.x - expected_overlay_x) > 1.0:
+		push_error("PUA_PROJECTOR_RENDER_FAIL packaged OSM position %.1f expected %.1f viewport %.1f" % [osm_overlay._overlay_root.position.x, expected_overlay_x, world.get_viewport().get_visible_rect().size.x])
 		quit(2)
 		return
 	var legacy_yaw := [deg_to_rad(-8.0), deg_to_rad(3.0), deg_to_rad(11.0), deg_to_rad(-4.0), deg_to_rad(6.0)]
@@ -198,6 +207,7 @@ func run() -> void:
 		"packaged_roads": packaged.get("roads", []).size(),
 		"packaged_overlay_roads": osm_overlay._packaged_overlay_road_count,
 		"packaged_overlay_position": [osm_overlay._overlay_root.position.x, osm_overlay._overlay_root.position.y],
+		"packaged_overlay_expected_x": expected_overlay_x,
 		"packaged_overlay_marker_visible": osm_overlay._overlay_marker.visible,
 		"packaged_buildings": packaged.get("buildings", []).size(),
 		"panel_render_sizes": panel_render_sizes,
