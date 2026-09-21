@@ -341,7 +341,7 @@ func viewport_size_for_surface(surface_size: Vector2, render_scale: float) -> Ve
 		max(1.0, surface_size.x * render_scale),
 		max(1.0, surface_size.y * render_scale)
 	)
-	var uniform_boost := max(
+	var uniform_boost: float = max(
 		1.0,
 		max(MIN_VIEWPORT_WIDTH / target.x, MIN_VIEWPORT_HEIGHT / target.y)
 	)
