@@ -24,6 +24,8 @@ var last_camera_position := Vector3.ZERO
 @export var pressure_frames := 12
 var pressure_count := 0
 var adaptive_chunk_cap := -1
+var recovery_count := 0
+@export var recovery_frames := 120
 
 func _ready() -> void:
 	viewer = get_viewport().get_camera_3d()
@@ -49,8 +51,13 @@ func _process(delta: float) -> void:
 	var frame_ms := delta * 1000.0
 	if frame_ms > target_frame_ms:
 		pressure_count += 1
+		recovery_count = 0
 	else:
 		pressure_count = max(0, pressure_count - 1)
+		recovery_count += 1
+		if recovery_count >= recovery_frames and adaptive_chunk_cap > 0:
+			adaptive_chunk_cap = min(max_loaded_chunks, adaptive_chunk_cap + 1)
+			recovery_count = 0
 	if pressure_count >= pressure_frames:
 		adaptive_chunk_cap = max(1, (max_loaded_chunks if adaptive_chunk_cap < 0 else adaptive_chunk_cap) - 1)
 		pressure_count = 0
