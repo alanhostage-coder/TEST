@@ -154,14 +154,14 @@ func _build_buttons():
 	add_child(surface_button)
 
 	yaw_left_button = Button.new()
-	yaw_left_button.text = "YAW −"
+	yaw_left_button.text = "PAN −"
 	yaw_left_button.position = Vector2(280, 94)
 	yaw_left_button.size = Vector2(82, 38)
 	yaw_left_button.pressed.connect(_nudge_yaw.bind(-1.0))
 	add_child(yaw_left_button)
 
 	yaw_right_button = Button.new()
-	yaw_right_button.text = "YAW +"
+	yaw_right_button.text = "PAN +"
 	yaw_right_button.position = Vector2(368, 94)
 	yaw_right_button.size = Vector2(82, 38)
 	yaw_right_button.pressed.connect(_nudge_yaw.bind(1.0))
@@ -384,13 +384,13 @@ func _update_calibration_controls():
 		return
 	layout_button.text = "LAYOUT: %d" % layout_surface_count
 	var adjustments = camera_yaw_adjust_five if layout_surface_count == 5 else camera_yaw_adjust_three
-	var yaw_degrees = rad_to_deg(float(adjustments[selected_surface]))
+	var yaw_degrees = rad_to_deg(float(adjustments[0]))
 	surface_button.text = "%d · %s" % [selected_surface + 1, SURFACE_NAMES[selected_surface]]
 	surface_button.tooltip_text = "Select a shutter/window surface"
-	yaw_left_button.tooltip_text = "Rotate selected view left by 1°"
-	yaw_right_button.tooltip_text = "Rotate selected view right by 1°"
+	yaw_left_button.tooltip_text = "Rotate the entire contiguous panorama left by 1°"
+	yaw_right_button.tooltip_text = "Rotate the entire contiguous panorama right by 1°"
 	if mode == 2:
-		title.text = "UNMEASURED START · %s · YAW %+.0f° · DRAG CORNERS, THEN SAVE" % [SURFACE_NAMES[selected_surface], yaw_degrees]
+		title.text = "UNMEASURED START · %s · PAN %+.0f° · DRAG CORNERS, THEN SAVE" % [SURFACE_NAMES[selected_surface], yaw_degrees]
 
 func _set_mode(value: int):
 	mode = value
@@ -586,6 +586,7 @@ func _save_calibration():
 		for corner in range(4):
 			cfg.set_value("five_plane_%d" % plane, "corner_%d" % corner, cal_offsets_five[plane][corner])
 		cfg.set_value("five_plane_%d" % plane, "yaw_adjust", camera_yaw_adjust_five[plane])
+	cfg.set_value("layout", "yaw_policy", "panorama_contiguous_v1")
 	cfg.save(CAL_PATH)
 	title.text = "%d-SURFACE CALIBRATION SAVED" % layout_surface_count
 
@@ -609,6 +610,20 @@ func _load_calibration():
 			if saved is Vector2:
 				cal_offsets_five[plane][corner] = saved
 		camera_yaw_adjust_five[plane] = float(cfg.get_value("five_plane_%d" % plane, "yaw_adjust", 0.0))
+	# Pre-contiguous calibration files stored independent pane yaw. Preserve the
+	# centre view as the optical reference and migrate every pane to that yaw so a
+	# legacy save cannot silently reopen panorama seams.
+	_normalise_panorama_yaw(camera_yaw_adjust_three, 1)
+	_normalise_panorama_yaw(camera_yaw_adjust_five, 1)
+
+
+func _normalise_panorama_yaw(adjustments: Array, reference_index: int) -> void:
+	if adjustments.is_empty():
+		return
+	var safe_index: int = clampi(reference_index, 0, adjustments.size() - 1)
+	var reference_yaw: float = float(adjustments[safe_index])
+	for i in range(adjustments.size()):
+		adjustments[i] = reference_yaw
 
 
 func _horizontal_fov(vertical_deg: float, aspect: float) -> float:

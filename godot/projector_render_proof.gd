@@ -49,6 +49,13 @@ func run() -> void:
 		push_error("PUA_PROJECTOR_RENDER_FAIL packaged map provenance/geometry invalid")
 		quit(2)
 		return
+	var legacy_yaw := [deg_to_rad(-8.0), deg_to_rad(3.0), deg_to_rad(11.0), deg_to_rad(-4.0), deg_to_rad(6.0)]
+	bay._normalise_panorama_yaw(legacy_yaw, 1)
+	for yaw in legacy_yaw:
+		if abs(float(yaw) - deg_to_rad(3.0)) > 0.00001:
+			push_error("PUA_PROJECTOR_RENDER_FAIL legacy yaw migration broke panorama continuity")
+			quit(2)
+			return
 	var projector_1024_aspect_error := _projector_profile_aspect_error(bay, Vector2(1024, 576))
 	if projector_1024_aspect_error > 0.01:
 		push_error("PUA_PROJECTOR_RENDER_FAIL low-res surface aspect drift %.5f" % projector_1024_aspect_error)
@@ -110,7 +117,8 @@ func run() -> void:
 		"packaged_patch_timestamp": str(packaged.get("source_timestamp_utc", "")),
 		"packaged_roads": packaged.get("roads", []).size(),
 		"packaged_buildings": packaged.get("buildings", []).size(),
-		"projector_1024_aspect_error": projector_1024_aspect_error
+		"projector_1024_aspect_error": projector_1024_aspect_error,
+		"legacy_yaw_normalised": true
 	}
 	var manifest_file = FileAccess.open(MANIFEST_PATH, FileAccess.WRITE)
 	if manifest_file == null:

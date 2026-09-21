@@ -93,6 +93,7 @@ jobs:
           assert proof['opening_policy'] == 'verified-first-impression-v1', proof
           assert proof['opening_anchor'], proof
           assert proof['projector_1024_aspect_error'] < 0.01, proof
+          assert proof['legacy_yaw_normalised'] is True, proof
           PY
           cp /tmp/pua-projector-proof.png build/projector-proof/
           cp /tmp/pua-projector-continuity.png build/projector-proof/
