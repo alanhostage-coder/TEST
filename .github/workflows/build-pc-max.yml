@@ -83,6 +83,7 @@ jobs:
           opening_marker_pixels = 0
           opening_marker_max_width = 0
           opening_marker_max_height = 0
+          opening_marker_touches_edge = False
           for panel in panels:
               rendered = Image.open(panel).convert('RGB')
               assert rendered.width >= 64 and rendered.height >= 180, (panel, rendered.size)
@@ -98,11 +99,13 @@ jobs:
                   marker_ys = [point[1] for point in marker_points]
                   opening_marker_max_width = max(opening_marker_max_width, max(marker_xs) - min(marker_xs) + 1)
                   opening_marker_max_height = max(opening_marker_max_height, max(marker_ys) - min(marker_ys) + 1)
+                  opening_marker_touches_edge |= min(marker_xs) <= 1 or max(marker_xs) >= rendered.width - 2
           assert opening_marker_pixels >= 12, f'opening anchor did not reach rendered pixels: {opening_marker_pixels}'
           assert opening_marker_pixels <= 2500, f'opening anchor became an oversized overlay: {opening_marker_pixels}'
           assert 60 <= opening_marker_max_width <= 175, f'opening anchor width is not projector-legible: {opening_marker_max_width}'
           assert opening_marker_max_height >= 4, f'opening anchor is too short to read: {opening_marker_max_height}'
           assert opening_marker_max_height <= 32, f'opening anchor became too tall for a restrained annotation: {opening_marker_max_height}'
+          assert not opening_marker_touches_edge, 'opening anchor is clipped by a panel edge'
           with open('/tmp/pua-projector-proof.json', encoding='utf-8') as handle:
               proof = json.load(handle)
           assert proof['proof_profile'] == 'deterministic-clear-five-surface-v1', proof
