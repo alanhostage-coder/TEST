@@ -141,7 +141,9 @@ func _recompute():
 	var now = Time.get_datetime_dict_from_system()
 	var hour = int(now.get("hour", 12))
 	var day_key = "%04d-%02d-%02d" % [int(now.get("year", 2026)), int(now.get("month", 1)), int(now.get("day", 1))]
-	var rain = clamp(float(weather.get("rain", 0.0)) + float(weather.get("precipitation", 0.0)), 0.0, 8.0)
+	var model_rain = float(weather.get("rain", 0.0)) + float(weather.get("precipitation", 0.0))
+	var observed_rain_15m = max(0.0, float(weather.get("observed_rain_15m_mm", 0.0)))
+	var rain = clamp(max(model_rain, observed_rain_15m * 4.0), 0.0, 8.0)
 	var wetness = clamp(rain / 2.5, 0.0, 1.0)
 	var cloud = clamp(float(weather.get("cloud", 65.0)) / 100.0, 0.0, 1.0)
 	var wind = max(0.0, float(weather.get("wind_speed", 12.0)))
@@ -205,6 +207,7 @@ func _recompute():
 			"hour": hour,
 			"weather_code": int(weather.get("weather_code", 3)),
 			"temperature": float(weather.get("temperature", 8.0)),
+			"observed_rain_15m_mm": observed_rain_15m,
 			"wind_speed": wind,
 			"cloud": cloud,
 			"aqi_ratio": aqi,
