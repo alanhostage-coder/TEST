@@ -57,7 +57,7 @@ func _process(delta: float) -> void:
 			chunk.visible = false
 			continue
 		ranked.append({"node": chunk, "distance": d})
-	ranked.sort_custom(func(a, b): return a["distance"] < b["distance"])
+	ranked.sort_custom(_sort_by_distance)
 	var visible_count := 0
 	var preload_count := 0
 	for item in ranked:
@@ -81,3 +81,6 @@ func set_stream_enabled(enabled: bool) -> void:
 	if not enabled:
 		for chunk in chunks:
 			chunk.visible = false
+
+func _sort_by_distance(a: Dictionary, b: Dictionary) -> bool:
+	return float(a.get("distance", INF)) < float(b.get("distance", INF))
