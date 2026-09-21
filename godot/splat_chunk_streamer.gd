@@ -8,6 +8,7 @@ extends Node3D
 @export var preload_radius_m := 320.0
 @export var max_preload_chunks := 5
 @export var projector_max_loaded_chunks := 2
+@export var thinkpad_max_loaded_chunks := 1
 var update_accum := 0.0
 
 var viewer: Node3D = null
@@ -34,6 +35,8 @@ func _process(delta: float) -> void:
 	var effective_max := max_loaded_chunks
 	if OS.has_feature("projector_max"):
 		effective_max = min(max_loaded_chunks, projector_max_loaded_chunks)
+	if OS.has_feature("thinkpad_low"):
+		effective_max = min(effective_max, thinkpad_max_loaded_chunks)
 	var ranked: Array = []
 	for chunk in chunks:
 		var d := viewer.global_position.distance_to(chunk.global_position)
