@@ -100,6 +100,55 @@ func _finish():
 	if secondary_shadow_violations != 0:
 		_fail("low-spec secondary meshes still cast projector shadows")
 		return
+	if str(car.get_meta("map_opening_policy", "")) != "verified-first-impression-v1":
+		_fail("verified first-impression opening policy missing")
+		return
+	var opening_score = float(car.get_meta("map_opening_hook_score", -INF))
+	var opening_branches = int(car.get_meta("map_opening_branch_count", 0))
+	var opening_approach = float(car.get_meta("map_opening_approach_m", 0.0))
+	var opening_roads = car.get_meta("map_opening_named_roads", [])
+	if opening_score < 45.0 or opening_branches < 3 or opening_approach < 5.5 or opening_approach > 10.1:
+		_fail("first-impression opening is not strong enough")
+		return
+	if not opening_roads is Array or opening_roads.size() < 2:
+		_fail("first-impression opening lacks verified named-road context")
+		return
+	var source_road_names := {}
+	for source_road in map_stream.data.get("roads", []):
+		if source_road is Dictionary:
+			var source_name = str(source_road.get("name", "")).strip_edges()
+			if source_name != "":
+				source_road_names[source_name] = true
+	for opening_road in opening_roads:
+		if not source_road_names.has(str(opening_road)):
+			_fail("first-impression road name is not source-backed")
+			return
+	var opening_junction_raw = car.get_meta("map_spawn_junction", [])
+	var opening_heading_raw = car.get_meta("map_spawn_heading", [])
+	if not opening_junction_raw is Array or opening_junction_raw.size() < 2 or not opening_heading_raw is Array or opening_heading_raw.size() < 2:
+		_fail("first-impression approach geometry missing")
+		return
+	var opening_junction = Vector2(float(opening_junction_raw[0]), float(opening_junction_raw[1]))
+	var opening_spawn = Vector2(car.global_position.x, car.global_position.z)
+	var opening_heading = Vector2(float(opening_heading_raw[0]), float(opening_heading_raw[1]))
+	var to_opening_junction = opening_junction - opening_spawn
+	if abs(to_opening_junction.length() - opening_approach) > 0.8 or opening_heading.length() < 0.95 or opening_heading.normalized().dot(to_opening_junction.normalized()) < 0.97:
+		_fail("first-impression car is not approaching its verified junction")
+		return
+	var opening_anchor = str(car.get_meta("map_opening_verified_anchor", ""))
+	var opening_anchor_source = str(car.get_meta("map_opening_verified_anchor_source", ""))
+	if opening_anchor == "" or opening_anchor_source not in ["poi", "building", "point"]:
+		_fail("first-impression opening lacks a verified forward anchor")
+		return
+	var anchor_verified := false
+	var anchor_collection = map_stream.data.get("poi_features", []) if opening_anchor_source == "poi" else (map_stream.data.get("buildings", []) if opening_anchor_source == "building" else map_stream.data.get("point_features", []))
+	for source_anchor in anchor_collection:
+		if source_anchor is Dictionary and str(source_anchor.get("name", "")).strip_edges() == opening_anchor:
+			anchor_verified = true
+			break
+	if not anchor_verified:
+		_fail("first-impression forward anchor is not source-backed")
+		return
 	var nearest_origin_road = map_stream.nearest_named_road(Vector2.ZERO)
 	if str(nearest_origin_road.get("name", "")) != "Pittville Street" or float(nearest_origin_road.get("distance_m", INF)) > 30.0:
 		_fail("verified Pittville Street context missing near postcode centroid")
