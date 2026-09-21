@@ -18,6 +18,8 @@ var predicted_focus := Vector3.ZERO
 var viewer: Camera3D
 var accum := 0.0
 var candidates: Array[Node3D] = []
+var candidate_cursor := 0
+@export var candidates_per_tick := 96
 
 func _ready() -> void:
 	viewer = get_viewport().get_camera_3d()
@@ -45,7 +47,12 @@ func _process(delta: float) -> void:
 	var near_used := 0
 	var mid_used := 0
 	var landmarks_used := 0
-	for n in candidates:
+	var total := candidates.size()
+	if total == 0:
+		return
+	var work_count := min(candidates_per_tick, total)
+	for i in range(work_count):
+		var n := candidates[(candidate_cursor + i) % total]
 		if not is_instance_valid(n):
 			continue
 		var offset := n.global_position - viewer.global_position
@@ -66,3 +73,4 @@ func _process(delta: float) -> void:
 			keep = true
 			mid_used += 1
 		n.visible = keep
+	candidate_cursor = (candidate_cursor + work_count) % total
