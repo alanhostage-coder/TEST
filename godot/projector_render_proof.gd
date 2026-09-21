@@ -63,6 +63,38 @@ func run() -> void:
 		return
 	if bay.layout_surface_count != 5:
 		bay._toggle_layout()
+	# Exercise the exact XPS projector allocation even though this proof runs in the
+	# CI editor rather than an exported feature-tagged executable.
+	bay.projector_max_mode = true
+	bay.pc_max_mode = true
+	bay.xps_9530_mode = true
+	bay.layout_surface_count = 5
+	bay._rescale_surfaces()
+	var xps_uniform_pixels := 0
+	var xps_actual_pixels := 0
+	var xps_scales: Array = []
+	var xps_panel_sizes: Array = []
+	for panel_index in range(5):
+		var rect: Rect2 = bay.FIVE_RECTS[panel_index]
+		var destination_size := Vector2(
+			root.size.x * rect.size.x,
+			root.size.y * rect.size.y
+		)
+		var uniform_size: Vector2i = bay.viewport_size_for_surface(destination_size, bay.XPS_9530_RENDER_SCALE)
+		var actual_size: Vector2i = bay.viewports[panel_index].size
+		xps_uniform_pixels += uniform_size.x * uniform_size.y
+		xps_actual_pixels += actual_size.x * actual_size.y
+		xps_scales.append(bay.render_scale_for_surface(panel_index))
+		xps_panel_sizes.append([actual_size.x, actual_size.y])
+	var xps_pixel_budget_ratio := float(xps_actual_pixels) / max(1.0, float(xps_uniform_pixels))
+	if xps_pixel_budget_ratio < 0.95 or xps_pixel_budget_ratio > 1.02:
+		push_error("PUA_PROJECTOR_RENDER_FAIL XPS perceptual pixel budget drift %.4f" % xps_pixel_budget_ratio)
+		quit(2)
+		return
+	if float(xps_scales[1]) <= bay.XPS_9530_RENDER_SCALE or float(xps_scales[3]) >= bay.XPS_9530_RENDER_SCALE:
+		push_error("PUA_PROJECTOR_RENDER_FAIL XPS centre/peripheral allocation missing")
+		quit(2)
+		return
 	bay._set_mode(1)
 	for _frame in range(8):
 		await process_frame
@@ -135,7 +167,11 @@ func run() -> void:
 		"panel_render_sizes": panel_render_sizes,
 		"max_panel_aspect_error": max_panel_aspect_error,
 		"projector_1024_aspect_error": projector_1024_aspect_error,
-		"legacy_yaw_normalised": true
+		"legacy_yaw_normalised": true,
+		"xps_profile_exercised": true,
+		"xps_panel_render_scales": xps_scales,
+		"xps_panel_render_sizes": xps_panel_sizes,
+		"xps_pixel_budget_ratio": xps_pixel_budget_ratio
 	}
 	var manifest_file = FileAccess.open(MANIFEST_PATH, FileAccess.WRITE)
 	if manifest_file == null:

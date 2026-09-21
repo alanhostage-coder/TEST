@@ -94,6 +94,12 @@ jobs:
           assert proof['opening_anchor'], proof
           assert proof['projector_1024_aspect_error'] < 0.01, proof
           assert proof['legacy_yaw_normalised'] is True, proof
+          assert proof['xps_profile_exercised'] is True, proof
+          assert 0.95 <= proof['xps_pixel_budget_ratio'] <= 1.02, proof
+          scales = proof['xps_panel_render_scales']
+          assert len(scales) == 5, scales
+          assert scales[1] > 0.86, scales
+          assert scales[3] < 0.86 and scales[4] < 0.86, scales
           PY
           cp /tmp/pua-projector-proof.png build/projector-proof/
           cp /tmp/pua-projector-continuity.png build/projector-proof/
@@ -114,7 +120,7 @@ jobs:
         run: |
           grep -q 'name="Windows XPS 9530 Projector"' godot/export_presets.cfg
           grep -q 'custom_features="pc_max,projector_max,xps_9530"' godot/export_presets.cfg
-          grep -q 'XPS_9530_RENDER_SCALE' godot/bay_projection.gd
+          grep -q 'XPS_9530_SURFACE_RENDER_SCALES' godot/bay_projection.gd
           grep -q 'xps_9530_mode' godot/world.gd
           grep -q 'pc_max_mode' godot/open_world_director.gd
           grep -q 'map_road_segments' godot/world.gd
@@ -154,7 +160,10 @@ jobs:
           Multiple GPUs installed; Windows reports a 4 GB graphics adapter.
 
           This is the active five-surface build. It boots directly into the projector
-          driver view and keeps the full PC map geometry. Secondary trim/furniture does
+          driver view and keeps the full PC map geometry. The centre pane receives a
+          larger render share while the two far wall panes use less, keeping the total
+          five-view pixel budget effectively flat while sharpening the road ahead.
+          Secondary trim/furniture does
           not cast shadows because five cameras multiply that cost while the seated
           driver gets almost no useful information from those shadows.
 

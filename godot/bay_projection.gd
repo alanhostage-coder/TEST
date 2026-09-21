@@ -28,6 +28,10 @@ const LOW_SPEC_RENDER_SCALE := 0.42
 const PROJECTOR_MAX_RENDER_SCALE := 0.48
 const PC_MAX_RENDER_SCALE := 0.88
 const XPS_9530_RENDER_SCALE := 0.86
+# Static perceptual allocation for the seated driver. Keep the old 0.86 uniform
+# scale as the pixel-budget baseline, spend more on the forward centre pane, and
+# recover that cost from the two far peripheral wall panes.
+const XPS_9530_SURFACE_RENDER_SCALES := [0.86, 0.96, 0.86, 0.60, 0.60]
 const CORNER_PICK_RADIUS := 82.0
 const MIN_VIEWPORT_WIDTH := 64.0
 const MIN_VIEWPORT_HEIGHT := 180.0
@@ -326,7 +330,7 @@ func _rescale_surfaces():
 		for corner in range(4):
 			warped.append(base[corner] + offsets[i][corner] * size)
 		surfaces[i].polygon = warped
-		var scale = XPS_9530_RENDER_SCALE if xps_9530_mode else (PROJECTOR_MAX_RENDER_SCALE if projector_max_mode else (PC_MAX_RENDER_SCALE if pc_max_mode else (LOW_SPEC_RENDER_SCALE if OS.has_feature("thinkpad_low") else RENDER_SCALE)))
+		var scale = render_scale_for_surface(i)
 		viewports[i].size = viewport_size_for_surface(Vector2(w, h), scale)
 		var uv_size = Vector2(viewports[i].size.x, viewports[i].size.y)
 		surfaces[i].uv = PackedVector2Array([Vector2.ZERO, Vector2(uv_size.x, 0), uv_size, Vector2(0, uv_size.y)])
@@ -335,6 +339,18 @@ func _rescale_surfaces():
 	_update_camera_frustums()
 	_layout_interior_overlay()
 	queue_redraw()
+
+func render_scale_for_surface(surface_index: int) -> float:
+	if xps_9530_mode and layout_surface_count == 5:
+		return float(XPS_9530_SURFACE_RENDER_SCALES[clamp(surface_index, 0, 4)])
+	if projector_max_mode:
+		return PROJECTOR_MAX_RENDER_SCALE
+	if pc_max_mode:
+		return PC_MAX_RENDER_SCALE
+	if OS.has_feature("thinkpad_low"):
+		return LOW_SPEC_RENDER_SCALE
+	return RENDER_SCALE
+
 
 func viewport_size_for_surface(surface_size: Vector2, render_scale: float) -> Vector2i:
 	# Keep the render buffer at the same aspect ratio as the physical destination.
