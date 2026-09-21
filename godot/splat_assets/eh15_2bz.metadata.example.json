@@ -23,5 +23,7 @@
     0,
     0
   ],
-  "uniform_scale": 1
+  "uniform_scale": 1,
+  "active_distance_m": 180,
+  "hysteresis_m": 20
 }
