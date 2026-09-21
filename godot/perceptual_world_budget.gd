@@ -10,6 +10,8 @@ extends Node3D
 @export var turn_lookahead_s := 1.4
 @export var speed_lookahead_s := 2.2
 @export var min_forward_bias_m := 18.0
+@export var landmark_radius_m := 450.0
+@export var max_landmarks := 12
 var previous_position := Vector3.ZERO
 var predicted_focus := Vector3.ZERO
 
@@ -42,6 +44,7 @@ func _process(delta: float) -> void:
 	predicted_focus = viewer.global_position + forward * min_forward_bias_m + velocity * speed_lookahead_s
 	var near_used := 0
 	var mid_used := 0
+	var landmarks_used := 0
 	for n in candidates:
 		if not is_instance_valid(n):
 			continue
@@ -50,7 +53,11 @@ func _process(delta: float) -> void:
 		var predicted_distance := n.global_position.distance_to(predicted_focus)
 		var ahead := offset.normalized().dot(forward) if distance > 0.01 else 1.0
 		var keep := false
-		if distance <= rear_keep_radius_m:
+		var landmark := n.is_in_group("pua_landmark")
+		if landmark and distance <= landmark_radius_m and landmarks_used < max_landmarks:
+			keep = true
+			landmarks_used += 1
+		elif distance <= rear_keep_radius_m:
 			keep = true
 		elif ahead > -0.15 and distance <= near_radius_m and near_used < max_near_details:
 			keep = true
