@@ -57,6 +57,8 @@ radial_segments = 12
 [sub_resource type="BoxShape3D" id="car_shape"]
 size = Vector3(1.9, 0.9, 4.2)
 
+[ext_resource path="res://perceptual_world_budget.gd" type="Script" id="pua_perceptual"]
+
 [node name="World" type="Node3D"]
 script = ExtResource("1")
 
@@ -256,3 +258,7 @@ theme_override_colors/font_color = Color(1, 1, 1, 0.28)
 theme_override_font_sizes/font_size = 11
 text = "PARKVIEW · A PARLEY · EMILY · RHEA · JASPER · MAGNUS · RUDI"
 horizontal_alignment = 0
+
+
+[node name="PerceptualWorldBudget" type="Node3D" parent="."]
+script = ExtResource("pua_perceptual")
