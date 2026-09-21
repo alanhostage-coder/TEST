@@ -920,6 +920,7 @@ func _on_world_state_changed(state: Dictionary):
 	var cloud = clamp(float(state.get("cloud", 60.0)) / 100.0, 0.0, 1.0)
 	var visibility = clamp(float(state.get("visibility", 12000.0)), 800.0, 30000.0)
 	var aqi = clamp(float(state.get("aqi", 25.0)), 0.0, 150.0)
+	var is_day = int(state.get("is_day", 1)) == 1
 	var wind = max(0.0, float(state.get("wind_speed", 12.0)))
 	var wave = max(0.0, float(state.get("wave_height", 0.5)))
 	asphalt_mat.roughness = lerp(0.34, 0.12, wetness)
@@ -928,19 +929,22 @@ func _on_world_state_changed(state: Dictionary):
 	kerb_mat.roughness = lerp(0.94, 0.68, wetness)
 	concrete_mat.roughness = lerp(0.86, 0.62, wetness)
 	weather_sun_energy = lerp(0.95, 0.56, cloud) * lerp(1.0, 0.90, wetness)
+	if not is_day:
+		weather_sun_energy = 0.035
 	$Sun.light_energy = weather_sun_energy
 	var env = $WorldEnvironment.environment
 	if env:
 		env.fog_enabled = true
 		var visibility_fog = clamp(1.0 - visibility / 22000.0, 0.0, 0.92)
 		env.fog_density = 0.0022 + visibility_fog * 0.008 + clamp(aqi / 150.0, 0.0, 1.0) * 0.002
-		env.fog_light_color = Color(0.46, 0.50, 0.51).lerp(Color(0.36, 0.40, 0.42), cloud)
-		env.ambient_light_energy = lerp(0.88, 0.66, cloud) * lerp(1.0, 0.94, wetness)
-		env.ambient_light_color = Color(0.54, 0.57, 0.58).lerp(Color(0.42, 0.46, 0.48), cloud)
-		env.tonemap_exposure = lerp(1.24, 1.08, cloud) * lerp(1.0, 0.98, wetness)
+		env.fog_light_color = (Color(0.46, 0.50, 0.51).lerp(Color(0.36, 0.40, 0.42), cloud)) if is_day else Color(0.055, 0.070, 0.095)
+		env.ambient_light_energy = (lerp(0.88, 0.66, cloud) * lerp(1.0, 0.94, wetness)) if is_day else 0.20
+		env.ambient_light_color = (Color(0.54, 0.57, 0.58).lerp(Color(0.42, 0.46, 0.48), cloud)) if is_day else Color(0.10, 0.13, 0.18)
+		env.tonemap_exposure = (lerp(1.24, 1.08, cloud) * lerp(1.0, 0.98, wetness)) if is_day else 0.82
 	var car = get_node_or_null("Car")
 	if car:
 		car.set_meta("world_wetness", wetness)
+		car.set_meta("world_is_day", is_day)
 		car.set_meta("world_wind_kph", wind)
 		car.set_meta("world_wind_direction_deg", float(state.get("wind_direction", 0.0)))
 		car.set_meta("world_wave_height", wave)
