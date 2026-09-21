@@ -29,6 +29,8 @@ jobs:
           printf '\n[editor_plugins]\nenabled=PackedStringArray("res://addons/gdgs/plugin.cfg")\n' >> godot/project.godot
 
       - name: Strict Godot 4.5.1 parse with GDGS
+        id: strict_parse
+        continue-on-error: true
         run: |
           godot --version
           set +e
@@ -38,6 +40,20 @@ jobs:
           cat /tmp/splat-parse.log
           test "$status" -eq 0
           ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/splat-parse.log
+
+      - name: Upload strict parse diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PUA-GDGS-PARSE-DIAGNOSTICS
+          path: /tmp/splat-parse.log
+          if-no-files-found: warn
+
+      - name: Stop on strict parse failure
+        if: steps.strict_parse.outcome == 'failure'
+        run: |
+          echo "::error::Strict Godot parse failed; diagnostics artifact uploaded."
+          exit 1
 
       - name: Provenance guard invariants
         run: |
