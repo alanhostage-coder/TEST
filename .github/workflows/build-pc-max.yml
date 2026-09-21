@@ -30,7 +30,7 @@ jobs:
             cp -a /root/.local/share/godot/export_templates/4.5.1.stable "$HOME/.local/share/godot/export_templates/"
           fi
           apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nsis zip
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nsis zip xvfb xauth python3-pil
           godot --version
           makensis -VERSION
           test -d "$HOME/.local/share/godot/export_templates/4.5.1.stable"
@@ -69,15 +69,19 @@ jobs:
       - name: Projector render proof
         run: |
           mkdir -p build/projector-proof
-          set +e
-          timeout 20s godot --path godot --resolution 1920x1080 --write-movie ../build/projector-proof/pua-projector-proof.avi --fixed-fps 30 > /tmp/pua-projector-proof.log 2>&1
-          status=$?
-          set -e
+          timeout 30s xvfb-run -a godot --path godot --resolution 1920x1080 --script res://projector_render_proof.gd > /tmp/pua-projector-proof.log 2>&1
           cat /tmp/pua-projector-proof.log
-          test "$status" -eq 0 -o "$status" -eq 124
-          test -s build/projector-proof/pua-projector-proof.avi
+          grep -q 'PUA_PROJECTOR_RENDER_OK' /tmp/pua-projector-proof.log
+          test -s /tmp/pua-projector-proof.png
+          python3 - <<'PY'
+          from PIL import Image, ImageStat
+          image = Image.open('/tmp/pua-projector-proof.png').convert('RGB')
+          assert image.size == (1920, 1080), image.size
+          assert max(ImageStat.Stat(image).stddev) > 3.0, 'projector proof is visually blank'
+          PY
+          cp /tmp/pua-projector-proof.png build/projector-proof/
           cp /tmp/pua-projector-proof.log build/projector-proof/
-          sha256sum build/projector-proof/pua-projector-proof.avi > build/projector-proof/SHA256.txt
+          sha256sum build/projector-proof/pua-projector-proof.png > build/projector-proof/SHA256.txt
 
       - name: Upload projector render proof
         uses: actions/upload-artifact@v4
