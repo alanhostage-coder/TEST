@@ -974,9 +974,9 @@ func _on_map_ready(map_data: Dictionary):
 	map_lamps.clear()
 	var street_edge_budget := 0
 	var marking_budget := 0
-	var street_edge_limit := 70 if projector_max_mode else (90 if low_spec_mode else (320 if pc_max_mode else 240))
-	var marking_limit := 46 if projector_max_mode else (55 if low_spec_mode else (180 if pc_max_mode else 130))
-	var micro_budget := 80 if projector_max_mode else (110 if low_spec_mode else (500 if pc_max_mode else 320))
+	var street_edge_limit := 70 if projector_max_mode else (90 if low_spec_mode else (620 if pc_max_mode else 240))
+	var marking_limit := 46 if projector_max_mode else (55 if low_spec_mode else (360 if pc_max_mode else 130))
+	var micro_budget := 80 if projector_max_mode else (110 if low_spec_mode else (1100 if pc_max_mode else 320))
 
 	for road in roads:
 		if not road is Dictionary:
@@ -1026,7 +1026,7 @@ func _on_map_ready(map_data: Dictionary):
 		var cz = float(center[1])
 		var seed = int(abs(cx * 17.0 + cz * 31.0 + sx * 11.0 + sz * 7.0))
 		var kind = str(building.get("kind", "yes"))
-		var exact_radius = 135.0 if low_spec_mode else (380.0 if pc_max_mode else 260.0)
+		var exact_radius = 135.0 if low_spec_mode else (620.0 if pc_max_mode else 260.0)
 		var exact = Vector2(cx, cz).length() <= exact_radius and _add_exact_osm_building(map_root, building, h, seed)
 		if not exact:
 			_add_edinburgh_building(map_root, Vector3(cx, 0.0, cz), Vector3(sx, h, sz), seed, kind)

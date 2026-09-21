@@ -6,21 +6,22 @@ signal location_ready(latitude, longitude, postcode)
 # Low-bandwidth OSM slice centred on a UK postcode. The postcode is resolved once,
 # then the resulting road/building geometry is simplified and cached locally.
 const OVERPASS_URL := "https://overpass-api.de/api/interpreter"
-const POSTCODES_URL := "https://api.postcodes.io/postcodes/"
-const START_POSTCODE := "RH15 2BZ"
-const CACHE_PATH := "user://pua_map_stream_rh15_2bz_v4.json"
+const START_POSTCODE := "EH15 2BZ"
+const PATCH_PATH := "res://patches/eh15_2bz.json"
+var CACHE_PATH := "user://pua_map_stream_eh15_2bz_v7_pc_max.json" if OS.has_feature("pc_max") else "user://pua_map_stream_eh15_2bz_v7.json"
 const CACHE_MAX_AGE_SECONDS := 604800
-# Burgess Hill fallback only matters if postcode resolution is unavailable.
-const FALLBACK_LAT := 50.9570
-const FALLBACK_LON := -0.1320
-const HALF_LAT := 0.0060
-const HALF_LON := 0.0100
+# Quality-1 postcodes.io centroid verified 2026-09-20. This is an origin for
+# local map coordinates, not a surveyed window, projector or vehicle position.
+const FALLBACK_LAT := 55.951507
+const FALLBACK_LON := -3.107122
+var HALF_LAT := 0.0100 if OS.has_feature("pc_max") else 0.0060
+var HALF_LON := 0.0160 if OS.has_feature("pc_max") else 0.0100
 const MIN_POINT_GAP_METERS := 0.75
-const MAX_ROADS := 220
-const MAX_BUILDINGS := 320
-const MAX_LINEAR_FEATURES := 260
-const MAX_POINT_FEATURES := 260
-const MAX_POI_FEATURES := 180
+var MAX_ROADS := 420 if OS.has_feature("pc_max") else 220
+var MAX_BUILDINGS := 720 if OS.has_feature("pc_max") else 320
+var MAX_LINEAR_FEATURES := 520 if OS.has_feature("pc_max") else 260
+var MAX_POINT_FEATURES := 520 if OS.has_feature("pc_max") else 260
+var MAX_POI_FEATURES := 360 if OS.has_feature("pc_max") else 180
 
 var center_lat := FALLBACK_LAT
 var center_lon := FALLBACK_LON
@@ -40,10 +41,11 @@ var data := {
 }
 
 var _request: HTTPRequest
-var _postcode_request: HTTPRequest
 
 func _ready():
 	var cache_fresh = _load_cache()
+	if not cache_fresh:
+		_load_packaged_patch()
 	if data["roads"].size() > 0 or data["buildings"].size() > 0:
 		center_lat = float(data.get("center_lat", FALLBACK_LAT))
 		center_lon = float(data.get("center_lon", FALLBACK_LON))
@@ -51,7 +53,55 @@ func _ready():
 		location_ready.emit(center_lat, center_lon, resolved_postcode)
 		map_ready.emit(data)
 	if not cache_fresh:
-		_resolve_start_postcode()
+		_fetch_osm()
+
+func _load_packaged_patch() -> bool:
+	if not FileAccess.file_exists(PATCH_PATH):
+		return false
+	var file = FileAccess.open(PATCH_PATH, FileAccess.READ)
+	if not file:
+		return false
+	var packaged = JSON.parse_string(file.get_as_text())
+	if not packaged is Dictionary:
+		return false
+	packaged = _hydrate_patch_parts(packaged)
+	if str(packaged.get("start_postcode", "")).to_upper() != START_POSTCODE:
+		return false
+	if abs(float(packaged.get("center_lat", 0.0)) - FALLBACK_LAT) > 0.000001:
+		return false
+	if abs(float(packaged.get("center_lon", 0.0)) - FALLBACK_LON) > 0.000001:
+		return false
+	if packaged.get("roads", []).is_empty() or packaged.get("buildings", []).is_empty():
+		return false
+	data = packaged
+	data["source"] = "packaged_osm_patch"
+	center_lat = FALLBACK_LAT
+	center_lon = FALLBACK_LON
+	resolved_postcode = START_POSTCODE
+	return true
+
+func _hydrate_patch_parts(manifest: Dictionary) -> Dictionary:
+	var parts = manifest.get("parts", {})
+	if not parts is Dictionary:
+		return manifest
+	var hydrated = manifest.duplicate(true)
+	for feature in ["roads", "buildings", "linear_features", "point_features", "poi_features"]:
+		var items: Array = []
+		var filenames = parts.get(feature, [])
+		if not filenames is Array:
+			continue
+		for filename in filenames:
+			var path = "res://patches/%s" % str(filename)
+			if not FileAccess.file_exists(path):
+				continue
+			var part_file = FileAccess.open(path, FileAccess.READ)
+			if not part_file:
+				continue
+			var part = JSON.parse_string(part_file.get_as_text())
+			if part is Dictionary and str(part.get("patch_id", "")) == str(manifest.get("patch_id", "")) and str(part.get("feature", "")) == feature:
+				items.append_array(part.get("items", []))
+		hydrated[feature] = items
+	return hydrated
 
 func _load_cache() -> bool:
 	if not FileAccess.file_exists(CACHE_PATH):
@@ -71,43 +121,6 @@ func _load_cache() -> bool:
 	var age = int(Time.get_unix_time_from_system()) - int(data.get("updated_unix", 0))
 	return age >= 0 and age < CACHE_MAX_AGE_SECONDS
 
-func _resolve_start_postcode():
-	if _postcode_request:
-		return
-	_postcode_request = HTTPRequest.new()
-	_postcode_request.timeout = 10.0
-	add_child(_postcode_request)
-	_postcode_request.request_completed.connect(_on_postcode_resolved)
-	var compact = START_POSTCODE.replace(" ", "").uri_encode()
-	var headers = PackedStringArray([
-		"Accept: application/json",
-		"User-Agent: ProceedUntilApprehended/0.71 (Godot Android; postcode-seeded OSM)"
-	])
-	var err = _postcode_request.request(POSTCODES_URL + compact, headers, HTTPClient.METHOD_GET)
-	if err != OK:
-		_postcode_request.queue_free()
-		_postcode_request = null
-		location_ready.emit(center_lat, center_lon, resolved_postcode)
-		_fetch_osm()
-
-func _on_postcode_resolved(result: int, response_code: int, _headers, body: PackedByteArray):
-	if _postcode_request:
-		_postcode_request.queue_free()
-		_postcode_request = null
-	if result == HTTPRequest.RESULT_SUCCESS and response_code >= 200 and response_code < 300:
-		var parsed = JSON.parse_string(body.get_string_from_utf8())
-		if parsed is Dictionary:
-			var postcode_result = parsed.get("result", {})
-			if postcode_result is Dictionary:
-				var lat = float(postcode_result.get("latitude", FALLBACK_LAT))
-				var lon = float(postcode_result.get("longitude", FALLBACK_LON))
-				if lat > 40.0 and lat < 65.0 and lon > -12.0 and lon < 5.0:
-					center_lat = lat
-					center_lon = lon
-					resolved_postcode = str(postcode_result.get("postcode", START_POSTCODE))
-	location_ready.emit(center_lat, center_lon, resolved_postcode)
-	_fetch_osm()
-
 func _fetch_osm():
 	if _request:
 		return
@@ -124,7 +137,7 @@ func _fetch_osm():
 	var url = OVERPASS_URL + "?data=" + query.uri_encode()
 	var headers = PackedStringArray([
 		"Accept: application/json",
-		"User-Agent: ProceedUntilApprehended/0.71 (Godot Android; postcode-seeded cached OSM geometry)"
+		"User-Agent: ProceedUntilApprehended/0.74 (Godot; EH15 source-labelled cached OSM geometry)"
 	])
 	var err = _request.request(url, headers, HTTPClient.METHOD_GET)
 	if err != OK:
@@ -168,7 +181,7 @@ func _on_request_completed(result: int, response_code: int, _headers, body: Pack
 					point_kind = highway
 				elif tags.has("traffic_sign"):
 					point_kind = "traffic_sign"
-			if point_kind != "" and point_features.size() < MAX_POINT_FEATURES:
+			if point_kind != "":
 				point_features.append({
 					"kind": point_kind,
 					"point": [p.x, p.y],
@@ -178,7 +191,7 @@ func _on_request_completed(result: int, response_code: int, _headers, body: Pack
 					"ref": str(tags.get("ref", ""))
 				})
 			var poi_name = str(tags.get("name", "")).strip_edges()
-			if poi_name != "" and poi_features.size() < MAX_POI_FEATURES:
+			if poi_name != "":
 				var poi_kind := ""
 				for key in ["amenity", "shop", "tourism", "leisure", "historic", "place"]:
 					if tags.has(key):
@@ -198,13 +211,15 @@ func _on_request_completed(result: int, response_code: int, _headers, body: Pack
 		if not geometry is Array or geometry.size() < 2:
 			continue
 		var highway_kind = str(tags.get("highway", ""))
-		if highway_kind in ["motorway", "trunk", "primary", "secondary", "tertiary", "residential", "unclassified", "living_street", "service", "track"] and roads.size() < MAX_ROADS:
+		if highway_kind in ["motorway", "trunk", "primary", "secondary", "tertiary", "residential", "unclassified", "living_street", "service", "track"]:
 			var points = _geometry_to_points(geometry, MIN_POINT_GAP_METERS)
 			if points.size() >= 2:
 				roads.append({
+					"osm_id": int(element.get("id", 0)),
 					"kind": highway_kind,
 					"name": str(tags.get("name", "")),
 					"width": _road_width_from_tags(tags),
+					"width_source": _road_width_source_from_tags(tags),
 					"lanes": int(str(tags.get("lanes", "0")).to_int()),
 					"oneway": str(tags.get("oneway", "no")),
 					"surface": str(tags.get("surface", "")),
@@ -214,11 +229,11 @@ func _on_request_completed(result: int, response_code: int, _headers, body: Pack
 					"ref": str(tags.get("ref", "")),
 					"points": points
 				})
-		elif tags.has("building") and buildings.size() < MAX_BUILDINGS:
-			var building = _building_from_geometry(tags, geometry)
+		elif tags.has("building"):
+			var building = _building_from_geometry(tags, geometry, int(element.get("id", 0)))
 			if not building.is_empty():
 				buildings.append(building)
-		elif linear_features.size() < MAX_LINEAR_FEATURES:
+		else:
 			var linear_kind := ""
 			var barrier = str(tags.get("barrier", ""))
 			if barrier in ["hedge", "fence", "wall"]:
@@ -233,8 +248,21 @@ func _on_request_completed(result: int, response_code: int, _headers, body: Pack
 						"surface": str(tags.get("surface", "")),
 						"points": feature_points
 					})
+	roads.sort_custom(_line_feature_closer)
+	buildings.sort_custom(_building_feature_closer)
+	linear_features.sort_custom(_line_feature_closer)
+	point_features.sort_custom(_point_feature_closer)
+	poi_features.sort_custom(_point_feature_closer)
+	roads.resize(min(roads.size(), MAX_ROADS))
+	buildings.resize(min(buildings.size(), MAX_BUILDINGS))
+	linear_features.resize(min(linear_features.size(), MAX_LINEAR_FEATURES))
+	point_features.resize(min(point_features.size(), MAX_POINT_FEATURES))
+	poi_features.resize(min(poi_features.size(), MAX_POI_FEATURES))
 	data = {
 		"source": "live",
+		"source_name": "OpenStreetMap",
+		"source_url": "https://www.openstreetmap.org/copyright",
+		"license": "ODbL 1.0; © OpenStreetMap contributors",
 		"start_postcode": resolved_postcode,
 		"center_lat": center_lat,
 		"center_lon": center_lon,
@@ -247,6 +275,26 @@ func _on_request_completed(result: int, response_code: int, _headers, body: Pack
 	}
 	_save_cache()
 	map_ready.emit(data)
+
+func _line_feature_closer(a: Dictionary, b: Dictionary) -> bool:
+	return _line_feature_distance(a) < _line_feature_distance(b)
+
+func _building_feature_closer(a: Dictionary, b: Dictionary) -> bool:
+	var ac = a.get("center", [INF, INF])
+	var bc = b.get("center", [INF, INF])
+	return Vector2(float(ac[0]), float(ac[1])).length_squared() < Vector2(float(bc[0]), float(bc[1])).length_squared()
+
+func _point_feature_closer(a: Dictionary, b: Dictionary) -> bool:
+	var ap = a.get("point", [INF, INF])
+	var bp = b.get("point", [INF, INF])
+	return Vector2(float(ap[0]), float(ap[1])).length_squared() < Vector2(float(bp[0]), float(bp[1])).length_squared()
+
+func _line_feature_distance(feature: Dictionary) -> float:
+	var best = INF
+	for point in feature.get("points", []):
+		if point is Array and point.size() >= 2:
+			best = min(best, Vector2(float(point[0]), float(point[1])).length_squared())
+	return best
 
 func _geometry_to_points(geometry: Array, min_gap: float) -> Array:
 	var points: Array = []
@@ -266,7 +314,7 @@ func _geometry_to_points(geometry: Array, min_gap: float) -> Array:
 				points.append([tail.x, tail.y])
 	return points
 
-func _building_from_geometry(tags: Dictionary, geometry: Array) -> Dictionary:
+func _building_from_geometry(tags: Dictionary, geometry: Array, osm_id: int = 0) -> Dictionary:
 	var min_x = INF
 	var max_x = -INF
 	var min_z = INF
@@ -291,15 +339,18 @@ func _building_from_geometry(tags: Dictionary, geometry: Array) -> Dictionary:
 	var tagged_height = float(str(tags.get("height", "0")).to_float())
 	var height = tagged_height if tagged_height > 1.5 else max(3.2, levels * 3.0)
 	if height <= 3.2:
-		height = 5.0 + fmod(sx + sz, 7.0)
+		height = 6.0
 	height = clamp(height, 3.0, 48.0)
 	if footprint.size() > 2 and footprint[0] == footprint[-1]:
 		footprint.pop_back()
 	return {
+		"osm_id": osm_id,
 		"center": [(min_x + max_x) * 0.5, (min_z + max_z) * 0.5],
 		"size": [sx, sz],
 		"footprint": footprint,
 		"height": height,
+		"footprint_source": "osm:way_geometry",
+		"height_source": "osm:height" if tagged_height > 1.5 else ("estimated:osm_levels_x_3m" if levels > 0.0 else "estimated:no_osm_height_default"),
 		"levels": levels,
 		"kind": str(tags.get("building", "yes")),
 		"material": str(tags.get("building:material", "")),
@@ -328,6 +379,15 @@ func _road_width_from_tags(tags: Dictionary) -> float:
 		var lane_width = 3.15 if kind in ["primary", "secondary", "tertiary"] else 2.85
 		return clamp(float(lanes) * lane_width, 3.0, 14.0)
 	return _road_width(kind)
+
+func _road_width_source_from_tags(tags: Dictionary) -> String:
+	var explicit = float(str(tags.get("width", "0")).to_float())
+	if explicit > 2.0 and explicit < 30.0:
+		return "osm:width"
+	var lanes = int(str(tags.get("lanes", "0")).to_int())
+	if lanes > 0:
+		return "estimated:osm_lanes_x_class_lane_width"
+	return "estimated:highway_class_default"
 
 func _road_width(kind: String) -> float:
 	match kind:

@@ -83,6 +83,12 @@ func _exit_tree():
 	_save_state()
 
 func _input(event):
+	if event is InputEventKey and event.pressed and not event.echo:
+		if event.keycode == KEY_R:
+			recover_to_road()
+		elif event.keycode == KEY_F11:
+			var fullscreen = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if fullscreen else DisplayServer.WINDOW_MODE_FULLSCREEN)
 	var screen_size = get_viewport().get_visible_rect().size
 	var screen_width = screen_size.x
 	if event is InputEventScreenTouch and event.position.x < 150.0 and event.position.y < 240.0:
@@ -120,7 +126,7 @@ func _physics_process(delta):
 	var input_throttle = Input.get_action_strength("throttle") - Input.get_action_strength("brake")
 	var input_steer = Input.get_action_strength("steer_right") - Input.get_action_strength("steer_left")
 	var pads = Input.get_connected_joypads()
-	var handbrake_pressed := false
+	var handbrake_pressed := Input.is_physical_key_pressed(KEY_SPACE)
 	if not pads.is_empty():
 		var pad = int(pads[0])
 		var joy_steer = Input.get_joy_axis(pad, JOY_AXIS_LEFT_X)
@@ -134,7 +140,7 @@ func _physics_process(delta):
 			input_throttle = 1.0
 		elif Input.is_joy_button_pressed(pad, JOY_BUTTON_B):
 			input_throttle = -1.0
-		handbrake_pressed = Input.is_joy_button_pressed(pad, JOY_BUTTON_X)
+		handbrake_pressed = handbrake_pressed or Input.is_joy_button_pressed(pad, JOY_BUTTON_X)
 		var look_x = Input.get_joy_axis(pad, JOY_AXIS_RIGHT_X)
 		var look_y = Input.get_joy_axis(pad, JOY_AXIS_RIGHT_Y)
 		if abs(look_x) > 0.16 or abs(look_y) > 0.16:
@@ -175,14 +181,14 @@ func _physics_process(delta):
 		rate = braking * 1.35
 	elif input_throttle > 0.04:
 		if speed < -0.7: target_speed = 0.0; rate = braking
-		else: target_speed = speed_limit; rate = acceleration
+		else: target_speed = speed_limit * input_throttle; rate = acceleration * input_throttle
 	elif input_throttle < -0.04:
 		if speed > 0.7: target_speed = 0.0; rate = braking
-		else: target_speed = -reversing_limit; rate = reverse_acceleration
+		else: target_speed = reversing_limit * input_throttle; rate = reverse_acceleration * abs(input_throttle)
 	speed = move_toward(speed, target_speed, delta * rate)
 	var speed_ratio = clamp(abs(speed) / max_speed, 0.0, 1.0)
 	var steering_at_speed = lerp(1.0, 0.48, speed_ratio)
-	var steering_authority = clamp(abs(speed) / 6.0, 0.22, 1.0)
+	var steering_authority = clamp(abs(speed) / 6.0, 0.0, 1.0)
 	var travel_sign = sign(speed) if abs(speed) > 0.1 else 1.0
 	rotate_y(-steer_smoothed * steer_rate * steering_at_speed * steering_authority * delta * travel_sign)
 	var desired_velocity = -global_transform.basis.z * speed
@@ -230,6 +236,32 @@ func _is_near_road() -> bool:
 	var local_x = abs(fposmod(global_position.x + 45.0, 90.0) - 45.0)
 	var local_z = abs(fposmod(global_position.z + 45.0, 90.0) - 45.0)
 	return local_x < 8.5 or local_z < 8.5
+
+func recover_to_road():
+	var p = Vector2(global_position.x, global_position.z)
+	var best := INF
+	var target := Vector2.ZERO
+	var heading := 0.0
+	for segment in get_meta("map_road_segments", []):
+		if not segment is Array or segment.size() < 3:
+			continue
+		var a = Vector2(float(segment[0][0]), float(segment[0][1]))
+		var b = Vector2(float(segment[1][0]), float(segment[1][1]))
+		var d = b - a
+		if d.length_squared() < 0.01:
+			continue
+		var point = a + d * clamp((p - a).dot(d) / d.length_squared(), 0.0, 1.0)
+		if point.distance_squared_to(p) < best:
+			best = point.distance_squared_to(p)
+			target = point
+			heading = atan2(-d.x, -d.y)
+	global_position = Vector3(target.x, 0.58, target.y)
+	rotation.y = heading
+	speed = 0.0
+	velocity = Vector3.ZERO
+	steer_smoothed = 0.0
+	previous_position = global_position
+	camera_lag = Vector3.ZERO
 
 func _point_segment_distance(p: Vector2, a: Vector2, b: Vector2) -> float:
 	var ab = b - a

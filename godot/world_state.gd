@@ -3,10 +3,10 @@ extends Node
 signal changed(state)
 
 # Edinburgh/Forth defaults keep the simulation useful offline.
-const WEATHER_URL := "https://api.open-meteo.com/v1/forecast?latitude=55.9533&longitude=-3.1883&current=temperature_2m,relative_humidity_2m,precipitation,rain,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility&daily=sunrise,sunset&timezone=Europe%2FLondon&forecast_days=1"
+const WEATHER_URL := "https://api.open-meteo.com/v1/forecast?latitude=55.951507&longitude=-3.107122&current=temperature_2m,relative_humidity_2m,precipitation,rain,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility&daily=sunrise,sunset&timezone=Europe%2FLondon&forecast_days=1"
 const MARINE_URL := "https://marine-api.open-meteo.com/v1/marine?latitude=56.00&longitude=-3.10&current=wave_height,wave_direction,wave_period,sea_surface_temperature&timezone=Europe%2FLondon"
-const AIR_URL := "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=55.9533&longitude=-3.1883&current=pm10,pm2_5,nitrogen_dioxide,european_aqi&timezone=Europe%2FLondon"
-const CACHE_PATH := "user://pua_world_state.json"
+const AIR_URL := "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=55.951507&longitude=-3.107122&current=pm10,pm2_5,nitrogen_dioxide,european_aqi&timezone=Europe%2FLondon"
+const CACHE_PATH := "user://pua_world_state_eh15_v2.json"
 const REFRESH_SECONDS := 900.0
 
 var state := {
@@ -34,9 +34,34 @@ var state := {
 
 var _requests := {}
 var _refresh_clock := 0.0
+var weather_mode := "LIVE"
+var live_state: Dictionary = {}
+
+func set_weather_mode(mode: String):
+	if mode not in ["LIVE", "CLEAR", "RAIN", "FOG"]:
+		return
+	weather_mode = mode
+	_publish_weather()
+
+func _publish_weather():
+	state = live_state.duplicate(true)
+	if weather_mode != "LIVE":
+		state["source"] = "manual " + weather_mode.to_lower()
+		state["rain"] = 4.0 if weather_mode == "RAIN" else 0.0
+		state["precipitation"] = state["rain"]
+		state["cloud"] = 5.0 if weather_mode == "CLEAR" else 95.0
+		state["visibility"] = 220.0 if weather_mode == "FOG" else 16000.0
+		state["weather_code"] = 61 if weather_mode == "RAIN" else (45 if weather_mode == "FOG" else 0)
+	changed.emit(state)
+
+func _unhandled_key_input(event):
+	if event.pressed and not event.echo and event.keycode == KEY_F6:
+		var modes = ["LIVE", "CLEAR", "RAIN", "FOG"]
+		set_weather_mode(modes[(modes.find(weather_mode) + 1) % modes.size()])
 
 func _ready():
 	_load_cache()
+	live_state = state.duplicate(true)
 	_fetch_all()
 
 func _process(delta):
@@ -74,16 +99,19 @@ func _on_request_completed(result: int, response_code: int, _headers, body: Pack
 	var current = parsed.get("current", {})
 	if not current is Dictionary:
 		return
+	state = live_state.duplicate(true)
 	if kind == "weather":
 		_apply_weather(current)
 	elif kind == "marine":
 		_apply_marine(current)
 	elif kind == "air":
 		_apply_air(current)
-	state["source"] = "live"
-	state["updated_unix"] = int(Time.get_unix_time_from_system())
+	if kind == "weather":
+		state["source"] = "live"
+		state["updated_unix"] = int(Time.get_unix_time_from_system())
+	live_state = state.duplicate(true)
 	_save_cache()
-	changed.emit(state)
+	_publish_weather()
 
 func _apply_weather(c: Dictionary):
 	state["temperature"] = float(c.get("temperature_2m", state["temperature"]))

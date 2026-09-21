@@ -95,7 +95,7 @@ func _process(delta):
 		_save_cache()
 
 func _capture_car():
-	if not _car:
+	if not is_instance_valid(_car) or not _car.is_inside_tree():
 		return
 	var p = _car.global_position
 	if _last_car_position != Vector3.ZERO:
@@ -107,7 +107,7 @@ func _capture_car():
 
 
 func _capture_situation_memory():
-	if not _car:
+	if not is_instance_valid(_car) or not _car.is_inside_tree():
 		return
 	var kind = int(_car.get_meta("near_world_situation", -1))
 	if kind < 0:

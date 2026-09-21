@@ -22,6 +22,7 @@ var _loaded_tile_count := 0
 var _overlay_root: Control
 var _overlay_map: TextureRect
 var _overlay_marker: ColorRect
+var _overlay_title: Label
 var _tile_textures := {}
 var _overlay_tile := Vector2i(-1, -1)
 
@@ -56,6 +57,8 @@ func _on_map_ready(map_data: Dictionary):
 func _on_location_ready(latitude: float, longitude: float, _postcode: String = ""):
 	_center_lat = latitude
 	_center_lon = longitude
+	if _overlay_title:
+		_overlay_title.text = "LIVE OSM · %s" % _postcode
 	if abs(_center_lat) < 0.001 and abs(_center_lon) < 0.001:
 		return
 	var sig = "%.6f:%.6f:%d" % [_center_lat, _center_lon, TILE_ZOOM]
@@ -120,7 +123,7 @@ func _fetch_next():
 	_request.request_completed.connect(_on_tile_received)
 	var headers = PackedStringArray([
 		"Accept: image/png",
-		"User-Agent: ProceedUntilApprehended/0.66 (personal Godot prototype; cached OSM context)"
+		"User-Agent: ProceedUntilApprehended/0.74 (personal Godot prototype; cached OSM context)"
 	])
 	var err = _request.request(TILE_URL % [TILE_ZOOM, _pending.x, _pending.y], headers, HTTPClient.METHOD_GET)
 	if err != OK:
@@ -222,12 +225,12 @@ func _build_live_map_overlay():
 	back.size = _overlay_root.size
 	back.color = Color(0.015, 0.02, 0.025, 0.88)
 	_overlay_root.add_child(back)
-	var title = Label.new()
-	title.position = Vector2(12, 8)
-	title.size = Vector2(228, 22)
-	title.text = "LIVE OSM · RH15 2BZ"
-	title.add_theme_font_size_override("font_size", 14)
-	_overlay_root.add_child(title)
+	_overlay_title = Label.new()
+	_overlay_title.position = Vector2(12, 8)
+	_overlay_title.size = Vector2(228, 22)
+	_overlay_title.text = "LIVE OSM · EH15 2BZ"
+	_overlay_title.add_theme_font_size_override("font_size", 14)
+	_overlay_root.add_child(_overlay_title)
 	_overlay_map = TextureRect.new()
 	_overlay_map.position = Vector2(12, 34)
 	_overlay_map.size = Vector2(228, 228)

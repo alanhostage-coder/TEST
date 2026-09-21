@@ -2,7 +2,7 @@ name: Validate PUA Godot
 on:
   push:
     branches: [ main ]
-    paths: [ 'godot/**', '.github/workflows/validate-godot.yml' ]
+    paths: [ 'godot/**', 'tools/build_osm_patch.py', '.github/workflows/validate-godot.yml' ]
   workflow_dispatch:
 jobs:
   validate:
@@ -27,6 +27,9 @@ jobs:
           timeout 20s godot --headless --path godot res://pua_soak_test.tscn 2>&1 | tee /tmp/pua-soak.log
           grep -q 'PUA_SOAK_OK' /tmp/pua-soak.log
           ! grep -E 'SCRIPT ERROR|Parse Error|PUA_SOAK_FAIL' /tmp/pua-soak.log
+          timeout 20s godot --headless --path godot --script res://projection_test.gd 2>&1 | tee /tmp/pua-projection.log
+          grep -q 'PUA_PROJECTION_WEATHER_OK' /tmp/pua-projection.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|Assertion failed' /tmp/pua-projection.log
 
       - name: Greybeard invariants
         run: |
@@ -42,10 +45,47 @@ jobs:
           grep -q 'for ring in range(radius + 1)' godot/osm_ground_tiles.gd
           grep -q 'window/handheld/orientation=0' godot/project.godot
           grep -q '_add_exact_osm_facade_detail' godot/world.gd
-          grep -q 'pua_map_stream_rh15_2bz_v4' godot/map_stream.gd
+          grep -q 'pua_map_stream_eh15_2bz_v7' godot/map_stream.gd
+          grep -q 'const START_POSTCODE := "EH15 2BZ"' godot/map_stream.gd
+          grep -q 'const FALLBACK_LAT := 55.951507' godot/map_stream.gd
+          grep -q 'const FALLBACK_LON := -3.107122' godot/map_stream.gd
+          grep -q 'const MAX_SURFACES := 5' godot/bay_projection.gd
+          grep -q 'set_weather_mode' godot/world_state.gd
+          python3 - <<'PY'
+          import json, pathlib
+          root=pathlib.Path('godot/patches')
+          p=json.load(open(root/'eh15_2bz.json'))
+          for feature,names in p['parts'].items():
+              p[feature]=[]
+              for name in names:
+                  p[feature].extend(json.load(open(root/name))['items'])
+          assert p['start_postcode']=='EH15 2BZ'
+          assert (p['center_lat'],p['center_lon'])==(55.951507,-3.107122)
+          assert len(p['roads']) >= 100 and len(p['buildings']) >= 100
+          assert any(r['name']=='Pittville Street' for r in p['roads'])
+          assert all('width_source' in r for r in p['roads'])
+          assert all('height_source' in b for b in p['buildings'])
+          PY
           grep -q 'poi_features' godot/map_stream.gd
           grep -q '_add_mapped_road_name_signs' godot/world.gd
           grep -q '_add_named_poi_markers' godot/world.gd
           grep -q '_build_live_map_overlay' godot/osm_ground_tiles.gd
           grep -q 'Windows PC Max' godot/export_presets.cfg
           grep -q 'custom_features="pc_max"' godot/export_presets.cfg
+
+      - name: Package independent EH15 location patch
+        run: |
+          mkdir -p build/location-patch
+          zip -j build/location-patch/PUA-EH15-2BZ-OSM-PATCH-2026-09-20.zip godot/patches/README.md godot/patches/eh15_2bz*.json
+          sha256sum build/location-patch/PUA-EH15-2BZ-OSM-PATCH-2026-09-20.zip > build/location-patch/SHA256-EH15-PATCH.txt
+          test -s build/location-patch/PUA-EH15-2BZ-OSM-PATCH-2026-09-20.zip
+
+      - name: Upload independent EH15 location patch
+        uses: actions/upload-artifact@v4
+        with:
+          name: PUA-EH15-2BZ-OSM-PATCH-2026-09-20
+          path: |
+            build/location-patch/PUA-EH15-2BZ-OSM-PATCH-2026-09-20.zip
+            build/location-patch/SHA256-EH15-PATCH.txt
+          if-no-files-found: error
+          retention-days: 30
