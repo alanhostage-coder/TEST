@@ -102,6 +102,8 @@ jobs:
           exit 1
 
       - name: Verify splat importer against upstream sample
+        id: splat_import
+        continue-on-error: true
         run: |
           mkdir -p godot/splat_probe
           cp /tmp/gdgs/samples/assets/demo.sog godot/splat_probe/upstream_demo.sog
@@ -109,6 +111,20 @@ jobs:
           cat /tmp/splat-import.log
           test -d godot/.godot/imported
           ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/splat-import.log
+
+      - name: Upload GDGS importer diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PUA-GDGS-IMPORT-DIAGNOSTICS
+          path: /tmp/splat-import.log
+          if-no-files-found: warn
+
+      - name: Stop on GDGS importer failure
+        if: steps.splat_import.outcome == 'failure' && steps.splat_import.conclusion == 'failure'
+        run: |
+          echo "::error::GDGS sample import failed; importer diagnostics uploaded."
+          exit 1
 
       - name: Render GDGS visual smoke frame
         run: |
