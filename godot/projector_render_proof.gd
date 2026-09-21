@@ -74,11 +74,12 @@ func run() -> void:
 	var xps_actual_pixels := 0
 	var xps_scales: Array = []
 	var xps_panel_sizes: Array = []
+	var bay_destination_size: Vector2 = bay.get_viewport_rect().size
 	for panel_index in range(5):
 		var rect: Rect2 = bay.FIVE_RECTS[panel_index]
 		var destination_size := Vector2(
-			root.size.x * rect.size.x,
-			root.size.y * rect.size.y
+			bay_destination_size.x * rect.size.x,
+			bay_destination_size.y * rect.size.y
 		)
 		var uniform_size: Vector2i = bay.viewport_size_for_surface(destination_size, bay.XPS_9530_RENDER_SCALE)
 		var actual_size: Vector2i = bay.viewports[panel_index].size
