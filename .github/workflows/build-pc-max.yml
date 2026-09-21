@@ -87,6 +87,7 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
+      # CI dispatch marker: 2026-09-21 projector-proof rerun
       - name: PC Max invariants
         run: |
           grep -q 'name="Windows PC Max"' godot/export_presets.cfg
