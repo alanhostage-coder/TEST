@@ -14,6 +14,7 @@ var splat_meta: Dictionary = {}
 var viewer: Node3D = null
 var active_distance_m := 180.0
 var hysteresis_m := 20.0
+var fade_band_m := 30.0
 
 func _ready() -> void:
 	if not OS.has_feature("gaussian_splat"):
@@ -83,6 +84,7 @@ func _apply_alignment_from_metadata(node: Node) -> void:
 	n.scale = Vector3.ONE * uniform_scale
 	active_distance_m = clamp(float(splat_meta.get("active_distance_m", 180.0)), 25.0, 1000.0)
 	hysteresis_m = clamp(float(splat_meta.get("hysteresis_m", 20.0)), 5.0, 100.0)
+	fade_band_m = clamp(float(splat_meta.get("fade_band_m", 30.0)), 5.0, 150.0)
 
 
 
