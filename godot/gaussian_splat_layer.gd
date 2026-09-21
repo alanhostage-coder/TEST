@@ -15,6 +15,7 @@ var viewer: Node3D = null
 var active_distance_m := 180.0
 var hysteresis_m := 20.0
 var fade_band_m := 30.0
+var patch_id := ""
 
 func _ready() -> void:
 	if not OS.has_feature("gaussian_splat"):
@@ -41,7 +42,7 @@ func _ready() -> void:
 	add_child(splat_node)
 	viewer = get_viewport().get_camera_3d()
 	set_process(viewer != null)
-	print("PUA_SPLAT_ACTIVE: ", SPLAT_PATH)
+	print("PUA_SPLAT_ACTIVE: patch=", patch_id, " asset=", SPLAT_PATH)
 
 
 func _metadata_is_safe() -> bool:
@@ -68,6 +69,9 @@ func _metadata_is_safe() -> bool:
 	var lat = float(meta.get("origin_lat", 0.0))
 	var lon = float(meta.get("origin_lon", 0.0))
 	if abs(lat - EXPECTED_LAT) > 0.01 or abs(lon - EXPECTED_LON) > 0.02:
+		return false
+	patch_id = str(meta.get("patch_id", "")).strip_edges()
+	if patch_id == "":
 		return false
 	splat_meta = meta
 	return true
