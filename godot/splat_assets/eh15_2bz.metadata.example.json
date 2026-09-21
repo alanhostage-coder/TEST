@@ -28,5 +28,7 @@
   "hysteresis_m": 20,
   "fade_band_m": 30,
   "capture_quality": "REQUIRED: draft|verified",
-  "control_points": []
+  "control_points": [],
+  "redistribution_allowed": false,
+  "asset_sha256": "REQUIRED: sha256"
 }
