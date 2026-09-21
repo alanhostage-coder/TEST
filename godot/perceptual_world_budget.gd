@@ -20,15 +20,26 @@ var accum := 0.0
 var candidates: Array[Node3D] = []
 var candidate_cursor := 0
 @export var candidates_per_tick := 96
+@export var candidate_refresh_s := 1.0
+var candidate_refresh_accum := 0.0
 
 func _ready() -> void:
 	viewer = get_viewport().get_camera_3d()
-	for n in get_tree().get_nodes_in_group("pua_world_detail"):
-		if n is Node3D:
-			candidates.append(n)
+	_refresh_candidates()
 	set_process(true)
 
+func _refresh_candidates() -> void:
+	candidates.clear()
+	for n in get_tree().get_nodes_in_group("pua_world_detail"):
+		if n is Node3D and is_instance_valid(n):
+			candidates.append(n)
+	candidate_cursor = 0
+
 func _process(delta: float) -> void:
+	candidate_refresh_accum += delta
+	if candidate_refresh_accum >= candidate_refresh_s:
+		candidate_refresh_accum = 0.0
+		_refresh_candidates()
 	accum += delta
 	if accum < update_interval_s:
 		return
