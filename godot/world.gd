@@ -28,6 +28,15 @@ var low_spec_mode := false
 var projector_max_mode := false
 var pc_max_mode := false
 var map_center_lat := 55.95
+var atmosphere_initialized := false
+var atmosphere_wetness := 0.0
+var atmosphere_cloud := 0.60
+var atmosphere_visibility := 12000.0
+var atmosphere_aqi := 25.0
+var atmosphere_target_wetness := 0.0
+var atmosphere_target_cloud := 0.60
+var atmosphere_target_visibility := 12000.0
+var atmosphere_target_aqi := 25.0
 
 var asphalt_mat
 var concrete_mat
@@ -88,6 +97,7 @@ func _process(delta):
 	else:
 		_update_traffic(delta)
 		_update_patrol(delta, car)
+	_update_weather_visuals(delta)
 	_update_atmosphere(car)
 	if not map_mode_active:
 		var c = Vector2i(floor(car.global_position.x / CELL), floor(car.global_position.z / CELL))
@@ -971,13 +981,52 @@ func _on_world_state_changed(state: Dictionary):
 	var aqi = clamp(float(state.get("aqi", 25.0)), 0.0, 150.0)
 	var wind = max(0.0, float(state.get("wind_speed", 12.0)))
 	var wave = max(0.0, float(state.get("wave_height", 0.5)))
+	atmosphere_target_wetness = wetness
+	atmosphere_target_cloud = cloud
+	atmosphere_target_visibility = visibility
+	atmosphere_target_aqi = aqi
+	# The first state establishes the scene immediately. Later live/override changes
+	# become targets so rain, fog and exposure glide rather than hard-cut across five
+	# projected views.
+	if not atmosphere_initialized:
+		atmosphere_initialized = true
+		atmosphere_wetness = wetness
+		atmosphere_cloud = cloud
+		atmosphere_visibility = visibility
+		atmosphere_aqi = aqi
+		_apply_weather_visuals()
+	var car = get_node_or_null("Car")
+	if car:
+		car.set_meta("world_wetness", wetness)
+		car.set_meta("world_wind_kph", wind)
+		car.set_meta("world_wave_height", wave)
+		car.set_meta("world_temperature", float(state.get("temperature", 8.0)))
+		car.set_meta("world_data_source", state.get("source", "offline"))
+
+func _update_weather_visuals(delta: float):
+	if not atmosphere_initialized:
+		return
+	# Fast enough to feel responsive, slow enough that the world does not visibly
+	# "switch modes" around the seated player.
+	var surface_mix = 1.0 - exp(-delta * 0.75)
+	var sky_mix = 1.0 - exp(-delta * 0.95)
+	atmosphere_wetness = lerp(atmosphere_wetness, atmosphere_target_wetness, surface_mix)
+	atmosphere_cloud = lerp(atmosphere_cloud, atmosphere_target_cloud, sky_mix)
+	atmosphere_visibility = lerp(atmosphere_visibility, atmosphere_target_visibility, sky_mix)
+	atmosphere_aqi = lerp(atmosphere_aqi, atmosphere_target_aqi, sky_mix)
+	_apply_weather_visuals()
+
+func _apply_weather_visuals():
+	var wetness = atmosphere_wetness
+	var cloud = atmosphere_cloud
+	var visibility = atmosphere_visibility
+	var aqi = atmosphere_aqi
 	asphalt_mat.roughness = lerp(0.34, 0.12, wetness)
 	asphalt_mat.metallic = lerp(0.05, 0.18, wetness)
 	pavement_mat.roughness = lerp(0.90, 0.58, wetness)
 	kerb_mat.roughness = lerp(0.94, 0.68, wetness)
 	concrete_mat.roughness = lerp(0.86, 0.62, wetness)
 	weather_sun_energy = lerp(0.95, 0.56, cloud) * lerp(1.0, 0.90, wetness)
-	$Sun.light_energy = weather_sun_energy
 	var env = $WorldEnvironment.environment
 	if env:
 		env.fog_enabled = true
@@ -987,13 +1036,6 @@ func _on_world_state_changed(state: Dictionary):
 		env.ambient_light_energy = lerp(0.88, 0.66, cloud) * lerp(1.0, 0.94, wetness)
 		env.ambient_light_color = Color(0.54, 0.57, 0.58).lerp(Color(0.42, 0.46, 0.48), cloud)
 		env.tonemap_exposure = lerp(1.24, 1.08, cloud) * lerp(1.0, 0.98, wetness)
-	var car = get_node_or_null("Car")
-	if car:
-		car.set_meta("world_wetness", wetness)
-		car.set_meta("world_wind_kph", wind)
-		car.set_meta("world_wave_height", wave)
-		car.set_meta("world_temperature", float(state.get("temperature", 8.0)))
-		car.set_meta("world_data_source", state.get("source", "offline"))
 
 
 func _bind_map_stream():
