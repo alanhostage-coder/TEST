@@ -1,4 +1,4 @@
-[gd_scene load_steps=17 format=3]
+[gd_scene load_steps=18 format=3]
 
 [ext_resource path="res://world.gd" type="Script" id="1"]
 [ext_resource path="res://car.gd" type="Script" id="2"]
@@ -10,6 +10,7 @@
 [ext_resource path="res://pua_api.gd" type="Script" id="8"]
 [ext_resource path="res://osm_ground_tiles.gd" type="Script" id="9"]
 [ext_resource path="res://gaussian_splat_layer.gd" type="Script" id="10"]
+[ext_resource path="res://visual_reference_feed.gd" type="Script" id="11"]
 
 [sub_resource type="BoxShape3D" id="road_shape"]
 size = Vector3(60, 0.5, 240)
@@ -76,6 +77,9 @@ script = ExtResource("9")
 
 [node name="GaussianSplatLayer" type="Node3D" parent="."]
 script = ExtResource("10")
+
+[node name="VisualReferenceFeed" type="Node" parent="."]
+script = ExtResource("11")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="."]
 environment = SubResource("environment")
