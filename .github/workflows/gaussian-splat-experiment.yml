@@ -49,6 +49,11 @@ jobs:
           test ! -f godot/splat_assets/eh15_2bz.sog
           test ! -f godot/splat_assets/eh15_2bz.json
 
+      - name: Parse experimental scripts directly
+        run: |
+          godot --headless --path godot --editor --quit-after 2 2>&1 | tee /tmp/editor-parse.log
+          ! grep -E "Parse Error|SCRIPT ERROR" /tmp/editor-parse.log
+
       - name: Existing PUA runtime regression
         run: |
           set +e
