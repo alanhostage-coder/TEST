@@ -34,6 +34,7 @@ var motion_steer := 0.0
 var motion_sensor_live := false
 var assisted_target_speed := 17.5
 var wheel_spin := 0.0
+var steering_velocity := 0.0
 
 
 func _ready():
@@ -170,8 +171,16 @@ func _physics_process(delta):
 			input_throttle = -0.70
 		else:
 			input_throttle = 0.12
+	# Rate-limit steering input before smoothing it. Keyboard/touch can jump from
+	# full-left to full-right in one frame; letting that step reach the camera makes
+	# the whole five-surface view yaw at once. The speed-sensitive slew keeps low-
+	# speed manoeuvring lively while giving projector/high-speed driving a steadier
+	# horizon without changing the mapped road geometry or vehicle speed model.
+	var speed_for_steer = clamp(abs(speed) / max_speed, 0.0, 1.0)
+	var steer_slew = lerp(7.5, 3.2, speed_for_steer)
+	steering_velocity = move_toward(steering_velocity, input_steer, delta * steer_slew)
 	var steer_response = 5.6 if abs(speed) < 15.0 else 4.5
-	steer_smoothed = move_toward(steer_smoothed, input_steer, delta * steer_response)
+	steer_smoothed = move_toward(steer_smoothed, steering_velocity, delta * steer_response)
 	var speed_limit = max_speed if on_road else max_speed * 0.72
 	var reversing_limit = speed_limit * 0.38
 	var target_speed = 0.0
@@ -260,6 +269,7 @@ func recover_to_road():
 	speed = 0.0
 	velocity = Vector3.ZERO
 	steer_smoothed = 0.0
+	steering_velocity = 0.0
 	previous_position = global_position
 	camera_lag = Vector3.ZERO
 
