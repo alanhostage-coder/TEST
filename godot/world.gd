@@ -495,15 +495,16 @@ func _add_opening_anchor_annotation(parent: Node3D, car: Node, pois: Array, buil
 		label.position = Vector3(float(coordinate[0]), 3.05, float(coordinate[1]))
 		label.font_size = 27 if low_spec_mode else 34
 		label.pixel_size = 0.0041
-		# Fixed-size, depth-independent rendering makes this unambiguously a map
-		# overlay rather than a claim that a physical sign exists on the facade.
+		# Depth-independent rendering makes this unambiguously a map overlay rather
+		# than a claim that a physical sign exists on the facade. Keep ordinary
+		# perspective scaling: fixed_size turns a long business name into a giant
+		# screen-space banner when it sits close to a side-panel frustum.
 		# The cyan is deliberately reserved for this sourced opening cue so the
 		# render proof can verify that it reached actual pixels.
 		label.modulate = Color(0.18, 0.88, 1.0, 0.98)
 		label.outline_size = 8
 		label.outline_modulate = Color(0.02, 0.025, 0.03, 0.96)
 		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
-		label.fixed_size = true
 		label.no_depth_test = true
 		label.visibility_range_end = 140.0 if low_spec_mode else 210.0
 		label.set_meta("annotation_only", true)

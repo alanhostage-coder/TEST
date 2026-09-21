@@ -81,15 +81,23 @@ jobs:
           panels = sorted(glob('/tmp/pua-projector-panel-*.png'))
           assert len(panels) == 5, panels
           opening_marker_pixels = 0
+          opening_marker_max_height = 0
           for panel in panels:
               rendered = Image.open(panel).convert('RGB')
               assert rendered.width >= 64 and rendered.height >= 180, (panel, rendered.size)
               assert max(ImageStat.Stat(rendered).stddev) > 3.0, f'{panel} is visually blank'
-              opening_marker_pixels += sum(
-                  1 for red, green, blue in rendered.getdata()
+              marker_points = [
+                  (index % rendered.width, index // rendered.width)
+                  for index, (red, green, blue) in enumerate(rendered.getdata())
                   if red < 120 and green > 150 and blue > 175 and blue - red > 90
-              )
+              ]
+              opening_marker_pixels += len(marker_points)
+              if marker_points:
+                  marker_ys = [point[1] for point in marker_points]
+                  opening_marker_max_height = max(opening_marker_max_height, max(marker_ys) - min(marker_ys) + 1)
           assert opening_marker_pixels >= 12, f'opening anchor did not reach rendered pixels: {opening_marker_pixels}'
+          assert opening_marker_pixels <= 2500, f'opening anchor became an oversized overlay: {opening_marker_pixels}'
+          assert opening_marker_max_height <= 32, f'opening anchor became too tall for a restrained annotation: {opening_marker_max_height}'
           with open('/tmp/pua-projector-proof.json', encoding='utf-8') as handle:
               proof = json.load(handle)
           assert proof['proof_profile'] == 'deterministic-clear-five-surface-v1', proof
