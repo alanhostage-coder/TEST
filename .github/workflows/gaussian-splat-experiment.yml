@@ -127,6 +127,8 @@ jobs:
           exit 1
 
       - name: Render GDGS visual smoke frame
+        id: render_smoke
+        continue-on-error: true
         run: |
           cat > godot/splat_probe/smoke.gd <<'EOF'
           extends Node3D
@@ -165,6 +167,24 @@ jobs:
           test -s /tmp/gdgs-smoke.png
           cp /tmp/gdgs-smoke.png godot/splat_probe/GDGS_RENDER_SMOKE.png
           ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/splat-render.log
+
+      - name: Upload render diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PUA-GDGS-RENDER-DIAGNOSTICS
+          path: |
+            /tmp/splat-render.log
+            /tmp/gdgs-smoke.png
+            godot/splat_probe/smoke.gd
+            godot/splat_probe/smoke.tscn
+          if-no-files-found: warn
+
+      - name: Stop on render smoke failure
+        if: steps.render_smoke.outcome == 'failure' && steps.render_smoke.conclusion == 'failure'
+        run: |
+          echo "::error::GDGS render smoke failed; render diagnostics uploaded."
+          exit 1
 
       - name: Prepare Gaussian-capable PC Max export
         run: |
