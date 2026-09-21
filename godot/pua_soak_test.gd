@@ -143,7 +143,7 @@ func _finish():
 		_fail("first-impression approach geometry missing")
 		return
 	var opening_junction = Vector2(float(opening_junction_raw[0]), float(opening_junction_raw[1]))
-	var opening_spawn = Vector2(car.global_position.x, car.global_position.z)
+	var opening_spawn = Vector2(start_position.x, start_position.z)
 	var opening_heading = Vector2(float(opening_heading_raw[0]), float(opening_heading_raw[1]))
 	var to_opening_junction = opening_junction - opening_spawn
 	if abs(to_opening_junction.length() - opening_approach) > 0.8 or opening_heading.length() < 0.95 or opening_heading.normalized().dot(to_opening_junction.normalized()) < 0.97:
