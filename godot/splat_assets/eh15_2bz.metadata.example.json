@@ -25,5 +25,8 @@
   ],
   "uniform_scale": 1,
   "active_distance_m": 180,
-  "hysteresis_m": 20
+  "hysteresis_m": 20,
+  "fade_band_m": 30,
+  "capture_quality": "REQUIRED: draft|verified",
+  "control_points": []
 }
