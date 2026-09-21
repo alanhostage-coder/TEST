@@ -52,6 +52,13 @@ jobs:
           grep -q 'PUA_SOAK_OK' /tmp/pua-pcmax-soak.log
           if grep -E 'SCRIPT ERROR|Parse Error|PUA_SOAK_FAIL' /tmp/pua-pcmax-soak.log; then exit 1; fi
 
+      - name: Perceptual budget regression
+        run: |
+          godot --headless --path godot res://perceptual_budget_test.gd > /tmp/pua-perceptual-budget.log 2>&1
+          cat /tmp/pua-perceptual-budget.log
+          grep -q 'PUA_PERCEPTUAL_BUDGET_OK' /tmp/pua-perceptual-budget.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Assertion failed' /tmp/pua-perceptual-budget.log; then exit 1; fi
+
       - name: PC Max invariants
         run: |
           grep -q 'name="Windows PC Max"' godot/export_presets.cfg

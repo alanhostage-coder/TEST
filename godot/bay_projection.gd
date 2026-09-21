@@ -496,6 +496,16 @@ func _process(_delta):
 		cameras[i].global_transform = t
 	queue_redraw()
 
+func get_active_view_cameras() -> Array[Camera3D]:
+	var result: Array[Camera3D] = []
+	if mode > 0:
+		for i in range(mini(layout_surface_count, cameras.size())):
+			if is_instance_valid(cameras[i]):
+				result.append(cameras[i])
+	elif is_instance_valid(source_camera):
+		result.append(source_camera)
+	return result
+
 func _draw():
 	if mode != 2:
 		return

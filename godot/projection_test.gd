@@ -13,6 +13,7 @@ func run():
 	bay._set_mode(1)
 	await process_frame
 	assert(bay.black_mask.visible)
+	assert(bay.get_active_view_cameras().size() == bay.layout_surface_count)
 	for camera in bay.cameras:
 		assert(camera.global_position.is_finite())
 	var osm_overlay = world.get_node("OSMGroundTiles")
@@ -30,6 +31,7 @@ func run():
 	assert(not osm_overlay._overlay_root.visible)
 	assert(not car.is_physics_processing())
 	bay._set_mode(0)
+	assert(bay.get_active_view_cameras().size() == 1)
 	osm_overlay._process(0.3)
 	assert(osm_overlay._overlay_root.visible)
 	assert(car.is_physics_processing())
