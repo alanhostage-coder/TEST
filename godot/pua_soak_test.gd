@@ -60,8 +60,14 @@ func _finish():
 	if furthest_building_center > world.LOW_SPEC_EXACT_FOOTPRINT_RADIUS:
 		_fail("packaged OSM footprint lies outside low-spec exact radius")
 		return
+	# Rebuild with the combined ThinkPad/projector profile so CI executes the
+	# low-spec footprint radius and capped mapped-label paths, not only their
+	# desktop equivalents.
+	world.low_spec_mode = true
+	world.projector_max_mode = true
+	world._on_map_ready(map_stream.data)
 	if int(car.get_meta("map_exact_building_count", -1)) != map_stream.data.get("buildings", []).size() or int(car.get_meta("map_fallback_building_count", -1)) != 0:
-		_fail("packaged OSM buildings did not use exact footprint geometry")
+		_fail("projector profile did not use exact packaged OSM footprint geometry")
 		return
 	var nearest_origin_road = map_stream.nearest_named_road(Vector2.ZERO)
 	if str(nearest_origin_road.get("name", "")) != "Pittville Street" or float(nearest_origin_road.get("distance_m", INF)) > 30.0:
