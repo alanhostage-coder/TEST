@@ -80,10 +80,16 @@ jobs:
           assert max(ImageStat.Stat(continuity).stddev) > 3.0, 'continuity frame is visually blank'
           panels = sorted(glob('/tmp/pua-projector-panel-*.png'))
           assert len(panels) == 5, panels
+          opening_marker_pixels = 0
           for panel in panels:
               rendered = Image.open(panel).convert('RGB')
               assert rendered.width >= 64 and rendered.height >= 180, (panel, rendered.size)
               assert max(ImageStat.Stat(rendered).stddev) > 3.0, f'{panel} is visually blank'
+              opening_marker_pixels += sum(
+                  1 for red, green, blue in rendered.getdata()
+                  if red < 120 and green > 150 and blue > 175 and blue - red > 90
+              )
+          assert opening_marker_pixels >= 12, f'opening anchor did not reach rendered pixels: {opening_marker_pixels}'
           with open('/tmp/pua-projector-proof.json', encoding='utf-8') as handle:
               proof = json.load(handle)
           assert proof['proof_profile'] == 'deterministic-clear-five-surface-v1', proof
