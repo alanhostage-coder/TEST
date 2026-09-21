@@ -1188,69 +1188,234 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_poi_feature_count", poi_features.size())
 		car.set_meta("map_road_annotation_count", mapped_road_annotation_count)
 		car.set_meta("map_road_segments", map_segments)
-		_snap_car_to_map_junction(car, roads)
+		_place_car_for_first_impression(car, roads, buildings, poi_features, point_features)
 
 
-func _snap_car_to_map_junction(car, roads: Array):
+func _place_car_for_first_impression(car, roads: Array, buildings: Array, poi_features: Array, point_features: Array):
+	# Persona 8: choose an opening from verified map facts rather than whichever
+	# junction happens to occur first in source order. The car starts on a real
+	# approach leg, facing a nearby real junction, with scoring biased toward:
+	# choice, named-local context, readable road scale and sourced features ahead.
+	# No geometry, sign, landmark or business is invented by this director.
+	const OPENING_SEARCH_RADIUS := 75.0
+	const OPENING_ANCHOR_RADIUS := 95.0
+	const OPENING_APPROACH_MAX := 10.0
 	var junctions := {}
 	var fallback := Vector2.ZERO
+	var fallback_heading := Vector2(0, -1)
 	var fallback_dist := INF
+
 	for road_index in range(roads.size()):
 		var road = roads[road_index]
 		if not road is Dictionary:
 			continue
 		var points = road.get("points", [])
+		if not points is Array:
+			continue
+		var road_name = str(road.get("name", "")).strip_edges()
+		var road_kind = str(road.get("kind", "road")).to_lower()
+		var road_width = float(road.get("width", 5.0))
 		for point_index in range(points.size()):
 			var point = points[point_index]
 			if not point is Array or point.size() < 2:
 				continue
 			var p = Vector2(float(point[0]), float(point[1]))
-			var d = p.length_squared()
-			if d < fallback_dist:
-				fallback_dist = d
+			var origin_dist = p.length_squared()
+			if origin_dist < fallback_dist:
+				fallback_dist = origin_dist
 				fallback = p
+				if point_index + 1 < points.size() and points[point_index + 1] is Array and points[point_index + 1].size() >= 2:
+					fallback_heading = Vector2(float(points[point_index + 1][0]), float(points[point_index + 1][1])) - p
 			var key = "%d:%d" % [int(round(p.x * 2.0)), int(round(p.y * 2.0))]
 			if not junctions.has(key):
-				junctions[key] = {"p": p, "roads": {}, "heading": Vector2.ZERO}
-			var item = junctions[key]
+				junctions[key] = {"p": p, "roads": {}, "legs": []}
+			var item: Dictionary = junctions[key]
 			var memberships: Dictionary = item["roads"]
 			memberships[str(road_index)] = true
 			item["roads"] = memberships
-			if item["heading"] == Vector2.ZERO:
-				if point_index + 1 < points.size():
-					var next = points[point_index + 1]
-					if next is Array and next.size() >= 2:
-						item["heading"] = Vector2(float(next[0]), float(next[1])) - p
-				elif point_index > 0:
-					var prev = points[point_index - 1]
-					if prev is Array and prev.size() >= 2:
-						item["heading"] = p - Vector2(float(prev[0]), float(prev[1]))
+			var legs: Array = item["legs"]
+			if point_index + 1 < points.size():
+				var next = points[point_index + 1]
+				if next is Array and next.size() >= 2:
+					legs.append({
+						"road_index": road_index,
+						"out": Vector2(float(next[0]), float(next[1])) - p,
+						"name": road_name,
+						"kind": road_kind,
+						"width": road_width
+					})
+			if point_index > 0:
+				var prev = points[point_index - 1]
+				if prev is Array and prev.size() >= 2:
+					legs.append({
+						"road_index": road_index,
+						"out": Vector2(float(prev[0]), float(prev[1])) - p,
+						"name": road_name,
+						"kind": road_kind,
+						"width": road_width
+					})
+			item["legs"] = legs
 			junctions[key] = item
 
-	var best = fallback
-	var best_heading = Vector2(0, -1)
-	var best_dist = INF
+	# Compact, data-oriented source anchors. These affect only where we look first;
+	# they do not create scene content.
+	var anchors: Array = []
+	for poi in poi_features:
+		if not poi is Dictionary:
+			continue
+		var point = poi.get("point", [])
+		var name = str(poi.get("name", "")).strip_edges()
+		if name != "" and point is Array and point.size() >= 2:
+			anchors.append({
+				"p": Vector2(float(point[0]), float(point[1])),
+				"name": name,
+				"kind": str(poi.get("kind", "poi")),
+				"source": "poi",
+				"weight": 8.0
+			})
+	for building in buildings:
+		if not building is Dictionary:
+			continue
+		var center = building.get("center", [])
+		var name = str(building.get("name", "")).strip_edges()
+		if name != "" and center is Array and center.size() >= 2:
+			anchors.append({
+				"p": Vector2(float(center[0]), float(center[1])),
+				"name": name,
+				"kind": str(building.get("kind", "building")),
+				"source": "building",
+				"weight": 5.0
+			})
+	var attention_kinds = ["traffic_signals", "bus_stop", "crossing", "stop", "give_way", "traffic_sign"]
+	for feature in point_features:
+		if not feature is Dictionary:
+			continue
+		var kind = str(feature.get("kind", "")).to_lower()
+		var point = feature.get("point", [])
+		if kind in attention_kinds and point is Array and point.size() >= 2:
+			anchors.append({
+				"p": Vector2(float(point[0]), float(point[1])),
+				"name": str(feature.get("name", "")).strip_edges(),
+				"kind": kind,
+				"source": "point",
+				"weight": 5.0
+			})
+
+	var best_score := -INF
+	var best_junction := fallback
+	var best_spawn := fallback
+	var best_heading := fallback_heading
+	var best_branch_count := 1
+	var best_approach := 0.0
+	var best_named_roads: Array = []
+	var best_anchor_name := ""
+	var best_anchor_kind := ""
+	var best_anchor_source := ""
+	var best_anchor_distance := INF
+	var best_visible_anchor_count := 0
+
 	for item in junctions.values():
 		var memberships: Dictionary = item["roads"]
 		if memberships.size() < 2:
 			continue
-		var p: Vector2 = item["p"]
-		var d = p.length_squared()
-		if d < best_dist:
-			best_dist = d
-			best = p
-			best_heading = item["heading"]
+		var junction: Vector2 = item["p"]
+		if junction.length() > OPENING_SEARCH_RADIUS:
+			continue
+		var named_roads := {}
+		for road_key in memberships.keys():
+			var member_index = int(road_key)
+			if member_index < 0 or member_index >= roads.size() or not roads[member_index] is Dictionary:
+				continue
+			var member_name = str(roads[member_index].get("name", "")).strip_edges()
+			if member_name != "":
+				named_roads[member_name] = true
+		var legs: Array = item["legs"]
+		for leg in legs:
+			if not leg is Dictionary:
+				continue
+			var kind = str(leg.get("kind", "road")).to_lower()
+			if kind in ["footway", "path", "cycleway", "track"]:
+				continue
+			var outward: Vector2 = leg.get("out", Vector2.ZERO)
+			var leg_length = outward.length()
+			if leg_length < 14.0:
+				continue
+			outward /= leg_length
+			var approach = min(OPENING_APPROACH_MAX, max(6.0, leg_length * 0.30))
+			var spawn = junction + outward * approach
+			var heading = -outward
+			var score = float(memberships.size()) * 12.0
+			score += min(leg_length, 45.0) * 0.25
+			score += float(named_roads.size()) * 3.0
+			score += clamp(float(leg.get("width", 5.0)), 4.0, 10.0) * 0.35
+			score -= junction.length() * 0.12
+			if kind == "service":
+				score -= 7.0
+
+			var candidate_anchor_name := ""
+			var candidate_anchor_kind := ""
+			var candidate_anchor_source := ""
+			var candidate_anchor_distance := INF
+			var strongest_anchor_gain := 0.0
+			var visible_anchor_count := 0
+			for anchor in anchors:
+				var anchor_pos: Vector2 = anchor["p"]
+				var to_anchor = anchor_pos - spawn
+				var anchor_distance = to_anchor.length()
+				if anchor_distance < 5.0 or anchor_distance > OPENING_ANCHOR_RADIUS:
+					continue
+				var forwardness = heading.dot(to_anchor / anchor_distance)
+				if forwardness <= 0.45:
+					continue
+				var proximity = 1.0 - anchor_distance / OPENING_ANCHOR_RADIUS
+				var gain = float(anchor["weight"]) * proximity * forwardness
+				score += gain
+				visible_anchor_count += 1
+				var anchor_name = str(anchor["name"])
+				if anchor_name != "" and gain > strongest_anchor_gain:
+					strongest_anchor_gain = gain
+					candidate_anchor_name = anchor_name
+					candidate_anchor_kind = str(anchor["kind"])
+					candidate_anchor_source = str(anchor["source"])
+					candidate_anchor_distance = anchor_distance
+			score += min(4, visible_anchor_count) * 1.5
+
+			if score > best_score:
+				best_score = score
+				best_junction = junction
+				best_spawn = spawn
+				best_heading = heading
+				best_branch_count = memberships.size()
+				best_approach = approach
+				best_named_roads = named_roads.keys()
+				best_anchor_name = candidate_anchor_name
+				best_anchor_kind = candidate_anchor_kind
+				best_anchor_source = candidate_anchor_source
+				best_anchor_distance = candidate_anchor_distance
+				best_visible_anchor_count = visible_anchor_count
 
 	if best_heading.length() < 0.1:
 		best_heading = Vector2(0, -1)
 	best_heading = best_heading.normalized()
-	var spawn = best + best_heading * 2.4
-	car.global_position.x = spawn.x
-	car.global_position.z = spawn.y
-	car.global_position.y = max(car.global_position.y, 0.58)
+	if best_score == -INF:
+		best_score = 0.0
+		best_junction = fallback
+		best_spawn = fallback
+		best_approach = 0.0
+	car.global_position = Vector3(best_spawn.x, max(car.global_position.y, 0.58), best_spawn.y)
 	car.rotation.y = atan2(-best_heading.x, -best_heading.y)
-	car.set_meta("map_spawn_junction", [best.x, best.y])
+	car.set_meta("map_spawn_junction", [best_junction.x, best_junction.y])
 	car.set_meta("map_spawn_heading", [best_heading.x, best_heading.y])
+	car.set_meta("map_opening_policy", "verified-first-impression-v1")
+	car.set_meta("map_opening_hook_score", best_score)
+	car.set_meta("map_opening_branch_count", best_branch_count)
+	car.set_meta("map_opening_approach_m", best_approach)
+	car.set_meta("map_opening_named_roads", best_named_roads)
+	car.set_meta("map_opening_verified_anchor", best_anchor_name)
+	car.set_meta("map_opening_verified_anchor_kind", best_anchor_kind)
+	car.set_meta("map_opening_verified_anchor_source", best_anchor_source)
+	car.set_meta("map_opening_verified_anchor_distance_m", best_anchor_distance)
+	car.set_meta("map_opening_visible_anchor_count", best_visible_anchor_count)
 
 
 
