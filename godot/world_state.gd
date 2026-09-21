@@ -3,7 +3,7 @@ extends Node
 signal changed(state)
 
 # Edinburgh/Forth defaults keep the simulation useful offline.
-const WEATHER_URL := "https://api.open-meteo.com/v1/forecast?latitude=55.951507&longitude=-3.107122&current=temperature_2m,relative_humidity_2m,precipitation,rain,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility&daily=sunrise,sunset&timezone=Europe%2FLondon&forecast_days=1"
+const WEATHER_URL := "https://api.open-meteo.com/v1/forecast?latitude=55.951507&longitude=-3.107122&current=temperature_2m,relative_humidity_2m,precipitation,rain,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility,is_day&daily=sunrise,sunset&timezone=Europe%2FLondon&forecast_days=1"
 const MARINE_URL := "https://marine-api.open-meteo.com/v1/marine?latitude=56.00&longitude=-3.10&current=wave_height,wave_direction,wave_period,sea_surface_temperature&timezone=Europe%2FLondon"
 const AIR_URL := "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=55.951507&longitude=-3.107122&current=pm10,pm2_5,nitrogen_dioxide,european_aqi&timezone=Europe%2FLondon"
 const SEPA_RAIN_URL := "https://timeseries.sepa.org.uk/KiWIS/KiWIS?service=kisters&type=queryServices&datasource=0&request=getTimeseriesValues&ts_path=1/15201/RE/15m.Total&returnfields=Timestamp,Value,Quality%20Code&format=csv&csvdiv=,"
@@ -22,6 +22,7 @@ var state := {
 	"wind_gusts": 30.0,
 	"visibility": 12000.0,
 	"weather_code": 3,
+	"is_day": 1,
 	"wave_height": 0.7,
 	"wave_direction": 250.0,
 	"wave_period": 4.5,
@@ -134,6 +135,7 @@ func _apply_weather(c: Dictionary):
 	state["wind_gusts"] = float(c.get("wind_gusts_10m", state["wind_gusts"]))
 	state["visibility"] = float(c.get("visibility", state["visibility"]))
 	state["weather_code"] = int(c.get("weather_code", state["weather_code"]))
+	state["is_day"] = int(c.get("is_day", state["is_day"]))
 
 func _apply_marine(c: Dictionary):
 	state["wave_height"] = float(c.get("wave_height", state["wave_height"]))
