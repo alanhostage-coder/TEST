@@ -163,7 +163,7 @@ jobs:
           SectionEnd
           EOF
           makensis installer.nsi
-          test -s PUA-0.76-PC-MAX-Setup.exe
+          test -s PUA-0.76-PC-MAX-LATEST-Setup.exe
           sha256sum PUA-0.76-PC-MAX-LATEST-Setup.exe > SHA256-INSTALLER.txt
           ls -lh PUA-0.76-PC-MAX-LATEST-Setup.exe PUA-0.76-PC-MAX-PORTABLE.zip
 
