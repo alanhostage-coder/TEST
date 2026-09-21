@@ -150,6 +150,15 @@ func run() -> void:
 		return
 
 	var car = world.get_node("Car")
+	var opening_anchor_label = world.map_root.get_node_or_null("MappedOpeningAnchor")
+	if opening_anchor_label == null \
+	or not opening_anchor_label is Label3D \
+	or str(opening_anchor_label.text) != str(car.get_meta("map_opening_verified_anchor", "")) \
+	or not bool(opening_anchor_label.get_meta("annotation_only", false)) \
+	or str(opening_anchor_label.get_meta("source_field", "")) != "osm:name":
+		push_error("PUA_PROJECTOR_RENDER_FAIL verified opening anchor annotation missing")
+		quit(2)
+		return
 	var manifest := {
 		"proof_profile": "deterministic-clear-five-surface-v1",
 		"weather": str(world_state.state.get("source", "unknown")),
@@ -159,6 +168,8 @@ func run() -> void:
 		"exact_buildings": int(car.get_meta("map_exact_building_count", 0)),
 		"opening_policy": str(car.get_meta("map_opening_policy", "")),
 		"opening_anchor": str(car.get_meta("map_opening_verified_anchor", "")),
+		"opening_anchor_annotation": str(opening_anchor_label.text),
+		"opening_anchor_annotation_source": str(opening_anchor_label.get_meta("source_collection", "")),
 		"surface_count": bay.layout_surface_count,
 		"camera_count": bay.cameras.size(),
 		"composite_size": [composite.get_width(), composite.get_height()],

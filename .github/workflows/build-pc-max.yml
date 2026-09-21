@@ -92,6 +92,8 @@ jobs:
           assert proof['exact_buildings'] == proof['buildings'], proof
           assert proof['opening_policy'] == 'verified-first-impression-v1', proof
           assert proof['opening_anchor'], proof
+          assert proof['opening_anchor_annotation'] == proof['opening_anchor'], proof
+          assert proof['opening_anchor_annotation_source'] in ('poi', 'building', 'point'), proof
           assert proof['projector_1024_aspect_error'] < 0.01, proof
           assert proof['legacy_yaw_normalised'] is True, proof
           assert proof['xps_profile_exercised'] is True, proof

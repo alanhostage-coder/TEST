@@ -471,6 +471,43 @@ func _add_named_building_marker(parent: Node3D, building: Dictionary):
 		return
 	_add_world_label(parent, Vector3(p.x, 3.2, p.y), name, Color(0.95, 0.93, 0.86), 25 if low_spec_mode else 34, 105.0 if low_spec_mode else 170.0)
 
+
+func _add_opening_anchor_annotation(parent: Node3D, car: Node, pois: Array, buildings: Array, points: Array) -> bool:
+	# The opening director selects a genuine named feature, but ordinary POI caps may
+	# omit that exact feature. Guarantee one restrained annotation at its source
+	# coordinate so the first view contains recognisable context without inventing a
+	# physical sign, pole, facade or location.
+	var anchor_name = str(car.get_meta("map_opening_verified_anchor", "")).strip_edges()
+	var anchor_source = str(car.get_meta("map_opening_verified_anchor_source", ""))
+	if anchor_name == "":
+		return false
+	var collection: Array = pois if anchor_source == "poi" else (buildings if anchor_source == "building" else points)
+	var coordinate_field = "center" if anchor_source == "building" else "point"
+	for feature in collection:
+		if not feature is Dictionary or str(feature.get("name", "")).strip_edges() != anchor_name:
+			continue
+		var coordinate = feature.get(coordinate_field, [])
+		if not coordinate is Array or coordinate.size() < 2:
+			continue
+		var label = Label3D.new()
+		label.name = "MappedOpeningAnchor"
+		label.text = anchor_name
+		label.position = Vector3(float(coordinate[0]), 3.05, float(coordinate[1]))
+		label.font_size = 27 if low_spec_mode else 34
+		label.pixel_size = 0.0041
+		label.modulate = Color(1.0, 0.82, 0.48, 0.96)
+		label.outline_size = 8
+		label.outline_modulate = Color(0.02, 0.025, 0.03, 0.96)
+		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		label.visibility_range_end = 140.0 if low_spec_mode else 210.0
+		label.set_meta("annotation_only", true)
+		label.set_meta("source_field", "osm:name")
+		label.set_meta("source_collection", anchor_source)
+		label.set_meta("opening_priority", true)
+		parent.add_child(label)
+		return true
+	return false
+
 func _visual_box(parent: Node3D, pos: Vector3, size: Vector3, material):
 	var mesh = MeshInstance3D.new()
 	var bm = BoxMesh.new()
@@ -1205,6 +1242,7 @@ func _on_map_ready(map_data: Dictionary):
 			# seize control of a moving player's transform. Recovery remains an
 			# explicit R action rather than a side effect of network timing.
 			car.set_meta("map_refresh_preserved_vehicle", true)
+		car.set_meta("map_opening_anchor_annotated", _add_opening_anchor_annotation(map_root, car, poi_features, buildings, point_features))
 
 
 func _place_car_for_first_impression(car, roads: Array, buildings: Array, poi_features: Array, point_features: Array):

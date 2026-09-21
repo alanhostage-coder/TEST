@@ -163,6 +163,19 @@ func _finish():
 	if not anchor_verified:
 		_fail("first-impression forward anchor is not source-backed")
 		return
+	var opening_label = world.map_root.get_node_or_null("MappedOpeningAnchor")
+	if opening_label == null or not opening_label is Label3D:
+		_fail("verified opening anchor annotation missing")
+		return
+	if opening_label.text != opening_anchor \
+	or not bool(opening_label.get_meta("annotation_only", false)) \
+	or str(opening_label.get_meta("source_field", "")) != "osm:name" \
+	or str(opening_label.get_meta("source_collection", "")) != opening_anchor_source:
+		_fail("opening anchor annotation is not source-backed")
+		return
+	if not bool(car.get_meta("map_opening_anchor_annotated", false)):
+		_fail("opening anchor annotation policy missing")
+		return
 	var nearest_origin_road = map_stream.nearest_named_road(Vector2.ZERO)
 	if str(nearest_origin_road.get("name", "")) != "Pittville Street" or float(nearest_origin_road.get("distance_m", INF)) > 30.0:
 		_fail("verified Pittville Street context missing near postcode centroid")
