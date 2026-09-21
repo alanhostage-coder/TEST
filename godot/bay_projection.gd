@@ -65,6 +65,7 @@ var steering_ring: Line2D
 var projector_max_mode := false
 var pc_max_mode := false
 var black_mask: ColorRect
+var shared_cab_transform := Transform3D.IDENTITY
 
 func _ready():
 	projector_max_mode = OS.has_feature("projector_max")
@@ -483,15 +484,18 @@ func _process(_delta):
 		return
 	if mode == 1 and steering_ring:
 		steering_ring.rotation = clamp(float(car.get("steer_smoothed")) * 0.18, -0.18, 0.18)
-	var cab_transform = car.global_transform
+	# Sample the vehicle pose once per rendered frame and derive every shutter view
+	# from that immutable transform. No surface gets a later car/camera state than
+	# its neighbour, which protects cross-panel object motion and horizon continuity.
+	shared_cab_transform = car.global_transform
 	# Right-hand-drive open-top seating position: the world should feel as if the
 	# viewer is sitting in the car, not watching a bumper camera.
-	cab_transform.origin = car.to_global(Vector3(0.42, 1.22, -0.34))
+	shared_cab_transform.origin = car.to_global(Vector3(0.42, 1.22, -0.34))
 	for i in range(layout_surface_count):
-		var t = cab_transform
+		var t = shared_cab_transform
 		# The yaw centres are derived from each plane's horizontal FOV, so adjacent
 		# views meet at the same ray instead of overlapping or leaving a jump.
-		t.basis = Basis(Vector3.UP, camera_yaws[i] * BAY_VIEW_YAW_SIGN) * cab_transform.basis
+		t.basis = Basis(Vector3.UP, camera_yaws[i] * BAY_VIEW_YAW_SIGN) * shared_cab_transform.basis
 		t.basis = t.basis * Basis(Vector3.RIGHT, deg_to_rad(CAB_PITCH_DEG))
 		cameras[i].global_transform = t
 	queue_redraw()
