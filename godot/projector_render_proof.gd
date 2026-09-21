@@ -49,6 +49,11 @@ func run() -> void:
 		push_error("PUA_PROJECTOR_RENDER_FAIL packaged map provenance/geometry invalid")
 		quit(2)
 		return
+	var projector_1024_aspect_error := _projector_profile_aspect_error(bay, Vector2(1024, 576))
+	if projector_1024_aspect_error > 0.01:
+		push_error("PUA_PROJECTOR_RENDER_FAIL low-res surface aspect drift %.5f" % projector_1024_aspect_error)
+		quit(2)
+		return
 	if bay.layout_surface_count != 5:
 		bay._toggle_layout()
 	bay._set_mode(1)
@@ -104,7 +109,8 @@ func run() -> void:
 		"composite_size": [composite.get_width(), composite.get_height()],
 		"packaged_patch_timestamp": str(packaged.get("source_timestamp_utc", "")),
 		"packaged_roads": packaged.get("roads", []).size(),
-		"packaged_buildings": packaged.get("buildings", []).size()
+		"packaged_buildings": packaged.get("buildings", []).size(),
+		"projector_1024_aspect_error": projector_1024_aspect_error
 	}
 	var manifest_file = FileAccess.open(MANIFEST_PATH, FileAccess.WRITE)
 	if manifest_file == null:
@@ -125,6 +131,17 @@ func run() -> void:
 		manifest.opening_anchor
 	])
 	quit(0)
+
+
+func _projector_profile_aspect_error(bay: Node, screen_size: Vector2) -> float:
+	var worst := 0.0
+	for rect in bay.FIVE_RECTS:
+		var surface_size := Vector2(screen_size.x * rect.size.x, screen_size.y * rect.size.y)
+		var viewport_size: Vector2i = bay.viewport_size_for_surface(surface_size, bay.PROJECTOR_MAX_RENDER_SCALE)
+		var destination_aspect := surface_size.x / max(1.0, surface_size.y)
+		var viewport_aspect := float(viewport_size.x) / max(1.0, float(viewport_size.y))
+		worst = max(worst, abs(destination_aspect - viewport_aspect))
+	return worst
 
 
 func _verified_map_ready(world: Node) -> bool:

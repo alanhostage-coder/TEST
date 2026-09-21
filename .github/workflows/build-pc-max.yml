@@ -82,7 +82,7 @@ jobs:
           assert len(panels) == 5, panels
           for panel in panels:
               rendered = Image.open(panel).convert('RGB')
-              assert rendered.width >= 112 and rendered.height >= 180, (panel, rendered.size)
+              assert rendered.width >= 64 and rendered.height >= 180, (panel, rendered.size)
               assert max(ImageStat.Stat(rendered).stddev) > 3.0, f'{panel} is visually blank'
           with open('/tmp/pua-projector-proof.json', encoding='utf-8') as handle:
               proof = json.load(handle)
@@ -92,6 +92,7 @@ jobs:
           assert proof['exact_buildings'] == proof['buildings'], proof
           assert proof['opening_policy'] == 'verified-first-impression-v1', proof
           assert proof['opening_anchor'], proof
+          assert proof['projector_1024_aspect_error'] < 0.01, proof
           PY
           cp /tmp/pua-projector-proof.png build/projector-proof/
           cp /tmp/pua-projector-continuity.png build/projector-proof/

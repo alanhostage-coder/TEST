@@ -28,6 +28,8 @@ const LOW_SPEC_RENDER_SCALE := 0.42
 const PROJECTOR_MAX_RENDER_SCALE := 0.48
 const PC_MAX_RENDER_SCALE := 0.88
 const CORNER_PICK_RADIUS := 82.0
+const MIN_VIEWPORT_WIDTH := 64.0
+const MIN_VIEWPORT_HEIGHT := 180.0
 
 var mode := 0 # 0 normal, 1 cab, 2 calibration
 var car: Node3D
@@ -322,7 +324,7 @@ func _rescale_surfaces():
 			warped.append(base[corner] + offsets[i][corner] * size)
 		surfaces[i].polygon = warped
 		var scale = PROJECTOR_MAX_RENDER_SCALE if projector_max_mode else (PC_MAX_RENDER_SCALE if pc_max_mode else (LOW_SPEC_RENDER_SCALE if OS.has_feature("thinkpad_low") else RENDER_SCALE))
-		viewports[i].size = Vector2i(max(112, int(w * scale)), max(180, int(h * scale)))
+		viewports[i].size = viewport_size_for_surface(Vector2(w, h), scale)
 		var uv_size = Vector2(viewports[i].size.x, viewports[i].size.y)
 		surfaces[i].uv = PackedVector2Array([Vector2.ZERO, Vector2(uv_size.x, 0), uv_size, Vector2(0, uv_size.y)])
 		surfaces[i].visible = mode > 0
@@ -330,6 +332,24 @@ func _rescale_surfaces():
 	_update_camera_frustums()
 	_layout_interior_overlay()
 	queue_redraw()
+
+func viewport_size_for_surface(surface_size: Vector2, render_scale: float) -> Vector2i:
+	# Keep the render buffer at the same aspect ratio as the physical destination.
+	# Independent width/height minimums distort narrow panes at low resolutions and
+	# therefore change the camera horizontal FOV and panorama seam geometry.
+	var target := Vector2(
+		max(1.0, surface_size.x * render_scale),
+		max(1.0, surface_size.y * render_scale)
+	)
+	var uniform_boost := max(
+		1.0,
+		max(MIN_VIEWPORT_WIDTH / target.x, MIN_VIEWPORT_HEIGHT / target.y)
+	)
+	return Vector2i(
+		max(1, int(round(target.x * uniform_boost))),
+		max(1, int(round(target.y * uniform_boost)))
+	)
+
 
 func _cycle_mode():
 	_set_mode(0 if mode == 1 else 1)
