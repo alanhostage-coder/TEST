@@ -86,7 +86,7 @@ func run() -> void:
 		xps_actual_pixels += actual_size.x * actual_size.y
 		xps_scales.append(bay.render_scale_for_surface(panel_index))
 		xps_panel_sizes.append([actual_size.x, actual_size.y])
-	var xps_pixel_budget_ratio := float(xps_actual_pixels) / max(1.0, float(xps_uniform_pixels))
+	var xps_pixel_budget_ratio: float = float(xps_actual_pixels) / maxf(1.0, float(xps_uniform_pixels))
 	if xps_pixel_budget_ratio < 0.95 or xps_pixel_budget_ratio > 1.02:
 		push_error("PUA_PROJECTOR_RENDER_FAIL XPS perceptual pixel budget drift %.4f" % xps_pixel_budget_ratio)
 		quit(2)
