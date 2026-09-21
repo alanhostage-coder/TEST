@@ -30,7 +30,7 @@ jobs:
             cp -a /root/.local/share/godot/export_templates/4.5.1.stable "$HOME/.local/share/godot/export_templates/"
           fi
           apt-get update -qq
-          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nsis zip
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq nsis zip xvfb xauth python3-pil
           godot --version
           makensis -VERSION
           test -d "$HOME/.local/share/godot/export_templates/4.5.1.stable"
@@ -51,6 +51,52 @@ jobs:
           test "$status" -eq 0
           grep -q 'PUA_SOAK_OK' /tmp/pua-pcmax-soak.log
           if grep -E 'SCRIPT ERROR|Parse Error|PUA_SOAK_FAIL' /tmp/pua-pcmax-soak.log; then exit 1; fi
+
+      - name: Five-surface render proof
+        id: projector_proof
+        continue-on-error: true
+        run: |
+          mkdir -p build/projector-proof
+          set +e
+          timeout 30s xvfb-run -a godot --path godot --display-driver x11 --resolution 1920x1080 --script res://projector_render_proof.gd > /tmp/pua-projector-proof.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/pua-projector-proof.log
+          cp /tmp/pua-projector-proof.log build/projector-proof/
+          test "$status" -eq 0
+          grep -q 'PUA_PROJECTOR_RENDER_OK' /tmp/pua-projector-proof.log
+          test -s /tmp/pua-projector-proof.png
+          python3 - <<'PY'
+          from glob import glob
+          from PIL import Image, ImageStat
+          composite = Image.open('/tmp/pua-projector-proof.png').convert('RGB')
+          assert composite.size == (1920, 1080), composite.size
+          assert max(ImageStat.Stat(composite).stddev) > 3.0, 'composite is visually blank'
+          panels = sorted(glob('/tmp/pua-projector-panel-*.png'))
+          assert len(panels) == 5, panels
+          for panel in panels:
+              rendered = Image.open(panel).convert('RGB')
+              assert rendered.width >= 112 and rendered.height >= 180, (panel, rendered.size)
+              assert max(ImageStat.Stat(rendered).stddev) > 3.0, f'{panel} is visually blank'
+          PY
+          cp /tmp/pua-projector-proof.png build/projector-proof/
+          cp /tmp/pua-projector-panel-*.png build/projector-proof/
+          sha256sum build/projector-proof/*.png > build/projector-proof/SHA256.txt
+
+      - name: Upload five-surface render proof
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PUA-0.76-FIVE-SURFACE-RENDER-PROOF
+          path: build/projector-proof/
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Stop on render proof failure
+        if: steps.projector_proof.outcome == 'failure' && steps.projector_proof.conclusion == 'failure'
+        run: |
+          echo "::error::Five-surface render proof failed; diagnostics uploaded."
+          exit 1
 
       - name: PC Max invariants
         run: |
