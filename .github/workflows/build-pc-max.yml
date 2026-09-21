@@ -67,10 +67,17 @@ jobs:
           if grep -E 'SCRIPT ERROR|Parse Error|Assertion failed' /tmp/pua-steering-polish.log; then exit 1; fi
 
       - name: Projector render proof
+        id: projector_proof
+        continue-on-error: true
         run: |
           mkdir -p build/projector-proof
-          timeout 30s xvfb-run -a godot --path godot --resolution 1920x1080 --script res://projector_render_proof.gd > /tmp/pua-projector-proof.log 2>&1
+          set +e
+          timeout 30s xvfb-run -a godot --path godot --display-driver x11 --resolution 1920x1080 --script res://projector_render_proof.gd > /tmp/pua-projector-proof.log 2>&1
+          status=$?
+          set -e
           cat /tmp/pua-projector-proof.log
+          cp /tmp/pua-projector-proof.log build/projector-proof/
+          test "$status" -eq 0
           grep -q 'PUA_PROJECTOR_RENDER_OK' /tmp/pua-projector-proof.log
           test -s /tmp/pua-projector-proof.png
           python3 - <<'PY'
@@ -80,16 +87,22 @@ jobs:
           assert max(ImageStat.Stat(image).stddev) > 3.0, 'projector proof is visually blank'
           PY
           cp /tmp/pua-projector-proof.png build/projector-proof/
-          cp /tmp/pua-projector-proof.log build/projector-proof/
           sha256sum build/projector-proof/pua-projector-proof.png > build/projector-proof/SHA256.txt
 
       - name: Upload projector render proof
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: PUA-0.76-PROJECTOR-RENDER-PROOF
           path: build/projector-proof/
           if-no-files-found: error
           retention-days: 30
+
+      - name: Stop on projector proof failure
+        if: steps.projector_proof.outcome == 'failure' && steps.projector_proof.conclusion == 'failure'
+        run: |
+          echo "::error::Five-surface projector render proof failed; diagnostics uploaded."
+          exit 1
 
       # CI dispatch marker: 2026-09-21 projector-proof rerun
       - name: PC Max invariants
