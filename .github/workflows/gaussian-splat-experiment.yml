@@ -43,6 +43,8 @@ jobs:
           grep -q 'redistribution_allowed' godot/gaussian_splat_layer.gd
           grep -q 'asset_sha256' godot/gaussian_splat_layer.gd
           grep -q 'max_loaded_chunks' godot/splat_chunk_streamer.gd
+          grep -q '_sort_by_distance' godot/splat_chunk_streamer.gd
+          ! grep -q 'sort_custom(func' godot/splat_chunk_streamer.gd
           grep -q 'postcode_centroid_not_surveyed_window' godot/splat_assets/eh15_2bz.metadata.example.json
           test ! -f godot/splat_assets/eh15_2bz.sog
           test ! -f godot/splat_assets/eh15_2bz.json
