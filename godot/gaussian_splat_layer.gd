@@ -58,6 +58,8 @@ func _metadata_is_safe() -> bool:
 		return false
 	if str(meta.get("licence", "")).strip_edges() == "":
 		return false
+	if bool(meta.get("redistribution_allowed", false)) != true:
+		return false
 	if str(meta.get("source", "")).strip_edges() == "":
 		return false
 	if str(meta.get("capture_date", "")).strip_edges() == "":
