@@ -35,6 +35,14 @@ jobs:
           cat /tmp/splat-parse.log
           ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/splat-parse.log
 
+      - name: Provenance guard invariants
+        run: |
+          grep -q 'META_PATH' godot/gaussian_splat_layer.gd
+          grep -q 'alignment_status' godot/gaussian_splat_layer.gd
+          grep -q 'postcode_centroid_not_surveyed_window' godot/splat_assets/eh15_2bz.metadata.example.json
+          test ! -f godot/splat_assets/eh15_2bz.sog
+          test ! -f godot/splat_assets/eh15_2bz.json
+
       - name: Existing PUA runtime regression
         run: |
           set +e
