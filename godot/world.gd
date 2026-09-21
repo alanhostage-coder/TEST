@@ -23,6 +23,7 @@ const ROAD_MICRO_STEP := 6.5
 # Covers every building in the source-dated EH15 patch (farthest centre 160.5 m)
 # while remaining a bounded low-spec draw/collision radius for future patches.
 const LOW_SPEC_EXACT_FOOTPRINT_RADIUS := 220.0
+const DRIVER_DETAIL_RADIUS := 38.0
 var low_spec_mode := false
 var projector_max_mode := false
 var pc_max_mode := false
@@ -417,6 +418,14 @@ func _visual_box(parent: Node3D, pos: Vector3, size: Vector3, material):
 
 func _road_micro_detail(parent: Node3D, a: Vector2, b: Vector2, width: float, seed: int, budget: int) -> int:
 	if budget <= 0:
+		return 0
+	# Spend procedural surface detail only where the seated driver can actually
+	# read it. This is visual texture, never geographic evidence: road alignment,
+	# widths and surfaces still come exclusively from the mapped segment.
+	var segment_mid = (a + b) * 0.5
+	var driver = get_node_or_null("Car")
+	var driver_pos = Vector2(driver.global_position.x, driver.global_position.z) if driver else Vector2.ZERO
+	if segment_mid.distance_to(driver_pos) > DRIVER_DETAIL_RADIUS + (b - a).length() * 0.5:
 		return 0
 	var delta = b - a
 	var length = delta.length()
@@ -976,13 +985,34 @@ func _on_map_ready(map_data: Dictionary):
 	add_child(map_root)
 	map_segments.clear()
 	map_lamps.clear()
+	# Near-to-far ordering makes the fixed low-spec budgets perceptual rather than
+	# source-order dependent: the roads around the driver's seat receive kerbs,
+	# markings and harmless micro texture first across all five projector views.
+	var detail_origin := Vector2.ZERO
+	var detail_car = get_node_or_null("Car")
+	if detail_car:
+		detail_origin = Vector2(detail_car.global_position.x, detail_car.global_position.z)
+	var detail_roads: Array = roads.duplicate()
+	detail_roads.sort_custom(func(a, b):
+		if not a is Dictionary: return false
+		if not b is Dictionary: return true
+		var ap = a.get("points", [])
+		var bp = b.get("points", [])
+		var ad := INF
+		var bd := INF
+		for p in ap:
+			if p is Array and p.size() >= 2: ad = min(ad, Vector2(float(p[0]), float(p[1])).distance_squared_to(detail_origin))
+		for p in bp:
+			if p is Array and p.size() >= 2: bd = min(bd, Vector2(float(p[0]), float(p[1])).distance_squared_to(detail_origin))
+		return ad < bd
+	)
 	var street_edge_budget := 0
 	var marking_budget := 0
 	var street_edge_limit := 70 if projector_max_mode else (90 if low_spec_mode else (620 if pc_max_mode else 240))
 	var marking_limit := 46 if projector_max_mode else (55 if low_spec_mode else (360 if pc_max_mode else 130))
 	var micro_budget := 80 if projector_max_mode else (110 if low_spec_mode else (1100 if pc_max_mode else 320))
 
-	for road in roads:
+	for road in detail_roads:
 		if not road is Dictionary:
 			continue
 		var points = road.get("points", [])
