@@ -55,10 +55,18 @@ func run() -> void:
 	var osm_overlay = world.get_node("OSMGroundTiles")
 	osm_overlay._build_live_map_overlay()
 	osm_overlay._build_packaged_vector_overlay(packaged)
+	osm_overlay._map_stream = map_stream
+	osm_overlay._center_lat = float(packaged.get("center_lat", 0.0))
+	osm_overlay._center_lon = float(packaged.get("center_lon", 0.0))
+	osm_overlay._last_postcode = str(packaged.get("start_postcode", "EH15 2BZ"))
+	osm_overlay._update_location_text(true)
+	osm_overlay._process(0.3)
 	await process_frame
 	if osm_overlay._packaged_overlay_road_count != packaged.get("roads", []).size() \
 	or osm_overlay._packaged_overlay_texture == null \
-	or osm_overlay._overlay_map.texture != osm_overlay._packaged_overlay_texture:
+	or osm_overlay._overlay_map.texture != osm_overlay._packaged_overlay_texture \
+	or not osm_overlay._overlay_marker.visible \
+	or osm_overlay._overlay_root.position.x < 1600.0:
 		push_error("PUA_PROJECTOR_RENDER_FAIL packaged OSM overlay unavailable")
 		quit(2)
 		return
@@ -189,6 +197,8 @@ func run() -> void:
 		"packaged_patch_timestamp": str(packaged.get("source_timestamp_utc", "")),
 		"packaged_roads": packaged.get("roads", []).size(),
 		"packaged_overlay_roads": osm_overlay._packaged_overlay_road_count,
+		"packaged_overlay_position": [osm_overlay._overlay_root.position.x, osm_overlay._overlay_root.position.y],
+		"packaged_overlay_marker_visible": osm_overlay._overlay_marker.visible,
 		"packaged_buildings": packaged.get("buildings", []).size(),
 		"panel_render_sizes": panel_render_sizes,
 		"max_panel_aspect_error": max_panel_aspect_error,
