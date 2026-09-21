@@ -12,6 +12,8 @@ extends Node3D
 @export var min_forward_bias_m := 18.0
 @export var landmark_radius_m := 450.0
 @export var max_landmarks := 12
+@export var visibility_hysteresis_m := 14.0
+@export var cone_hysteresis := 0.10
 var previous_position := Vector3.ZERO
 var predicted_focus := Vector3.ZERO
 
@@ -71,16 +73,19 @@ func _process(delta: float) -> void:
 		var predicted_distance := n.global_position.distance_to(predicted_focus)
 		var ahead := offset.normalized().dot(forward) if distance > 0.01 else 1.0
 		var keep := false
+		var was_visible := n.visible
+		var distance_slack := visibility_hysteresis_m if was_visible else 0.0
+		var cone_slack := cone_hysteresis if was_visible else 0.0
 		var landmark := n.is_in_group("pua_landmark")
-		if landmark and distance <= landmark_radius_m and landmarks_used < max_landmarks:
+		if landmark and distance <= landmark_radius_m + distance_slack and landmarks_used < max_landmarks:
 			keep = true
 			landmarks_used += 1
-		elif distance <= rear_keep_radius_m:
+		elif distance <= rear_keep_radius_m + distance_slack:
 			keep = true
-		elif ahead > -0.15 and distance <= near_radius_m and near_used < max_near_details:
+		elif ahead > -0.15 - cone_slack and distance <= near_radius_m + distance_slack and near_used < max_near_details:
 			keep = true
 			near_used += 1
-		elif ahead > 0.15 and min(distance, predicted_distance) <= mid_radius_m and mid_used < max_mid_details:
+		elif ahead > 0.15 - cone_slack and min(distance, predicted_distance) <= mid_radius_m + distance_slack and mid_used < max_mid_details:
 			keep = true
 			mid_used += 1
 		n.visible = keep
