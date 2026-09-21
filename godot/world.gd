@@ -340,16 +340,20 @@ func _add_world_label(parent: Node3D, pos: Vector3, text_value: String, colour: 
 	label.visibility_range_end = range_end
 	parent.add_child(label)
 
-func _add_mapped_road_name_signs(parent: Node3D, roads: Array):
-	var seen := {}
+func _add_mapped_road_name_signs(parent: Node3D, roads: Array) -> int:
+	# Road names are mapped facts, but a name in OSM does not prove that a physical
+	# street-name board exists at an arbitrary segment midpoint. Keep generic names
+	# as unobtrusive world annotations; actual mapped traffic signs are created only
+	# by _add_mapped_point_features at their sourced coordinates.
 	var cap = 8 if projector_max_mode else (10 if low_spec_mode else (34 if pc_max_mode else 18))
 	var distance_limit = 125.0 if low_spec_mode else 260.0
 	var label_range = 115.0 if low_spec_mode else 180.0
-	var label_size = 26 if low_spec_mode else 34
-	var made := 0
+	var label_size = 24 if low_spec_mode else 31
+	var candidates: Array = []
+	var seen := {}
 	for road in roads:
-		if made >= cap or not road is Dictionary:
-			break
+		if not road is Dictionary:
+			continue
 		var road_name = str(road.get("name", "")).strip_edges()
 		if road_name == "" or seen.has(road_name):
 			continue
@@ -370,10 +374,29 @@ func _add_mapped_road_name_signs(parent: Node3D, roads: Array):
 		if chosen.x == INF or chosen.length() > distance_limit:
 			continue
 		seen[road_name] = true
-		_visual_box(parent, Vector3(chosen.x, 1.55, chosen.y), Vector3(0.10, 3.10, 0.10), metal_mat)
-		_visual_box(parent, Vector3(chosen.x, 2.75, chosen.y), Vector3(1.60, 0.46, 0.08), sign_white_mat)
-		_add_world_label(parent, Vector3(chosen.x, 2.76, chosen.y), road_name.to_upper(), Color(0.08, 0.10, 0.12), label_size, label_range)
+		candidates.append({"name": road_name, "point": chosen, "distance_sq": chosen.length_squared()})
+	candidates.sort_custom(func(a, b): return float(a["distance_sq"]) < float(b["distance_sq"]))
+	var made := 0
+	for candidate in candidates:
+		if made >= cap:
+			break
+		var chosen: Vector2 = candidate["point"]
+		var label = Label3D.new()
+		label.name = "MappedRoadName_%d" % made
+		label.text = str(candidate["name"]).to_upper()
+		label.position = Vector3(chosen.x, 1.05, chosen.y)
+		label.font_size = label_size
+		label.pixel_size = 0.0042
+		label.modulate = Color(0.94, 0.95, 0.92, 0.88)
+		label.outline_size = 7
+		label.outline_modulate = Color(0.02, 0.025, 0.03, 0.92)
+		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		label.visibility_range_end = label_range
+		label.set_meta("annotation_only", true)
+		label.set_meta("source_field", "osm:name")
+		parent.add_child(label)
 		made += 1
+	return made
 
 func _add_named_poi_markers(parent: Node3D, pois: Array):
 	var cap = 5 if projector_max_mode else (7 if low_spec_mode else (32 if pc_max_mode else 14))
@@ -1073,7 +1096,7 @@ func _on_map_ready(map_data: Dictionary):
 
 	_add_mapped_linear_features(map_root, linear_features)
 	_add_mapped_point_features(map_root, point_features)
-	_add_mapped_road_name_signs(map_root, roads)
+	var mapped_road_annotation_count = _add_mapped_road_name_signs(map_root, roads)
 	_add_named_poi_markers(map_root, poi_features)
 	if linear_features.is_empty() and point_features.is_empty():
 		_add_map_furniture(map_root)
@@ -1095,6 +1118,7 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_linear_feature_count", linear_features.size())
 		car.set_meta("map_point_feature_count", point_features.size())
 		car.set_meta("map_poi_feature_count", poi_features.size())
+		car.set_meta("map_road_annotation_count", mapped_road_annotation_count)
 		car.set_meta("map_road_segments", map_segments)
 		_snap_car_to_map_junction(car, roads)
 
