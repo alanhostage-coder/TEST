@@ -141,12 +141,15 @@ func _recompute():
 	var now = Time.get_datetime_dict_from_system()
 	var hour = int(now.get("hour", 12))
 	var day_key = "%04d-%02d-%02d" % [int(now.get("year", 2026)), int(now.get("month", 1)), int(now.get("day", 1))]
-	var rain = clamp(float(weather.get("rain", 0.0)) + float(weather.get("precipitation", 0.0)), 0.0, 8.0)
+	var model_rain = float(weather.get("rain", 0.0)) + float(weather.get("precipitation", 0.0))
+	var observed_rain_15m = max(0.0, float(weather.get("observed_rain_15m_mm", 0.0)))
+	var rain = clamp(max(model_rain, observed_rain_15m * 4.0), 0.0, 8.0)
 	var wetness = clamp(rain / 2.5, 0.0, 1.0)
 	var cloud = clamp(float(weather.get("cloud", 65.0)) / 100.0, 0.0, 1.0)
 	var wind = max(0.0, float(weather.get("wind_speed", 12.0)))
 	var visibility = clamp(float(weather.get("visibility", 12000.0)) / 22000.0, 0.08, 1.0)
 	var aqi = clamp(float(weather.get("aqi", 25.0)) / 100.0, 0.0, 1.0)
+	var is_day = int(weather.get("is_day", 1)) == 1
 	var road_count = int(map_data.get("roads", []).size())
 	var building_count = int(map_data.get("buildings", []).size())
 	var centre = "%s:%s" % [str(map_data.get("center_lat", "55.97")), str(map_data.get("center_lon", "-3.17"))]
@@ -163,8 +166,8 @@ func _recompute():
 	var traffic_factor = clamp(0.78 + commute - wetness * 0.16, 0.34, 1.35)
 	var speed_factor = clamp(1.02 - wetness * 0.20 - min(wind / 120.0, 0.12), 0.70, 1.08)
 	var lamp_factor = 1.0
-	if hour >= 18 or hour <= 7:
-		lamp_factor = 1.45
+	if not is_day:
+		lamp_factor = 1.55
 	else:
 		lamp_factor = 0.62 + cloud * 0.42
 	var radio_instability = clamp(0.12 + wind / 95.0 + wetness * 0.28, 0.08, 0.92)
@@ -205,6 +208,8 @@ func _recompute():
 			"hour": hour,
 			"weather_code": int(weather.get("weather_code", 3)),
 			"temperature": float(weather.get("temperature", 8.0)),
+			"is_day": is_day,
+			"observed_rain_15m_mm": observed_rain_15m,
 			"wind_speed": wind,
 			"cloud": cloud,
 			"aqi_ratio": aqi,

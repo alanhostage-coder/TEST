@@ -1,0 +1,219 @@
+name: PUA Gaussian Splat Experiment
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ experiment/gaussian-splat ]
+    paths:
+      - 'godot/**'
+      - '.github/workflows/gaussian-splat-experiment.yml'
+
+jobs:
+  windows-splat-capability:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    container:
+      image: barichello/godot-ci:4.5.1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install pinned GDGS 3.3.0 addon
+        run: |
+          apt-get update -qq && DEBIAN_FRONTEND=noninteractive apt-get install -y -qq git xvfb xauth
+          git clone --depth 1 --branch v3.3.0 https://github.com/ReconWorldLab/godot-gaussian-splatting.git /tmp/gdgs
+          mkdir -p godot/addons
+          cp -a /tmp/gdgs/addons/gdgs godot/addons/gdgs
+          test -f godot/addons/gdgs/plugin.cfg
+          printf '\n[editor_plugins]\nenabled=PackedStringArray("res://addons/gdgs/plugin.cfg")\n' >> godot/project.godot
+
+      - name: Strict Godot 4.5.1 parse with GDGS
+        id: strict_parse
+        continue-on-error: true
+        run: |
+          godot --version
+          set +e
+          godot --headless --verbose --path godot --editor --quit > /tmp/splat-parse.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/splat-parse.log
+          test "$status" -eq 0
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/splat-parse.log
+
+      - name: Upload strict parse diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PUA-GDGS-PARSE-DIAGNOSTICS
+          path: /tmp/splat-parse.log
+          if-no-files-found: warn
+
+      - name: Stop on strict parse failure
+        if: steps.strict_parse.outcome == 'failure' && steps.strict_parse.conclusion == 'failure'
+        run: |
+          echo "::error::Strict Godot parse failed; diagnostics artifact uploaded."
+          exit 1
+
+      - name: Provenance guard invariants
+        run: |
+          grep -q 'META_PATH' godot/gaussian_splat_layer.gd
+          grep -q 'alignment_status' godot/gaussian_splat_layer.gd
+          grep -q 'capture_quality' godot/gaussian_splat_layer.gd
+          grep -q 'redistribution_allowed' godot/gaussian_splat_layer.gd
+          grep -q 'asset_sha256' godot/gaussian_splat_layer.gd
+          grep -q 'max_loaded_chunks' godot/splat_chunk_streamer.gd
+          grep -q '_sort_by_distance' godot/splat_chunk_streamer.gd
+          ! grep -q 'sort_custom(func' godot/splat_chunk_streamer.gd
+          grep -q 'postcode_centroid_not_surveyed_window' godot/splat_assets/eh15_2bz.metadata.example.json
+          test ! -f godot/splat_assets/eh15_2bz.sog
+          test ! -f godot/splat_assets/eh15_2bz.json
+
+      - name: Parse experimental scripts directly
+        run: |
+          godot --headless --path godot --editor --quit-after 2 2>&1 | tee /tmp/editor-parse.log
+          ! grep -E "Parse Error|SCRIPT ERROR" /tmp/editor-parse.log
+
+      - name: Existing PUA runtime regression
+        id: runtime_soak
+        continue-on-error: true
+        run: |
+          set +e
+          timeout 30s godot --headless --path godot res://pua_soak_test.tscn > /tmp/splat-soak.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/splat-soak.log
+          test "$status" -eq 0
+          grep -q 'PUA_SOAK_OK' /tmp/splat-soak.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|PUA_SOAK_FAIL' /tmp/splat-soak.log
+
+      - name: Upload runtime diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PUA-RUNTIME-DIAGNOSTICS
+          path: /tmp/splat-soak.log
+          if-no-files-found: warn
+
+      - name: Stop on runtime regression
+        if: steps.runtime_soak.outcome == 'failure' && steps.runtime_soak.conclusion == 'failure'
+        run: |
+          echo "::error::PUA runtime soak failed; diagnostics artifact uploaded."
+          exit 1
+
+      - name: Verify splat importer against upstream sample
+        id: splat_import
+        continue-on-error: true
+        run: |
+          mkdir -p godot/splat_probe
+          cp /tmp/gdgs/samples/assets/demo.sog godot/splat_probe/upstream_demo.sog
+          godot --headless --verbose --path godot --editor --quit > /tmp/splat-import.log 2>&1
+          cat /tmp/splat-import.log
+          test -d godot/.godot/imported
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/splat-import.log
+
+      - name: Upload GDGS importer diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PUA-GDGS-IMPORT-DIAGNOSTICS
+          path: /tmp/splat-import.log
+          if-no-files-found: warn
+
+      - name: Stop on GDGS importer failure
+        if: steps.splat_import.outcome == 'failure' && steps.splat_import.conclusion == 'failure'
+        run: |
+          echo "::error::GDGS sample import failed; importer diagnostics uploaded."
+          exit 1
+
+      - name: Render GDGS visual smoke frame
+        id: render_smoke
+        continue-on-error: true
+        run: |
+          cat > godot/splat_probe/smoke.gd <<'EOF'
+          extends Node3D
+          var frames := 0
+          func _ready():
+            var n = ClassDB.instantiate("GaussianSplatNode")
+            var g = load("res://splat_probe/upstream_demo.sog")
+            if n == null or g == null:
+              get_tree().quit(3)
+              return
+            n.set("gaussian", g)
+            add_child(n)
+            var cam = Camera3D.new()
+            cam.position = Vector3(0, 0, 3)
+            cam.look_at_from_position(cam.position, Vector3.ZERO)
+            cam.current = true
+            add_child(cam)
+          func _process(_delta):
+            frames += 1
+            if frames == 8:
+              get_viewport().get_texture().get_image().save_png("/tmp/gdgs-smoke.png")
+              get_tree().quit()
+          EOF
+          cat > godot/splat_probe/smoke.tscn <<'EOF'
+          [gd_scene load_steps=2 format=3]
+          [ext_resource path="res://splat_probe/smoke.gd" type="Script" id="1"]
+          [node name="SplatSmoke" type="Node3D"]
+          script = ExtResource("1")
+          EOF
+          set +e
+          timeout 30s xvfb-run -a godot --path godot --display-driver x11 res://splat_probe/smoke.tscn > /tmp/splat-render.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/splat-render.log
+          test "$status" -eq 0
+          test -s /tmp/gdgs-smoke.png
+          cp /tmp/gdgs-smoke.png godot/splat_probe/GDGS_RENDER_SMOKE.png
+          ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/splat-render.log
+
+      - name: Upload render diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: PUA-GDGS-RENDER-DIAGNOSTICS
+          path: |
+            /tmp/splat-render.log
+            /tmp/gdgs-smoke.png
+            godot/splat_probe/smoke.gd
+            godot/splat_probe/smoke.tscn
+          if-no-files-found: warn
+
+      - name: Stop on render smoke failure
+        if: steps.render_smoke.outcome == 'failure' && steps.render_smoke.conclusion == 'failure'
+        run: |
+          echo "::error::GDGS render smoke failed; render diagnostics uploaded."
+          exit 1
+
+      - name: Prepare Gaussian-capable PC Max export
+        run: |
+          mkdir -p "$HOME/.local/share/godot/export_templates"
+          if [ -d /root/.local/share/godot/export_templates/4.5.1.stable ]; then
+            cp -a /root/.local/share/godot/export_templates/4.5.1.stable "$HOME/.local/share/godot/export_templates/"
+          fi
+          sed -i 's/custom_features="pc_max"/custom_features="pc_max,gaussian_splat"/' godot/export_presets.cfg
+          grep -q 'pc_max,gaussian_splat' godot/export_presets.cfg
+
+      - name: Export Windows Gaussian capability build
+        run: |
+          mkdir -p build/splat
+          godot --headless --verbose --path godot --export-release "Windows PC Max" "$(pwd)/build/splat/PUA_0_76_GAUSSIAN_EXPERIMENT.exe"
+          test -s build/splat/PUA_0_76_GAUSSIAN_EXPERIMENT.exe
+          cat > build/splat/README.txt <<'EOF'
+          PUA Gaussian Splat experiment
+          This proves the Godot/GDGS integration and preserves the normal OSM driving world.
+          No EH15 splat imagery is bundled, so this build does NOT claim photoreal EH15.
+          Add only licensed, georeferenced EH15 capture data as res://splat_assets/eh15_2bz.sog
+          before export. Google imagery and private room photographs are not included.
+          EOF
+          sha256sum build/splat/PUA_0_76_GAUSSIAN_EXPERIMENT.exe > build/splat/SHA256.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PUA-0.76-GAUSSIAN-CAPABILITY-EXPERIMENT
+          path: |
+            build/splat/
+            godot/splat_probe/GDGS_RENDER_SMOKE.png
+          if-no-files-found: error
+          retention-days: 14

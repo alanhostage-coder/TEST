@@ -354,6 +354,12 @@ func _update_vapour(delta):
 	if vapour_nodes.is_empty():
 		return
 	var wind = float(car.get_meta("world_wind_kph", 10.0)) if car else 10.0
+	var wind_from_deg = float(car.get_meta("world_wind_direction_deg", 0.0)) if car else 0.0
+	var wind_rad = deg_to_rad(wind_from_deg)
+	# Meteorological bearing is where wind comes FROM. Local +X is east and +Z is south,
+	# so the drift vector points downwind while preserving the real compass direction.
+	var downwind = Vector3(-sin(wind_rad), 0.0, cos(wind_rad))
+	var crosswind = Vector3(downwind.z, 0.0, -downwind.x)
 	var drift = clamp(wind / 80.0, 0.05, 0.55)
 	var t = Time.get_ticks_msec() * 0.001
 	for item in vapour_nodes:
@@ -362,7 +368,9 @@ func _update_vapour(delta):
 			continue
 		var phase = float(item.get("phase", 0.0))
 		var base: Vector3 = item.get("base", Vector3.ZERO)
-		node.position = base + Vector3(sin(t * 0.21 + phase) * 2.4, fmod(t * drift + phase * 1.7, 7.0), cos(t * 0.17 + phase) * 1.4)
+		var travel = fmod(t * drift * 4.0 + phase * 1.7, 14.0)
+		var wobble = sin(t * 0.21 + phase) * 1.6
+		node.position = base + downwind * travel + crosswind * wobble + Vector3.UP * fmod(t * drift + phase * 1.7, 7.0)
 		node.scale = Vector3.ONE * (0.82 + 0.18 * sin(t * 0.13 + phase))
 
 

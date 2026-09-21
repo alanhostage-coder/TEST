@@ -6,6 +6,7 @@ signal location_ready(latitude, longitude, postcode)
 # Low-bandwidth OSM slice centred on a UK postcode. The postcode is resolved once,
 # then the resulting road/building geometry is simplified and cached locally.
 const OVERPASS_URL := "https://overpass-api.de/api/interpreter"
+const POSTCODE_URL := "https://api.postcodes.io/postcodes/"
 const START_POSTCODE := "EH15 2BZ"
 const PATCH_PATH := "res://patches/eh15_2bz.json"
 var CACHE_PATH := "user://pua_map_stream_eh15_2bz_v7_pc_max.json" if OS.has_feature("pc_max") else "user://pua_map_stream_eh15_2bz_v7.json"
@@ -41,6 +42,7 @@ var data := {
 }
 
 var _request: HTTPRequest
+var _postcode_request: HTTPRequest
 var _named_road_segments: Array = []
 
 func _ready():
@@ -57,7 +59,41 @@ func _ready():
 	# Headless validation must exercise the packaged, source-dated patch
 	# deterministically. Playable builds still refresh from Overpass when online.
 	if not cache_fresh and DisplayServer.get_name() != "headless":
+		_resolve_postcode_then_fetch()
+
+func _resolve_postcode_then_fetch():
+	if _postcode_request:
+		return
+	_postcode_request = HTTPRequest.new()
+	_postcode_request.timeout = 8.0
+	add_child(_postcode_request)
+	_postcode_request.request_completed.connect(_on_postcode_resolved)
+	var compact = START_POSTCODE.replace(" ", "")
+	var err = _postcode_request.request(POSTCODE_URL + compact.uri_encode())
+	if err != OK:
+		_postcode_request.queue_free()
+		_postcode_request = null
 		_fetch_osm()
+
+func _on_postcode_resolved(result: int, response_code: int, _headers, body: PackedByteArray):
+	if _postcode_request:
+		_postcode_request.queue_free()
+		_postcode_request = null
+	if result == HTTPRequest.RESULT_SUCCESS and response_code >= 200 and response_code < 300:
+		var parsed = JSON.parse_string(body.get_string_from_utf8())
+		if parsed is Dictionary:
+			var resolved = parsed.get("result", {})
+			if resolved is Dictionary:
+				var lat = float(resolved.get("latitude", FALLBACK_LAT))
+				var lon = float(resolved.get("longitude", FALLBACK_LON))
+				if lat >= -90.0 and lat <= 90.0 and lon >= -180.0 and lon <= 180.0:
+					center_lat = lat
+					center_lon = lon
+					resolved_postcode = str(resolved.get("postcode", START_POSTCODE))
+					data["postcode_source"] = "postcodes.io"
+					data["postcode_quality"] = int(resolved.get("quality", 0))
+					location_ready.emit(center_lat, center_lon, resolved_postcode)
+	_fetch_osm()
 
 func _load_packaged_patch() -> bool:
 	if not FileAccess.file_exists(PATCH_PATH):

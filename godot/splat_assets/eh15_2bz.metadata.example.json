@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "patch_id": "eh15_2bz",
+  "postcode": "EH15 2BZ",
+  "origin_lat": 55.951507,
+  "origin_lon": -3.107122,
+  "origin_role": "postcode_centroid_not_surveyed_window",
+  "source": "REQUIRED: identify capture owner/source",
+  "capture_date": "REQUIRED: YYYY-MM-DD",
+  "licence": "REQUIRED: redistribution/reuse terms",
+  "alignment_status": "estimated",
+  "alignment_method": "REQUIRED: describe OSM control points or survey",
+  "scale_status": "estimated",
+  "orientation_status": "estimated",
+  "notes": "Template only. Transform fields register the splat to PUA local OSM coordinates. Do not rename to eh15_2bz.json until REQUIRED fields are replaced and alignment is checked.",
+  "local_offset_m": [
+    0,
+    0,
+    0
+  ],
+  "rotation_degrees": [
+    0,
+    0,
+    0
+  ],
+  "uniform_scale": 1,
+  "active_distance_m": 180,
+  "hysteresis_m": 20,
+  "fade_band_m": 30,
+  "capture_quality": "REQUIRED: draft|verified",
+  "control_points": [],
+  "redistribution_allowed": false,
+  "asset_sha256": "REQUIRED: sha256"
+}
