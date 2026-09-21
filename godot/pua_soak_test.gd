@@ -83,6 +83,23 @@ func _finish():
 	if verified_annotations != road_annotation_count:
 		_fail("mapped road-name annotation count mismatch")
 		return
+	var secondary_visual_count := 0
+	var secondary_shadow_violations := 0
+	var scan_stack: Array = [world.map_root]
+	while not scan_stack.is_empty():
+		var scan_node = scan_stack.pop_back()
+		if scan_node is GeometryInstance3D and bool(scan_node.get_meta("secondary_visual", false)):
+			secondary_visual_count += 1
+			if scan_node.cast_shadow != GeometryInstance3D.SHADOW_CASTING_SETTING_OFF:
+				secondary_shadow_violations += 1
+		for scan_child in scan_node.get_children():
+			scan_stack.append(scan_child)
+	if secondary_visual_count < 10:
+		_fail("low-spec secondary visual budget was not exercised")
+		return
+	if secondary_shadow_violations != 0:
+		_fail("low-spec secondary meshes still cast projector shadows")
+		return
 	var nearest_origin_road = map_stream.nearest_named_road(Vector2.ZERO)
 	if str(nearest_origin_road.get("name", "")) != "Pittville Street" or float(nearest_origin_road.get("distance_m", INF)) > 30.0:
 		_fail("verified Pittville Street context missing near postcode centroid")
