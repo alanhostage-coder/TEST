@@ -10,6 +10,7 @@ const EXPECTED_LAT := 55.951507
 const EXPECTED_LON := -3.107122
 
 var splat_node: Node = null
+var splat_meta: Dictionary = {}
 
 func _ready() -> void:
 	if not OS.has_feature("gaussian_splat"):
@@ -32,6 +33,7 @@ func _ready() -> void:
 		push_warning("PUA_SPLAT_DISABLED: could not instantiate GaussianSplatNode")
 		return
 	splat_node.set("gaussian", resource)
+	_apply_alignment_from_metadata(splat_node)
 	add_child(splat_node)
 	print("PUA_SPLAT_ACTIVE: ", SPLAT_PATH)
 
@@ -59,4 +61,19 @@ func _metadata_is_safe() -> bool:
 	var lon = float(meta.get("origin_lon", 0.0))
 	if abs(lat - EXPECTED_LAT) > 0.01 or abs(lon - EXPECTED_LON) > 0.02:
 		return false
+	splat_meta = meta
 	return true
+
+func _apply_alignment_from_metadata(node: Node) -> void:
+	if not node is Node3D or splat_meta.is_empty():
+		return
+	var n := node as Node3D
+	var offset = splat_meta.get("local_offset_m", [0.0, 0.0, 0.0])
+	if offset is Array and offset.size() >= 3:
+		n.position = Vector3(float(offset[0]), float(offset[1]), float(offset[2]))
+	var rotation = splat_meta.get("rotation_degrees", [0.0, 0.0, 0.0])
+	if rotation is Array and rotation.size() >= 3:
+		n.rotation_degrees = Vector3(float(rotation[0]), float(rotation[1]), float(rotation[2]))
+	var uniform_scale := clamp(float(splat_meta.get("uniform_scale", 1.0)), 0.01, 100.0)
+	n.scale = Vector3.ONE * uniform_scale
+
