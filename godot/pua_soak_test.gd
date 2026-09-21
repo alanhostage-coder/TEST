@@ -65,7 +65,21 @@ func _finish():
 	# desktop equivalents.
 	world.low_spec_mode = true
 	world.projector_max_mode = true
+	var verified_opening_position: Vector3 = car.global_position
+	var verified_opening_rotation: float = car.rotation.y
+	var refresh_probe_position := verified_opening_position + Vector3(1.25, 0.0, 0.75)
+	var refresh_probe_rotation := verified_opening_rotation + 0.125
+	car.global_position = refresh_probe_position
+	car.rotation.y = refresh_probe_rotation
 	world._on_map_ready(map_stream.data)
+	if car.global_position.distance_to(refresh_probe_position) > 0.001 or abs(angle_difference(car.rotation.y, refresh_probe_rotation)) > 0.001:
+		_fail("map refresh teleported the active vehicle")
+		return
+	if not bool(car.get_meta("map_refresh_preserved_vehicle", false)):
+		_fail("map refresh preservation policy missing")
+		return
+	car.global_position = verified_opening_position
+	car.rotation.y = verified_opening_rotation
 	if int(car.get_meta("map_exact_building_count", -1)) != map_stream.data.get("buildings", []).size() or int(car.get_meta("map_fallback_building_count", -1)) != 0:
 		_fail("projector profile did not use exact packaged OSM footprint geometry")
 		return

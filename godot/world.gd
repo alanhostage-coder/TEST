@@ -7,6 +7,7 @@ var patrol_axis := 0
 var patrol_dir := 1.0
 var patrol_interest := 0.0
 var map_mode_active := false
+var map_opening_placed := false
 var weather_sun_energy := 0.68
 var map_root: Node3D
 var map_segments: Array = []
@@ -1188,7 +1189,15 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_poi_feature_count", poi_features.size())
 		car.set_meta("map_road_annotation_count", mapped_road_annotation_count)
 		car.set_meta("map_road_segments", map_segments)
-		_place_car_for_first_impression(car, roads, buildings, poi_features, point_features)
+		if not map_opening_placed:
+			_place_car_for_first_impression(car, roads, buildings, poi_features, point_features)
+			map_opening_placed = true
+			car.set_meta("map_refresh_preserved_vehicle", false)
+		else:
+			# Live/cache refreshes may rebuild source geometry, but they must never
+			# seize control of a moving player's transform. Recovery remains an
+			# explicit R action rather than a side effect of network timing.
+			car.set_meta("map_refresh_preserved_vehicle", true)
 
 
 func _place_car_for_first_impression(car, roads: Array, buildings: Array, poi_features: Array, point_features: Array):
