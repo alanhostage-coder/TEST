@@ -55,7 +55,6 @@ func _process(delta: float) -> void:
 	if previous_position != Vector3.ZERO:
 		velocity = (viewer.global_position - previous_position) / max(update_interval_s, 0.001)
 	previous_position = viewer.global_position
-	var speed := velocity.length()
 	predicted_focus = viewer.global_position + forward * min_forward_bias_m + velocity * speed_lookahead_s
 	var near_used := 0
 	var mid_used := 0
@@ -63,7 +62,7 @@ func _process(delta: float) -> void:
 	var total := candidates.size()
 	if total == 0:
 		return
-	var work_count := min(candidates_per_tick, total)
+	var work_count: int = min(candidates_per_tick, total)
 	for i in range(work_count):
 		var n := candidates[(candidate_cursor + i) % total]
 		if not is_instance_valid(n):
