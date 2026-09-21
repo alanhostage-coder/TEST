@@ -59,6 +59,13 @@ jobs:
           grep -q 'PUA_PERCEPTUAL_BUDGET_OK' /tmp/pua-thinkpad-budget.log
           if grep -E 'SCRIPT ERROR|Parse Error|Assertion failed' /tmp/pua-thinkpad-budget.log; then exit 1; fi
 
+      - name: Steering polish regression
+        run: |
+          timeout 30s godot --headless --path godot --script res://steering_polish_test.gd > /tmp/pua-thinkpad-steering.log 2>&1
+          cat /tmp/pua-thinkpad-steering.log
+          grep -q 'PUA_STEERING_POLISH_OK' /tmp/pua-thinkpad-steering.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Assertion failed' /tmp/pua-thinkpad-steering.log; then exit 1; fi
+
       - name: Greybeard invariants
         run: |
           grep -q 'renderer/rendering_method="mobile"' godot/project.godot
