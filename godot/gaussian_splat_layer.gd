@@ -11,6 +11,9 @@ const EXPECTED_LON := -3.107122
 
 var splat_node: Node = null
 var splat_meta: Dictionary = {}
+var viewer: Node3D = null
+var active_distance_m := 180.0
+var hysteresis_m := 20.0
 
 func _ready() -> void:
 	if not OS.has_feature("gaussian_splat"):
@@ -35,6 +38,8 @@ func _ready() -> void:
 	splat_node.set("gaussian", resource)
 	_apply_alignment_from_metadata(splat_node)
 	add_child(splat_node)
+	viewer = get_viewport().get_camera_3d()
+	set_process(viewer != null)
 	print("PUA_SPLAT_ACTIVE: ", SPLAT_PATH)
 
 
@@ -77,3 +82,18 @@ func _apply_alignment_from_metadata(node: Node) -> void:
 	var uniform_scale := clamp(float(splat_meta.get("uniform_scale", 1.0)), 0.01, 100.0)
 	n.scale = Vector3.ONE * uniform_scale
 
+
+
+func _process(_delta: float) -> void:
+	if splat_node == null or not splat_node is Node3D:
+		return
+	if viewer == null or not is_instance_valid(viewer):
+		viewer = get_viewport().get_camera_3d()
+		if viewer == null:
+			return
+	var splat_3d := splat_node as Node3D
+	var distance := viewer.global_position.distance_to(splat_3d.global_position)
+	if splat_3d.visible and distance > active_distance_m + hysteresis_m:
+		splat_3d.visible = false
+	elif not splat_3d.visible and distance < active_distance_m - hysteresis_m:
+		splat_3d.visible = true
