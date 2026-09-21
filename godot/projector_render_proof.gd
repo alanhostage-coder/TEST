@@ -49,6 +49,19 @@ func run() -> void:
 		push_error("PUA_PROJECTOR_RENDER_FAIL packaged map provenance/geometry invalid")
 		quit(2)
 		return
+	# CI runs without export feature tags, so explicitly exercise the same offline
+	# OSM panel that the XPS executable creates. Feed it the packaged snapshot we
+	# just validated so live/cache timing cannot change the proof.
+	var osm_overlay = world.get_node("OSMGroundTiles")
+	osm_overlay._build_live_map_overlay()
+	osm_overlay._build_packaged_vector_overlay(packaged)
+	await process_frame
+	if osm_overlay._packaged_overlay_road_count != packaged.get("roads", []).size() \
+	or osm_overlay._packaged_overlay_texture == null \
+	or osm_overlay._overlay_map.texture != osm_overlay._packaged_overlay_texture:
+		push_error("PUA_PROJECTOR_RENDER_FAIL packaged OSM overlay unavailable")
+		quit(2)
+		return
 	var legacy_yaw := [deg_to_rad(-8.0), deg_to_rad(3.0), deg_to_rad(11.0), deg_to_rad(-4.0), deg_to_rad(6.0)]
 	bay._normalise_panorama_yaw(legacy_yaw, 1)
 	for yaw in legacy_yaw:
@@ -175,6 +188,7 @@ func run() -> void:
 		"composite_size": [composite.get_width(), composite.get_height()],
 		"packaged_patch_timestamp": str(packaged.get("source_timestamp_utc", "")),
 		"packaged_roads": packaged.get("roads", []).size(),
+		"packaged_overlay_roads": osm_overlay._packaged_overlay_road_count,
 		"packaged_buildings": packaged.get("buildings", []).size(),
 		"panel_render_sizes": panel_render_sizes,
 		"max_panel_aspect_error": max_panel_aspect_error,

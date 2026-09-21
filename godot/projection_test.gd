@@ -18,10 +18,18 @@ func run():
 	var osm_overlay = world.get_node("OSMGroundTiles")
 	osm_overlay._build_live_map_overlay()
 	osm_overlay._bind_map_stream()
+	await process_frame
+	assert(osm_overlay._packaged_overlay_road_count > 0)
+	assert(osm_overlay._packaged_overlay_road_count == osm_overlay._map_stream.data.get("roads", []).size())
+	assert(osm_overlay._packaged_overlay_texture != null)
+	assert(osm_overlay._overlay_map.texture == osm_overlay._packaged_overlay_texture)
 	var car = world.get_node("Car")
 	var saved_car_position = car.global_position
 	car.global_position = Vector3.ZERO
 	osm_overlay._update_location_text(true)
+	osm_overlay._process(0.3)
+	assert(osm_overlay._overlay_marker.visible)
+	assert(int(car.get_meta("osm_overlay_fallback_roads", 0)) == osm_overlay._packaged_overlay_road_count)
 	assert("PITTVILLE STREET" in osm_overlay._overlay_street.text)
 	assert("2026-09-20" in osm_overlay._overlay_coords.text)
 	car.global_position = saved_car_position

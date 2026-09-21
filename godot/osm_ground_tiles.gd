@@ -9,6 +9,8 @@ const TILE_ZOOM := 16
 const TILE_RADIUS_ANDROID := 2
 const TILE_RADIUS_LOW_SPEC := 1
 const TILE_Y := -0.028
+const VECTOR_MAP_SIZE := 228
+const VECTOR_MAP_HALF_EXTENT_M := 240.0
 
 var _map_stream: Node
 var _request: HTTPRequest
@@ -27,6 +29,9 @@ var _overlay_street: Label
 var _overlay_coords: Label
 var _tile_textures := {}
 var _overlay_tile := Vector2i(-1, -1)
+var _packaged_overlay_texture: ImageTexture
+var _packaged_overlay_road_count := 0
+var _using_packaged_overlay := false
 var _overlay_user_visible := true
 var _location_clock := 0.0
 var _last_postcode := "EH15 2BZ"
@@ -54,6 +59,7 @@ func _bind_map_stream():
 
 func _on_map_ready(map_data: Dictionary):
 	_last_postcode = str(map_data.get("start_postcode", _last_postcode))
+	_build_packaged_vector_overlay(map_data)
 	_on_location_ready(
 		float(map_data.get("center_lat", 0.0)),
 		float(map_data.get("center_lon", 0.0)),
@@ -223,6 +229,8 @@ func _add_tile(tile: Vector2i, image: Image):
 
 
 func _build_live_map_overlay():
+	if _overlay_root != null:
+		return
 	var layer = CanvasLayer.new()
 	layer.layer = 40
 	add_child(layer)
@@ -269,6 +277,68 @@ func _build_live_map_overlay():
 	credit.add_theme_font_size_override("font_size", 10)
 	_overlay_root.add_child(credit)
 
+func _build_packaged_vector_overlay(map_data: Dictionary):
+	# Raster tiles are useful live context, but a projector must retain meaningful
+	# geography on a cold offline start. Draw a north-up fallback from the exact
+	# packaged OSM road polylines; live tiles replace it when they arrive.
+	if _overlay_map == null:
+		return
+	var roads = map_data.get("roads", [])
+	if not roads is Array or roads.is_empty():
+		return
+	var image = Image.create(VECTOR_MAP_SIZE, VECTOR_MAP_SIZE, false, Image.FORMAT_RGB8)
+	image.fill(Color(0.025, 0.035, 0.040))
+	_packaged_overlay_road_count = 0
+	for road in roads:
+		if not road is Dictionary:
+			continue
+		var points = road.get("points", [])
+		if not points is Array or points.size() < 2:
+			continue
+		var kind = str(road.get("kind", ""))
+		var major = kind in ["motorway", "trunk", "primary", "secondary", "tertiary"]
+		var colour = Color(0.82, 0.72, 0.50) if major else Color(0.46, 0.53, 0.55)
+		var thickness = 3 if major else 2
+		for point_index in range(points.size() - 1):
+			var a_raw = points[point_index]
+			var b_raw = points[point_index + 1]
+			if not a_raw is Array or not b_raw is Array or a_raw.size() < 2 or b_raw.size() < 2:
+				continue
+			var a = _local_to_vector_pixel(Vector2(float(a_raw[0]), float(a_raw[1])))
+			var b = _local_to_vector_pixel(Vector2(float(b_raw[0]), float(b_raw[1])))
+			_draw_vector_line(image, a, b, colour, thickness)
+		_packaged_overlay_road_count += 1
+	_packaged_overlay_texture = ImageTexture.create_from_image(image)
+	_overlay_map.texture = _packaged_overlay_texture
+	_using_packaged_overlay = true
+	var car = get_node_or_null("../Car")
+	if car:
+		car.set_meta("osm_overlay_fallback_roads", _packaged_overlay_road_count)
+
+func _local_to_vector_pixel(local: Vector2) -> Vector2i:
+	var normalised = Vector2(
+		0.5 + local.x / (VECTOR_MAP_HALF_EXTENT_M * 2.0),
+		0.5 + local.y / (VECTOR_MAP_HALF_EXTENT_M * 2.0)
+	)
+	return Vector2i(roundi(normalised.x * (VECTOR_MAP_SIZE - 1)), roundi(normalised.y * (VECTOR_MAP_SIZE - 1)))
+
+func _draw_vector_line(image: Image, from: Vector2i, to: Vector2i, colour: Color, thickness: int):
+	# Integer interpolation is enough at 228 px and runs only when map data changes.
+	# It avoids a second viewport or shader on low-spec projector builds.
+	var delta = to - from
+	var steps = maxi(abs(delta.x), abs(delta.y))
+	if steps <= 0:
+		return
+	var radius = int(thickness / 2)
+	for step in range(steps + 1):
+		var t = float(step) / float(steps)
+		var p = Vector2i(roundi(lerp(float(from.x), float(to.x), t)), roundi(lerp(float(from.y), float(to.y), t)))
+		for oy in range(-radius, radius + 1):
+			for ox in range(-radius, radius + 1):
+				var pixel = p + Vector2i(ox, oy)
+				if pixel.x >= 0 and pixel.y >= 0 and pixel.x < image.get_width() and pixel.y < image.get_height():
+					image.set_pixelv(pixel, colour)
+
 func _unhandled_key_input(event):
 	if event.pressed and not event.echo and event.keycode == KEY_M and _overlay_root:
 		_overlay_user_visible = not _overlay_user_visible
@@ -297,15 +367,26 @@ func _process(delta):
 	var tile_float = _lat_lon_to_tile_float(lat, lon)
 	var tile = Vector2i(int(floor(tile_float.x)), int(floor(tile_float.y)))
 	var key = "%d:%d" % [tile.x, tile.y]
-	if _tile_textures.has(key) and tile != _overlay_tile:
-		_overlay_tile = tile
-		_overlay_map.texture = _tile_textures[key]
+	if _tile_textures.has(key):
+		if tile != _overlay_tile:
+			_overlay_tile = tile
+			_overlay_map.texture = _tile_textures[key]
+		_using_packaged_overlay = false
+	elif _packaged_overlay_texture != null:
+		_overlay_tile = Vector2i(-1, -1)
+		_overlay_map.texture = _packaged_overlay_texture
+		_using_packaged_overlay = true
 	if _overlay_tile == tile:
 		var frac = Vector2(tile_float.x - floor(tile_float.x), tile_float.y - floor(tile_float.y))
 		_overlay_marker.position = _overlay_map.position + frac * _overlay_map.size - _overlay_marker.size * 0.5
 		_overlay_marker.visible = true
 	else:
-		_overlay_marker.visible = false
+		if _using_packaged_overlay:
+			var fallback_pixel = _local_to_vector_pixel(Vector2(car.global_position.x, car.global_position.z))
+			_overlay_marker.position = _overlay_map.position + Vector2(fallback_pixel) - _overlay_marker.size * 0.5
+			_overlay_marker.visible = fallback_pixel.x >= 0 and fallback_pixel.y >= 0 and fallback_pixel.x < VECTOR_MAP_SIZE and fallback_pixel.y < VECTOR_MAP_SIZE
+		else:
+			_overlay_marker.visible = false
 
 func _update_location_text(force: bool = false):
 	if not _overlay_street or not _overlay_coords or not _map_stream:
