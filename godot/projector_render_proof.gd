@@ -67,6 +67,16 @@ func run() -> void:
 	for _frame in range(8):
 		await process_frame
 	for panel_index in range(5):
+		var panel_size: Vector2i = bay.viewports[panel_index].size
+		var quad: PackedVector2Array = bay.base_quads[panel_index]
+		var quad_width = quad[0].distance_to(quad[1])
+		var quad_height = quad[0].distance_to(quad[3])
+		var quad_aspect = quad_width / max(1.0, quad_height)
+		var render_aspect = float(panel_size.x) / max(1.0, float(panel_size.y))
+		if abs(render_aspect / quad_aspect - 1.0) > 0.03:
+			push_error("PUA_PROJECTOR_RENDER_FAIL panel %d aspect drift render=%.4f quad=%.4f" % [panel_index, render_aspect, quad_aspect])
+			quit(2)
+			return
 		var panel_image = bay.viewports[panel_index].get_texture().get_image()
 		if panel_image == null or panel_image.is_empty():
 			push_error("PUA_PROJECTOR_RENDER_FAIL empty panel %d" % panel_index)
