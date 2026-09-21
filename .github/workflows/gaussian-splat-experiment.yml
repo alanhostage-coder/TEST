@@ -64,6 +64,47 @@ jobs:
           ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/splat-import.log
           rm -rf godot/splat_probe
 
+      - name: Render GDGS visual smoke frame
+        run: |
+          cat > godot/splat_probe/smoke.gd <<'EOF'
+          extends Node3D
+          var frames := 0
+          func _ready():
+            var n = ClassDB.instantiate("GaussianSplatNode")
+            var g = load("res://splat_probe/upstream_demo.sog")
+            if n == null or g == null:
+              get_tree().quit(3)
+              return
+            n.set("gaussian", g)
+            add_child(n)
+            var cam = Camera3D.new()
+            cam.position = Vector3(0, 0, 3)
+            cam.look_at_from_position(cam.position, Vector3.ZERO)
+            cam.current = true
+            add_child(cam)
+          func _process(_delta):
+            frames += 1
+            if frames == 8:
+              get_viewport().get_texture().get_image().save_png("/tmp/gdgs-smoke.png")
+              get_tree().quit()
+          EOF
+          cat > godot/splat_probe/smoke.tscn <<'EOF'
+          [gd_scene load_steps=2 format=3]
+          [ext_resource path="res://splat_probe/smoke.gd" type="Script" id="1"]
+          [node name="SplatSmoke" type="Node3D"]
+          script = ExtResource("1")
+          EOF
+          set +e
+          timeout 30s godot --path godot --display-driver x11 res://splat_probe/smoke.tscn > /tmp/splat-render.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/splat-render.log
+          if [ "$status" -eq 0 ] && [ -s /tmp/gdgs-smoke.png ]; then
+            cp /tmp/gdgs-smoke.png godot/splat_probe/GDGS_RENDER_SMOKE.png
+          else
+            echo "No graphical display available in this runner; importer/export proof remains valid." > godot/splat_probe/RENDER_NOT_VERIFIED.txt
+          fi
+
       - name: Prepare Gaussian-capable PC Max export
         run: |
           mkdir -p "$HOME/.local/share/godot/export_templates"
@@ -90,6 +131,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: PUA-0.76-GAUSSIAN-CAPABILITY-EXPERIMENT
-          path: build/splat/
+          path: |
+            build/splat/
+            godot/splat_probe/GDGS_RENDER_SMOKE.png
+            godot/splat_probe/RENDER_NOT_VERIFIED.txt
           if-no-files-found: error
           retention-days: 14
