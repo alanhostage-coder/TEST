@@ -7,6 +7,7 @@ extends Node3D
 @export var update_interval_s := 0.15
 @export var preload_radius_m := 320.0
 @export var max_preload_chunks := 5
+@export var projector_max_loaded_chunks := 2
 var update_accum := 0.0
 
 var viewer: Node3D = null
@@ -29,6 +30,9 @@ func _process(delta: float) -> void:
 		viewer = get_viewport().get_camera_3d()
 		if viewer == null:
 			return
+	var effective_max := max_loaded_chunks
+	if OS.has_feature("projector_max"):
+		effective_max = min(max_loaded_chunks, projector_max_loaded_chunks)
 	var ranked: Array = []
 	for chunk in chunks:
 		var d := viewer.global_position.distance_to(chunk.global_position)
@@ -41,8 +45,8 @@ func _process(delta: float) -> void:
 		var distance: float = item["distance"]
 		if distance <= preload_radius_m and preload_count < max_preload_chunks:
 			preload_count += 1
-		var should_show := distance <= load_radius_m and visible_count < max_loaded_chunks
-		if chunk.visible and distance <= unload_radius_m and visible_count < max_loaded_chunks:
+		var should_show := distance <= load_radius_m and visible_count < effective_max
+		if chunk.visible and distance <= unload_radius_m and visible_count < effective_max:
 			should_show = true
 		chunk.visible = should_show
 		if should_show:
