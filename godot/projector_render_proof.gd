@@ -66,6 +66,8 @@ func run() -> void:
 	bay._set_mode(1)
 	for _frame in range(8):
 		await process_frame
+	var panel_render_sizes: Array = []
+	var max_panel_aspect_error := 0.0
 	for panel_index in range(5):
 		var panel_size: Vector2i = bay.viewports[panel_index].size
 		var quad: PackedVector2Array = bay.base_quads[panel_index]
@@ -73,7 +75,10 @@ func run() -> void:
 		var quad_height = quad[0].distance_to(quad[3])
 		var quad_aspect = quad_width / max(1.0, quad_height)
 		var render_aspect = float(panel_size.x) / max(1.0, float(panel_size.y))
-		if abs(render_aspect / quad_aspect - 1.0) > 0.03:
+		var aspect_error = abs(render_aspect / quad_aspect - 1.0)
+		max_panel_aspect_error = max(max_panel_aspect_error, aspect_error)
+		panel_render_sizes.append([panel_size.x, panel_size.y])
+		if aspect_error > 0.03:
 			push_error("PUA_PROJECTOR_RENDER_FAIL panel %d aspect drift render=%.4f quad=%.4f" % [panel_index, render_aspect, quad_aspect])
 			quit(2)
 			return
@@ -127,6 +132,8 @@ func run() -> void:
 		"packaged_patch_timestamp": str(packaged.get("source_timestamp_utc", "")),
 		"packaged_roads": packaged.get("roads", []).size(),
 		"packaged_buildings": packaged.get("buildings", []).size(),
+		"panel_render_sizes": panel_render_sizes,
+		"max_panel_aspect_error": max_panel_aspect_error,
 		"projector_1024_aspect_error": projector_1024_aspect_error,
 		"legacy_yaw_normalised": true
 	}
