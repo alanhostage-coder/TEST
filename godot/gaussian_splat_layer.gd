@@ -81,6 +81,8 @@ func _apply_alignment_from_metadata(node: Node) -> void:
 		n.rotation_degrees = Vector3(float(rotation[0]), float(rotation[1]), float(rotation[2]))
 	var uniform_scale := clamp(float(splat_meta.get("uniform_scale", 1.0)), 0.01, 100.0)
 	n.scale = Vector3.ONE * uniform_scale
+	active_distance_m = clamp(float(splat_meta.get("active_distance_m", 180.0)), 25.0, 1000.0)
+	hysteresis_m = clamp(float(splat_meta.get("hysteresis_m", 20.0)), 5.0, 100.0)
 
 
 
