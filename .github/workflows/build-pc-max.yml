@@ -1,4 +1,4 @@
-name: Build PUA PC Max
+name: Build PUA XPS 15 9530
 
 on:
   workflow_dispatch:
@@ -9,7 +9,7 @@ on:
       - '.github/workflows/build-pc-max.yml'
 
 concurrency:
-  group: pua-pc-max-windows
+  group: pua-xps9530-windows
   cancel-in-progress: true
 
 jobs:
@@ -110,48 +110,62 @@ jobs:
           if-no-files-found: error
           retention-days: 30
 
-      - name: PC Max invariants
+      - name: XPS 9530 invariants
         run: |
-          grep -q 'name="Windows PC Max"' godot/export_presets.cfg
-          grep -q 'custom_features="pc_max"' godot/export_presets.cfg
-          grep -q 'PC_MAX_RENDER_SCALE' godot/bay_projection.gd
-          grep -q 'pc_max_mode' godot/world.gd
+          grep -q 'name="Windows XPS 9530 Projector"' godot/export_presets.cfg
+          grep -q 'custom_features="pc_max,projector_max,xps_9530"' godot/export_presets.cfg
+          grep -q 'XPS_9530_RENDER_SCALE' godot/bay_projection.gd
+          grep -q 'xps_9530_mode' godot/world.gd
           grep -q 'pc_max_mode' godot/open_world_director.gd
           grep -q 'map_road_segments' godot/world.gd
           grep -q 'const START_POSTCODE := "EH15 2BZ"' godot/map_stream.gd
           grep -q 'const MAX_SURFACES := 5' godot/bay_projection.gd
 
-      - name: Export Windows PC Max
+      - name: Export Windows XPS 9530 projector
         run: |
           mkdir -p build/pcmax
           EXPORT_DIR="$(readlink -f build/pcmax)"
-          godot --headless --verbose --path godot --export-release "Windows PC Max" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe"
-          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe"
+          godot --headless --verbose --path godot --export-release "Windows XPS 9530 Projector" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_XPS9530.exe"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_XPS9530.exe"
           cd "$EXPORT_DIR"
-          cat > PLAY_PUA_PC_MAX.cmd <<'EOF'
+          cat > PLAY_PUA_XPS9530.cmd <<'EOF'
           @echo off
           cd /d "%~dp0"
-          PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe --resolution 1920x1080
+          set "GAME=%~dp0PROCEED_UNTIL_APPREHENDED_0_76_XPS9530.exe"
+          rem Windows 11 per-app preference: use the high-performance adapter on this dual-GPU XPS.
+          reg add "HKCU\Software\Microsoft\DirectX\UserGpuPreferences" /v "%GAME%" /t REG_SZ /d "GpuPreference=2;" /f >nul 2>&1
+          "%GAME%" --resolution 1920x1080 --fullscreen
           EOF
-          cat > PLAY_PUA_PC_MAX_FULLSCREEN.cmd <<'EOF'
+          cat > PLAY_PUA_XPS9530_WINDOWED.cmd <<'EOF'
           @echo off
           cd /d "%~dp0"
-          PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe --resolution 1920x1080 --fullscreen
+          set "GAME=%~dp0PROCEED_UNTIL_APPREHENDED_0_76_XPS9530.exe"
+          reg add "HKCU\Software\Microsoft\DirectX\UserGpuPreferences" /v "%GAME%" /t REG_SZ /d "GpuPreference=2;" /f >nul 2>&1
+          "%GAME%" --resolution 1920x1080
           EOF
-          cat > README-PC-MAX.txt <<'EOF'
-          PROCEED UNTIL APPREHENDED 0.76 - PC MAX
+          cat > README-XPS9530.txt <<'EOF'
+          PROCEED UNTIL APPREHENDED 0.76 - XPS 15 9530 PROJECTOR
 
-          Tuned for a modern Windows laptop/desktop with a discrete or capable integrated GPU.
-          Recommended: PLAY_PUA_PC_MAX.cmd for a 1920x1080 window.
-          Fullscreen: PLAY_PUA_PC_MAX_FULLSCREEN.cmd.
+          Reference machine:
+          Dell XPS 15 9530
+          Intel Core i7-13620H
+          16 GB RAM
+          Windows 11 Pro
+          Multiple GPUs installed; Windows reports a 4 GB graphics adapter.
 
-          PC Max loads the source-dated EH15 2BZ OpenStreetMap patch immediately, then
-          refreshes it when online. Building heights and road widths identify estimates.
-          CAL supports five separate surfaces or the optional three-bay-only layout.
-          The five-surface defaults are an unmeasured starting layout; align every corner
-          and yaw to the closed shutters before judging the physical projection.
-          The OSM panel names the nearest mapped road and source date; M toggles it.
-          F6 cycles WEATHER through live / clear / rain / fog.
+          This is the active five-surface build. It boots directly into the projector
+          driver view and keeps the full PC map geometry. Secondary trim/furniture does
+          not cast shadows because five cameras multiply that cost while the seated
+          driver gets almost no useful information from those shadows.
+
+          PLAY_PUA_XPS9530.cmd is the normal fullscreen launch.
+          PLAY_PUA_XPS9530_WINDOWED.cmd is the diagnostic fallback.
+          Both launchers ask Windows 11 to prefer the high-performance GPU for this exe.
+
+          The bundled EH15 2BZ OpenStreetMap patch is source-dated and works offline.
+          Building footprints are mapped geometry. Unmapped heights and road widths are
+          labelled estimates, not surveyed dimensions. Five-surface calibration remains
+          user-measured: align corners to the closed shutters and save before judging fit.
 
           Controller:
           Left stick = steer
@@ -160,9 +174,10 @@ jobs:
           LT = brake/reverse
           X = handbrake
           Y / right shoulder = Bay Window view toggle
+          F6 = weather mode
           EOF
-          sha256sum PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe > SHA256-PC-MAX.txt
-          zip -9 PUA-0.76-PC-MAX-PORTABLE.zip PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe PLAY_PUA_PC_MAX.cmd PLAY_PUA_PC_MAX_FULLSCREEN.cmd README-PC-MAX.txt SHA256-PC-MAX.txt
+          sha256sum PROCEED_UNTIL_APPREHENDED_0_76_XPS9530.exe > SHA256-XPS9530.txt
+          zip -9 PUA-0.76-XPS9530-PORTABLE.zip PROCEED_UNTIL_APPREHENDED_0_76_XPS9530.exe PLAY_PUA_XPS9530.cmd PLAY_PUA_XPS9530_WINDOWED.cmd README-XPS9530.txt SHA256-XPS9530.txt
 
       - name: Build Windows installer
         run: |
@@ -171,8 +186,8 @@ jobs:
           Unicode True
           !include "MUI2.nsh"
 
-          Name "PROCEED UNTIL APPREHENDED 0.76 PC MAX"
-          OutFile "PUA-0.76-PC-MAX-Setup.exe"
+          Name "PROCEED UNTIL APPREHENDED 0.76 XPS 15 9530"
+          OutFile "PUA-0.76-XPS9530-Setup.exe"
           InstallDir "$LOCALAPPDATA\Programs\ProceedUntilApprehended"
           RequestExecutionLevel user
           SetCompressor /SOLID lzma
@@ -181,7 +196,7 @@ jobs:
           !insertmacro MUI_PAGE_WELCOME
           !insertmacro MUI_PAGE_DIRECTORY
           !insertmacro MUI_PAGE_INSTFILES
-          !define MUI_FINISHPAGE_RUN "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe"
+          !define MUI_FINISHPAGE_RUN "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_76_XPS9530.exe"
           !insertmacro MUI_PAGE_FINISH
           !insertmacro MUI_UNPAGE_CONFIRM
           !insertmacro MUI_UNPAGE_INSTFILES
@@ -189,48 +204,50 @@ jobs:
 
           Section "Game" SecGame
             SetOutPath "$INSTDIR"
-            File "PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe"
-            File "README-PC-MAX.txt"
-            File "SHA256-PC-MAX.txt"
+            File "PROCEED_UNTIL_APPREHENDED_0_76_XPS9530.exe"
+            File "README-XPS9530.txt"
+            File "SHA256-XPS9530.txt"
+            WriteRegStr HKCU "Software\Microsoft\DirectX\UserGpuPreferences" "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_76_XPS9530.exe" "GpuPreference=2;"
 
             CreateDirectory "$SMPROGRAMS\PROCEED UNTIL APPREHENDED"
-            CreateShortCut "$DESKTOP\PROCEED UNTIL APPREHENDED.lnk" "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe" "--resolution 1920x1080"
-            CreateShortCut "$SMPROGRAMS\PROCEED UNTIL APPREHENDED\Play PUA PC MAX.lnk" "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe" "--resolution 1920x1080"
-            CreateShortCut "$SMPROGRAMS\PROCEED UNTIL APPREHENDED\Play PUA PC MAX Fullscreen.lnk" "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe" "--resolution 1920x1080 --fullscreen"
+            CreateShortCut "$DESKTOP\PROCEED UNTIL APPREHENDED.lnk" "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_76_XPS9530.exe" "--resolution 1920x1080 --fullscreen"
+            CreateShortCut "$SMPROGRAMS\PROCEED UNTIL APPREHENDED\Play PUA XPS 9530.lnk" "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_76_XPS9530.exe" "--resolution 1920x1080 --fullscreen"
+            CreateShortCut "$SMPROGRAMS\PROCEED UNTIL APPREHENDED\Play PUA XPS 9530 Windowed.lnk" "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_76_XPS9530.exe" "--resolution 1920x1080"
 
             WriteUninstaller "$INSTDIR\Uninstall.exe"
-            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAPCMax" "DisplayName" "PROCEED UNTIL APPREHENDED 0.76 PC MAX"
-            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAPCMax" "DisplayVersion" "0.76"
-            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAPCMax" "Publisher" "Abbey Hill"
-            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAPCMax" "UninstallString" "$\"$INSTDIR\Uninstall.exe$\""
-            WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAPCMax" "NoModify" 1
-            WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAPCMax" "NoRepair" 1
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAXPS9530" "DisplayName" "PROCEED UNTIL APPREHENDED 0.76 XPS 15 9530"
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAXPS9530" "DisplayVersion" "0.76"
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAXPS9530" "Publisher" "Abbey Hill"
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAXPS9530" "UninstallString" "$\"$INSTDIR\Uninstall.exe$\""
+            WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAXPS9530" "NoModify" 1
+            WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAXPS9530" "NoRepair" 1
           SectionEnd
 
           Section "Uninstall"
             Delete "$DESKTOP\PROCEED UNTIL APPREHENDED.lnk"
-            Delete "$SMPROGRAMS\PROCEED UNTIL APPREHENDED\Play PUA PC MAX.lnk"
-            Delete "$SMPROGRAMS\PROCEED UNTIL APPREHENDED\Play PUA PC MAX Fullscreen.lnk"
+            Delete "$SMPROGRAMS\PROCEED UNTIL APPREHENDED\Play PUA XPS 9530.lnk"
+            Delete "$SMPROGRAMS\PROCEED UNTIL APPREHENDED\Play PUA XPS 9530 Windowed.lnk"
             RMDir "$SMPROGRAMS\PROCEED UNTIL APPREHENDED"
-            Delete "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe"
-            Delete "$INSTDIR\README-PC-MAX.txt"
-            Delete "$INSTDIR\SHA256-PC-MAX.txt"
+            DeleteRegValue HKCU "Software\Microsoft\DirectX\UserGpuPreferences" "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_76_XPS9530.exe"
+            Delete "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_76_XPS9530.exe"
+            Delete "$INSTDIR\README-XPS9530.txt"
+            Delete "$INSTDIR\SHA256-XPS9530.txt"
             Delete "$INSTDIR\Uninstall.exe"
             RMDir "$INSTDIR"
-            DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAPCMax"
+            DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAXPS9530"
           SectionEnd
           EOF
           makensis installer.nsi
-          test -s PUA-0.76-PC-MAX-Setup.exe
-          sha256sum PUA-0.76-PC-MAX-Setup.exe > SHA256-INSTALLER.txt
-          ls -lh PUA-0.76-PC-MAX-Setup.exe PUA-0.76-PC-MAX-PORTABLE.zip
+          test -s PUA-0.76-XPS9530-Setup.exe
+          sha256sum PUA-0.76-XPS9530-Setup.exe > SHA256-INSTALLER.txt
+          ls -lh PUA-0.76-XPS9530-Setup.exe PUA-0.76-XPS9530-PORTABLE.zip
 
       - name: Upload PC Max installer
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.76-PC-MAX-INSTALLER
+          name: PUA-0.76-XPS9530-INSTALLER
           path: |
-            build/pcmax/PUA-0.76-PC-MAX-Setup.exe
+            build/pcmax/PUA-0.76-XPS9530-Setup.exe
             build/pcmax/SHA256-INSTALLER.txt
           if-no-files-found: error
           retention-days: 30
@@ -238,7 +255,7 @@ jobs:
       - name: Upload PC Max portable
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.76-PC-MAX-PORTABLE
-          path: build/pcmax/PUA-0.76-PC-MAX-PORTABLE.zip
+          name: PUA-0.76-XPS9530-PORTABLE
+          path: build/pcmax/PUA-0.76-XPS9530-PORTABLE.zip
           if-no-files-found: error
           retention-days: 30

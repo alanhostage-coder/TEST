@@ -27,6 +27,7 @@ const RENDER_SCALE := 0.72
 const LOW_SPEC_RENDER_SCALE := 0.42
 const PROJECTOR_MAX_RENDER_SCALE := 0.48
 const PC_MAX_RENDER_SCALE := 0.88
+const XPS_9530_RENDER_SCALE := 0.86
 const CORNER_PICK_RADIUS := 82.0
 const MIN_VIEWPORT_WIDTH := 64.0
 const MIN_VIEWPORT_HEIGHT := 180.0
@@ -66,12 +67,14 @@ var interior_parts: Array = []
 var steering_ring: Line2D
 var projector_max_mode := false
 var pc_max_mode := false
+var xps_9530_mode := false
 var black_mask: ColorRect
 var shared_cab_transform := Transform3D.IDENTITY
 
 func _ready():
 	projector_max_mode = OS.has_feature("projector_max")
 	pc_max_mode = OS.has_feature("pc_max")
+	xps_9530_mode = OS.has_feature("xps_9530")
 	layout_surface_count = 5 if projector_max_mode else 3
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	car = get_node_or_null("../Car")
@@ -189,7 +192,7 @@ func _build_views():
 		var camera = Camera3D.new()
 		camera.current = true
 		camera.near = 0.12
-		camera.far = 320.0 if projector_max_mode else (1100.0 if pc_max_mode else (420.0 if OS.has_feature("thinkpad_low") else 900.0))
+		camera.far = 760.0 if xps_9530_mode else (320.0 if projector_max_mode else (1100.0 if pc_max_mode else (420.0 if OS.has_feature("thinkpad_low") else 900.0)))
 		camera.keep_aspect = Camera3D.KEEP_HEIGHT
 		camera.fov = CAB_VERTICAL_FOV_DEG
 		viewport.add_child(camera)
@@ -323,7 +326,7 @@ func _rescale_surfaces():
 		for corner in range(4):
 			warped.append(base[corner] + offsets[i][corner] * size)
 		surfaces[i].polygon = warped
-		var scale = PROJECTOR_MAX_RENDER_SCALE if projector_max_mode else (PC_MAX_RENDER_SCALE if pc_max_mode else (LOW_SPEC_RENDER_SCALE if OS.has_feature("thinkpad_low") else RENDER_SCALE))
+		var scale = XPS_9530_RENDER_SCALE if xps_9530_mode else (PROJECTOR_MAX_RENDER_SCALE if projector_max_mode else (PC_MAX_RENDER_SCALE if pc_max_mode else (LOW_SPEC_RENDER_SCALE if OS.has_feature("thinkpad_low") else RENDER_SCALE)))
 		viewports[i].size = viewport_size_for_surface(Vector2(w, h), scale)
 		var uv_size = Vector2(viewports[i].size.x, viewports[i].size.y)
 		surfaces[i].uv = PackedVector2Array([Vector2.ZERO, Vector2(uv_size.x, 0), uv_size, Vector2(0, uv_size.y)])
@@ -432,7 +435,7 @@ func _set_mode(value: int):
 		button.text = "PROJECTOR MAX" if projector_max_mode else "DRIVE VIEW"
 		cal_button.text = "CAL"
 		drive_button.text = "DRIVE"
-		title.text = "PROJECTOR MAX · BAY WINDOW DRIVER VIEW" if projector_max_mode else "BAY WINDOW SIM · FORWARD DRIVER VIEW"
+		title.text = "XPS 15 9530 · FIVE-SURFACE DRIVER VIEW" if xps_9530_mode else ("PROJECTOR MAX · BAY WINDOW DRIVER VIEW" if projector_max_mode else "BAY WINDOW SIM · FORWARD DRIVER VIEW")
 	else:
 		button.text = "EXIT CAL"
 		cal_button.text = "DONE"

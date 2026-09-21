@@ -28,6 +28,7 @@ const DRIVER_DETAIL_RADIUS := 38.0
 var low_spec_mode := false
 var projector_max_mode := false
 var pc_max_mode := false
+var xps_9530_mode := false
 var map_center_lat := 55.95
 var atmosphere_initialized := false
 var atmosphere_wetness := 0.0
@@ -68,8 +69,14 @@ var weed_mat
 func _ready():
 	projector_max_mode = OS.has_feature("projector_max")
 	pc_max_mode = OS.has_feature("pc_max")
-	low_spec_mode = OS.has_feature("thinkpad_low") or projector_max_mode
-	if projector_max_mode:
+	xps_9530_mode = OS.has_feature("xps_9530")
+	low_spec_mode = OS.has_feature("thinkpad_low") or (projector_max_mode and not xps_9530_mode)
+	if xps_9530_mode:
+		# Five cameras multiply shadow cost. Preserve full mapped geometry and nearby
+		# driver-readable detail, but spend the 4 GB GPU budget on image stability.
+		api_detail_pressure = 0.82
+		$Sun.directional_shadow_max_distance = 118.0
+	elif projector_max_mode:
 		api_detail_pressure = 0.32
 		$Sun.directional_shadow_max_distance = 58.0
 	elif low_spec_mode:
@@ -146,10 +153,10 @@ func _apply_secondary_visual_budget(mesh: GeometryInstance3D, low_spec_range := 
 	# Five projector cameras multiply shadow work. Keep the geometry and material cue,
 	# but secondary trim/furniture does not need to enter every low-spec shadow map.
 	mesh.set_meta("secondary_visual", true)
-	if low_spec_mode:
+	if low_spec_mode or xps_9530_mode:
 		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-		mesh.set_meta("low_spec_shadow_disabled", true)
-		if low_spec_range > 0.0:
+		mesh.set_meta("secondary_shadow_disabled", true)
+		if low_spec_mode and low_spec_range > 0.0:
 			if mesh.visibility_range_end <= 0.0:
 				mesh.visibility_range_end = low_spec_range
 			else:
