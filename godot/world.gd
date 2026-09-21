@@ -338,6 +338,8 @@ func _add_world_label(parent: Node3D, pos: Vector3, text_value: String, colour: 
 	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
 	label.visibility_range_end = range_end
 	parent.add_child(label)
+	label.add_to_group("pua_world_detail")
+	label.add_to_group("pua_landmark")
 
 func _add_mapped_road_name_signs(parent: Node3D, roads: Array):
 	var seen := {}
@@ -603,6 +605,11 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 	body.add_child(collision)
 	_add_exact_osm_facade_detail(body, poly, height, seed, building)
 	parent.add_child(body)
+	body.add_to_group("pua_world_detail")
+	var named = str(building.get("name", "")).strip_edges() != ""
+	var public_place = str(building.get("amenity", "")).strip_edges() != "" or str(building.get("shop", "")).strip_edges() != ""
+	if named or public_place:
+		body.add_to_group("pua_landmark")
 	return true
 
 func _vehicle_visual(parent: Node3D, seed: int, patrol_style := false):
@@ -1035,7 +1042,8 @@ func _on_map_ready(map_data: Dictionary):
 		var exact_radius = LOW_SPEC_EXACT_FOOTPRINT_RADIUS if low_spec_mode else (620.0 if pc_max_mode else 260.0)
 		var exact = Vector2(cx, cz).length() <= exact_radius and _add_exact_osm_building(map_root, building, h, seed)
 		if not exact:
-			_add_edinburgh_building(map_root, Vector3(cx, 0.0, cz), Vector3(sx, h, sz), seed, kind)
+			var important = str(building.get("name", "")).strip_edges() != "" or str(building.get("amenity", "")).strip_edges() != "" or str(building.get("shop", "")).strip_edges() != ""
+			_add_edinburgh_building(map_root, Vector3(cx, 0.0, cz), Vector3(sx, h, sz), seed, kind, important)
 			fallback_building_count += 1
 		else:
 			exact_building_count += 1
@@ -1298,7 +1306,7 @@ func _add_map_furniture(parent: Node3D):
 		placed += 1
 
 
-func _add_edinburgh_building(parent: Node3D, base: Vector3, size: Vector3, seed: int, kind: String):
+func _add_edinburgh_building(parent: Node3D, base: Vector3, size: Vector3, seed: int, kind: String, important := false):
 	var sx = size.x
 	var h = size.y
 	var sz = size.z
@@ -1320,6 +1328,9 @@ func _add_edinburgh_building(parent: Node3D, base: Vector3, size: Vector3, seed:
 	if industrial:
 		stone = _mat(Color(0.27, 0.285, 0.29), 0.84, 0.03)
 	var body = _box(parent, base + Vector3(0, h * 0.5, 0), Vector3(sx, h, sz), stone)
+	body.add_to_group("pua_world_detail")
+	if important:
+		body.add_to_group("pua_landmark")
 
 	# Dark plinths make terraces and warehouses sit on wet streets rather than float.
 	var plinth_h = min(1.25, h * 0.18)
