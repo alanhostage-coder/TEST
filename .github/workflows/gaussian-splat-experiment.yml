@@ -2,6 +2,8 @@ name: PUA Gaussian Splat Experiment
 
 on:
   workflow_dispatch:
+  pull_request:
+    branches: [ main ]
   push:
     branches: [ experiment/gaussian-splat ]
     paths:
