@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "patch_id": "eh15_2bz",
+  "postcode": "EH15 2BZ",
+  "origin_lat": 55.951507,
+  "origin_lon": -3.107122,
+  "origin_role": "postcode_centroid_not_surveyed_window",
+  "source": "REQUIRED: identify capture owner/source",
+  "capture_date": "REQUIRED: YYYY-MM-DD",
+  "licence": "REQUIRED: redistribution/reuse terms",
+  "alignment_status": "estimated",
+  "alignment_method": "REQUIRED: describe OSM control points or survey",
+  "scale_status": "estimated",
+  "orientation_status": "estimated",
+  "notes": "Template only. Do not rename to eh15_2bz.json until all REQUIRED fields are replaced and the visual asset is correctly matched."
+}
