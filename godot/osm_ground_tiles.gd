@@ -131,7 +131,7 @@ func _fetch_next():
 	_request.request_completed.connect(_on_tile_received)
 	var headers = PackedStringArray([
 		"Accept: image/png",
-		"User-Agent: ProceedUntilApprehended/0.75 (personal Godot prototype; cached OSM context)"
+		"User-Agent: ProceedUntilApprehended/0.76 (personal Godot prototype; cached OSM context)"
 	])
 	var err = _request.request(TILE_URL % [TILE_ZOOM, _pending.x, _pending.y], headers, HTTPClient.METHOD_GET)
 	if err != OK:

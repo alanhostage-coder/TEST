@@ -198,7 +198,7 @@ def main() -> None:
         box = ",".join(f"{v:.6f}" for v in bbox)
         query = f'[out:json][timeout:30];(way[highway~"^(motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|service|track|footway|path|cycleway)$"]({box});way[building]({box});way[barrier~"^(hedge|fence|wall)$"]({box});node[natural=tree]({box});node[highway~"^(traffic_signals|crossing|bus_stop|stop|give_way)$"]({box});node[traffic_sign]({box});node[amenity][name]({box});node[shop][name]({box});node[tourism][name]({box});node[leisure][name]({box});node[historic][name]({box});node[place][name]({box}););out tags geom qt;'
         url = "https://overpass-api.de/api/interpreter?" + urllib.parse.urlencode({"data": query})
-        request = urllib.request.Request(url, headers={"User-Agent": "ProceedUntilApprehended/0.75 location-patch-builder"})
+        request = urllib.request.Request(url, headers={"User-Agent": "ProceedUntilApprehended/0.76 location-patch-builder"})
         with urllib.request.urlopen(request, timeout=60) as response:
             payload = json.load(response)
     patch = build_patch(payload, DEFAULT_POSTCODE, DEFAULT_LAT, DEFAULT_LON, bbox)

@@ -50,6 +50,19 @@ func _finish():
 	if map_stream.data.get("roads", []).size() < 100 or map_stream.data.get("buildings", []).size() < 100:
 		_fail("packaged OSM patch incomplete")
 		return
+	var furthest_building_center := 0.0
+	for building in map_stream.data.get("buildings", []):
+		var center = building.get("center", []) if building is Dictionary else []
+		if not center is Array or center.size() < 2:
+			_fail("packaged OSM building centre missing")
+			return
+		furthest_building_center = maxf(furthest_building_center, Vector2(float(center[0]), float(center[1])).length())
+	if furthest_building_center > world.LOW_SPEC_EXACT_FOOTPRINT_RADIUS:
+		_fail("packaged OSM footprint lies outside low-spec exact radius")
+		return
+	if int(car.get_meta("map_exact_building_count", -1)) != map_stream.data.get("buildings", []).size() or int(car.get_meta("map_fallback_building_count", -1)) != 0:
+		_fail("packaged OSM buildings did not use exact footprint geometry")
+		return
 	var nearest_origin_road = map_stream.nearest_named_road(Vector2.ZERO)
 	if str(nearest_origin_road.get("name", "")) != "Pittville Street" or float(nearest_origin_road.get("distance_m", INF)) > 30.0:
 		_fail("verified Pittville Street context missing near postcode centroid")
@@ -100,7 +113,7 @@ func _finish():
 			_fail("directive missing " + key)
 			return
 	var moved = start_position.distance_to(car.global_position)
-	print("PUA_SOAK_OK moved=%.2f traffic=%.2f lamps=%.2f moment=%s map=%s roads=%d buildings=%d nearest=%s distance=%.1fm surfaces=%d sources=%s" % [
+	print("PUA_SOAK_OK moved=%.2f traffic=%.2f lamps=%.2f moment=%s map=%s roads=%d buildings=%d exact=%d fallback=%d furthest=%.1fm nearest=%s distance=%.1fm surfaces=%d sources=%s" % [
 		moved,
 		float(directive.get("traffic_factor", 0.0)),
 		float(directive.get("lamp_factor", 0.0)),
@@ -108,6 +121,9 @@ func _finish():
 		str(map_stream.data.get("start_postcode", "")),
 		map_stream.data.get("roads", []).size(),
 		map_stream.data.get("buildings", []).size(),
+		int(car.get_meta("map_exact_building_count", -1)),
+		int(car.get_meta("map_fallback_building_count", -1)),
+		furthest_building_center,
 		str(nearest_origin_road.get("name", "")),
 		float(nearest_origin_road.get("distance_m", 0.0)),
 		bay.surfaces.size(),

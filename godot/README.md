@@ -6,7 +6,7 @@ Acceptance rule: if a road, yard, light or transmitter makes the player think "I
 
 First slice: Godot Mobile renderer, real 3D collision space, reversible free driving, chase camera, deterministic streamed world cells. No missions, scores, streaks or completion state. AI EYES remains identity-free.
 
-## 0.75 geographic and projector baseline
+## 0.76 geographic and projector baseline
 
 - The start patch is `patches/eh15_2bz.json`, centred on the verified postcodes.io
   centroid `55.951507,-3.107122`. That origin is not a surveyed window position.
@@ -16,6 +16,9 @@ First slice: Godot Mobile renderer, real 3D collision space, reversible free dri
   source date and map-frame coordinate. Press `M` to hide or restore the map.
 - Each road width and building height says whether it is OSM-tagged or estimated.
   Generic facade treatment is visual only and is not a claim about a real facade.
+- ThinkPad and Projector Max retain the exact polygon footprint for every building
+  in the packaged EH15 patch. Their in-world street and place labels are capped and
+  distance-limited to protect the low-spec frame budget.
 - Projector Max starts in five-surface mode: three bay shutters and two separate
   wall windows. `LAYOUT` switches to the optional three-bay-only mode.
 - `CAL` supports mouse/touch corner warping, surface selection and per-surface

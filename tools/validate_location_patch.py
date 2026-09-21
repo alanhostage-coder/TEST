@@ -115,6 +115,7 @@ def validate(manifest_path: Path) -> dict[str, Any]:
 
     building_ids: set[int] = set()
     tagged_height_count = 0
+    furthest_building_center_m = 0.0
     for index, building in enumerate(patch["buildings"]):
         if not isinstance(building, dict):
             fail(f"buildings[{index}] must be an object")
@@ -133,6 +134,7 @@ def validate(manifest_path: Path) -> dict[str, Any]:
         if height_source.startswith("osm:"):
             tagged_height_count += 1
         center = point(building.get("center"), f"buildings[{index}].center")
+        furthest_building_center_m = max(furthest_building_center_m, math.hypot(*center))
         size = point(building.get("size"), f"buildings[{index}].size")
         min_x, max_x = min(x for x, _ in coords), max(x for x, _ in coords)
         min_z, max_z = min(z for _, z in coords), max(z for _, z in coords)
@@ -179,6 +181,7 @@ def validate(manifest_path: Path) -> dict[str, Any]:
         "named_pois": named_poi_count,
         "osm_tagged_building_heights": tagged_height_count,
         "estimated_building_heights": len(patch["buildings"]) - tagged_height_count,
+        "furthest_building_center_m": round(furthest_building_center_m, 3),
     }
 
 

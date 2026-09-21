@@ -66,48 +66,48 @@ jobs:
         run: |
           mkdir -p build/thinkpad
           EXPORT_DIR="$(readlink -f build/thinkpad)"
-          godot --headless --verbose --path godot --export-release "Windows Desktop" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_75_THINKPAD.exe"
-          godot --headless --verbose --path godot --export-release "Windows Projector Max" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_75_PROJECTOR_MAX.exe"
-          godot --headless --verbose --path godot --export-release "Windows PC Max" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe"
-          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_75_THINKPAD.exe"
-          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_75_PROJECTOR_MAX.exe"
-          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe"
-          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_75_THINKPAD.exe" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_75_PROJECTOR_MAX.exe" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe"
+          godot --headless --verbose --path godot --export-release "Windows Desktop" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_THINKPAD.exe"
+          godot --headless --verbose --path godot --export-release "Windows Projector Max" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_PROJECTOR_MAX.exe"
+          godot --headless --verbose --path godot --export-release "Windows PC Max" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_THINKPAD.exe"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_PROJECTOR_MAX.exe"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe"
+          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_THINKPAD.exe" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_PROJECTOR_MAX.exe" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe"
           cd "$EXPORT_DIR"
           cat > PLAY_PUA_THINKPAD.cmd <<'EOF'
           @echo off
           cd /d "%~dp0"
-          PROCEED_UNTIL_APPREHENDED_0_75_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 960x540
+          PROCEED_UNTIL_APPREHENDED_0_76_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 960x540
           EOF
           cat > PLAY_PUA_POTATO.cmd <<'EOF'
           @echo off
           cd /d "%~dp0"
-          PROCEED_UNTIL_APPREHENDED_0_75_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 800x450
+          PROCEED_UNTIL_APPREHENDED_0_76_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 800x450
           EOF
           cat > PLAY_PUA_PROJECTOR_MAX.cmd <<'EOF'
           @echo off
           cd /d "%~dp0"
-          PROCEED_UNTIL_APPREHENDED_0_75_PROJECTOR_MAX.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 1024x576
+          PROCEED_UNTIL_APPREHENDED_0_76_PROJECTOR_MAX.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 1024x576
           EOF
           cat > PLAY_PUA_PROJECTOR_SAFE.cmd <<'EOF'
           @echo off
           cd /d "%~dp0"
-          PROCEED_UNTIL_APPREHENDED_0_75_PROJECTOR_MAX.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 800x450
+          PROCEED_UNTIL_APPREHENDED_0_76_PROJECTOR_MAX.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 800x450
           EOF
           cat > PLAY_PUA_PROJECTOR_FULLSCREEN.cmd <<'EOF'
           @echo off
           cd /d "%~dp0"
-          PROCEED_UNTIL_APPREHENDED_0_75_PROJECTOR_MAX.exe --rendering-method gl_compatibility --rendering-driver opengl3 --fullscreen
+          PROCEED_UNTIL_APPREHENDED_0_76_PROJECTOR_MAX.exe --rendering-method gl_compatibility --rendering-driver opengl3 --fullscreen
           EOF
           cat > README-THINKPAD.txt <<'EOF'
-          PROCEED UNTIL APPREHENDED 0.75 - THINKPAD LOW SPEC
+          PROCEED UNTIL APPREHENDED 0.76 - THINKPAD LOW SPEC
 
           PLAY_PUA_THINKPAD.cmd = normal low-spec game.
           PLAY_PUA_POTATO.cmd = emergency 800x450 fallback.
           Source-dated EH15 2BZ OSM patch, five/three-surface calibration and controller support.
           EOF
           cat > README-PROJECTOR-MAX.txt <<'EOF'
-          PROCEED UNTIL APPREHENDED 0.75 - PROJECTOR MAX
+          PROCEED UNTIL APPREHENDED 0.76 - PROJECTOR MAX
 
           This build boots directly into the five-surface projector renderer.
           Start with PLAY_PUA_PROJECTOR_MAX.cmd.
@@ -128,49 +128,49 @@ jobs:
           cat > PLAY_PUA_PC_MAX.cmd <<'EOF'
           @echo off
           cd /d "%~dp0"
-          PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe --fullscreen --resolution 1920x1080
+          PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe --fullscreen --resolution 1920x1080
           EOF
           cat > README-PC-MAX.txt <<'EOF'
-          PROCEED UNTIL APPREHENDED 0.75 - PC MAX
+          PROCEED UNTIL APPREHENDED 0.76 - PC MAX
 
           Full-density Windows profile for the XPS-class machine.
           Does not enable thinkpad_low or projector_max.
           Use BAY WINDOW in-game, then LAYOUT to switch between five and three views.
           The OSM panel names the nearest mapped road and source date; M toggles it.
           EOF
-          sha256sum PROCEED_UNTIL_APPREHENDED_0_75_THINKPAD.exe > SHA256-THINKPAD.txt
-          sha256sum PROCEED_UNTIL_APPREHENDED_0_75_PROJECTOR_MAX.exe > SHA256-PROJECTOR-MAX.txt
-          sha256sum PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe > SHA256-PC-MAX.txt
-          zip -9 PUA-0.75-THINKPAD.zip PROCEED_UNTIL_APPREHENDED_0_75_THINKPAD.exe PLAY_PUA_THINKPAD.cmd PLAY_PUA_POTATO.cmd README-THINKPAD.txt SHA256-THINKPAD.txt
-          zip -9 PUA-0.75-PROJECTOR-MAX.zip PROCEED_UNTIL_APPREHENDED_0_75_PROJECTOR_MAX.exe PLAY_PUA_PROJECTOR_MAX.cmd PLAY_PUA_PROJECTOR_SAFE.cmd PLAY_PUA_PROJECTOR_FULLSCREEN.cmd README-PROJECTOR-MAX.txt SHA256-PROJECTOR-MAX.txt
-          zip -9 PUA-0.75-PC-MAX.zip PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe PLAY_PUA_PC_MAX.cmd README-PC-MAX.txt SHA256-PC-MAX.txt
+          sha256sum PROCEED_UNTIL_APPREHENDED_0_76_THINKPAD.exe > SHA256-THINKPAD.txt
+          sha256sum PROCEED_UNTIL_APPREHENDED_0_76_PROJECTOR_MAX.exe > SHA256-PROJECTOR-MAX.txt
+          sha256sum PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe > SHA256-PC-MAX.txt
+          zip -9 PUA-0.76-THINKPAD.zip PROCEED_UNTIL_APPREHENDED_0_76_THINKPAD.exe PLAY_PUA_THINKPAD.cmd PLAY_PUA_POTATO.cmd README-THINKPAD.txt SHA256-THINKPAD.txt
+          zip -9 PUA-0.76-PROJECTOR-MAX.zip PROCEED_UNTIL_APPREHENDED_0_76_PROJECTOR_MAX.exe PLAY_PUA_PROJECTOR_MAX.cmd PLAY_PUA_PROJECTOR_SAFE.cmd PLAY_PUA_PROJECTOR_FULLSCREEN.cmd README-PROJECTOR-MAX.txt SHA256-PROJECTOR-MAX.txt
+          zip -9 PUA-0.76-PC-MAX.zip PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe PLAY_PUA_PC_MAX.cmd README-PC-MAX.txt SHA256-PC-MAX.txt
 
       - name: Upload portable ThinkPad build
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.75-THINKPAD
+          name: PUA-0.76-THINKPAD
           path: |
-            build/thinkpad/PROCEED_UNTIL_APPREHENDED_0_75_THINKPAD.exe
+            build/thinkpad/PROCEED_UNTIL_APPREHENDED_0_76_THINKPAD.exe
             build/thinkpad/PLAY_PUA_THINKPAD.cmd
             build/thinkpad/PLAY_PUA_POTATO.cmd
             build/thinkpad/README-THINKPAD.txt
             build/thinkpad/SHA256-THINKPAD.txt
-            build/thinkpad/PUA-0.75-THINKPAD.zip
+            build/thinkpad/PUA-0.76-THINKPAD.zip
           if-no-files-found: error
           retention-days: 30
 
       - name: Upload Projector Max build
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.75-PROJECTOR-MAX
+          name: PUA-0.76-PROJECTOR-MAX
           path: |
-            build/thinkpad/PROCEED_UNTIL_APPREHENDED_0_75_PROJECTOR_MAX.exe
+            build/thinkpad/PROCEED_UNTIL_APPREHENDED_0_76_PROJECTOR_MAX.exe
             build/thinkpad/PLAY_PUA_PROJECTOR_MAX.cmd
             build/thinkpad/PLAY_PUA_PROJECTOR_SAFE.cmd
             build/thinkpad/PLAY_PUA_PROJECTOR_FULLSCREEN.cmd
             build/thinkpad/README-PROJECTOR-MAX.txt
             build/thinkpad/SHA256-PROJECTOR-MAX.txt
-            build/thinkpad/PUA-0.75-PROJECTOR-MAX.zip
+            build/thinkpad/PUA-0.76-PROJECTOR-MAX.zip
           if-no-files-found: error
           retention-days: 30
 
@@ -178,12 +178,12 @@ jobs:
       - name: Upload PC Max build
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.75-PC-MAX
+          name: PUA-0.76-PC-MAX
           path: |
-            build/thinkpad/PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe
+            build/thinkpad/PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe
             build/thinkpad/PLAY_PUA_PC_MAX.cmd
             build/thinkpad/README-PC-MAX.txt
             build/thinkpad/SHA256-PC-MAX.txt
-            build/thinkpad/PUA-0.75-PC-MAX.zip
+            build/thinkpad/PUA-0.76-PC-MAX.zip
           if-no-files-found: error
           retention-days: 30

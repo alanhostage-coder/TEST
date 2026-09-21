@@ -141,7 +141,7 @@ func _fetch_osm():
 	var url = OVERPASS_URL + "?data=" + query.uri_encode()
 	var headers = PackedStringArray([
 		"Accept: application/json",
-		"User-Agent: ProceedUntilApprehended/0.75 (Godot; EH15 source-labelled cached OSM geometry)"
+		"User-Agent: ProceedUntilApprehended/0.76 (Godot; EH15 source-labelled cached OSM geometry)"
 	])
 	var err = _request.request(url, headers, HTTPClient.METHOD_GET)
 	if err != OK:

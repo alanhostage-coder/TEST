@@ -20,6 +20,9 @@ var api_radio_instability := 0.20
 var api_moment := "none"
 const CELL := 90.0
 const ROAD_MICRO_STEP := 6.5
+# Covers every building in the source-dated EH15 patch (farthest centre 160.5 m)
+# while remaining a bounded low-spec draw/collision radius for future patches.
+const LOW_SPEC_EXACT_FOOTPRINT_RADIUS := 220.0
 var low_spec_mode := false
 var projector_max_mode := false
 var pc_max_mode := false
@@ -337,10 +340,11 @@ func _add_world_label(parent: Node3D, pos: Vector3, text_value: String, colour: 
 	parent.add_child(label)
 
 func _add_mapped_road_name_signs(parent: Node3D, roads: Array):
-	if low_spec_mode:
-		return
 	var seen := {}
-	var cap = 34 if pc_max_mode else 18
+	var cap = 8 if projector_max_mode else (10 if low_spec_mode else (34 if pc_max_mode else 18))
+	var distance_limit = 125.0 if low_spec_mode else 260.0
+	var label_range = 115.0 if low_spec_mode else 180.0
+	var label_size = 26 if low_spec_mode else 34
 	var made := 0
 	for road in roads:
 		if made >= cap or not road is Dictionary:
@@ -362,18 +366,19 @@ func _add_mapped_road_name_signs(parent: Node3D, roads: Array):
 			var mid = (a + b) * 0.5
 			if mid.length() < chosen.length():
 				chosen = mid
-		if chosen.x == INF or chosen.length() > 260.0:
+		if chosen.x == INF or chosen.length() > distance_limit:
 			continue
 		seen[road_name] = true
 		_visual_box(parent, Vector3(chosen.x, 1.55, chosen.y), Vector3(0.10, 3.10, 0.10), metal_mat)
 		_visual_box(parent, Vector3(chosen.x, 2.75, chosen.y), Vector3(1.60, 0.46, 0.08), sign_white_mat)
-		_add_world_label(parent, Vector3(chosen.x, 2.76, chosen.y), road_name.to_upper(), Color(0.08, 0.10, 0.12), 34, 180.0)
+		_add_world_label(parent, Vector3(chosen.x, 2.76, chosen.y), road_name.to_upper(), Color(0.08, 0.10, 0.12), label_size, label_range)
 		made += 1
 
 func _add_named_poi_markers(parent: Node3D, pois: Array):
-	if low_spec_mode:
-		return
-	var cap = 32 if pc_max_mode else 14
+	var cap = 5 if projector_max_mode else (7 if low_spec_mode else (32 if pc_max_mode else 14))
+	var distance_limit = 120.0 if low_spec_mode else 300.0
+	var label_range = 110.0 if low_spec_mode else 200.0
+	var label_size = 25 if low_spec_mode else 32
 	var made := 0
 	for poi in pois:
 		if made >= cap or not poi is Dictionary:
@@ -383,24 +388,23 @@ func _add_named_poi_markers(parent: Node3D, pois: Array):
 		if poi_name == "" or not point is Array or point.size() < 2:
 			continue
 		var p = Vector2(float(point[0]), float(point[1]))
-		if p.length() > 300.0:
+		if p.length() > distance_limit:
 			continue
 		_visual_box(parent, Vector3(p.x, 1.35, p.y), Vector3(0.08, 2.70, 0.08), metal_mat)
 		_visual_box(parent, Vector3(p.x, 2.55, p.y), Vector3(0.92, 0.40, 0.08), sign_blue_mat)
-		_add_world_label(parent, Vector3(p.x, 2.58, p.y), poi_name, Color(0.98, 0.98, 0.96), 32, 200.0)
+		_add_world_label(parent, Vector3(p.x, 2.58, p.y), poi_name, Color(0.98, 0.98, 0.96), label_size, label_range)
 		made += 1
 
 func _add_named_building_marker(parent: Node3D, building: Dictionary):
-	if low_spec_mode:
-		return
 	var name = str(building.get("name", "")).strip_edges()
 	var center = building.get("center", [])
 	if name == "" or not center is Array or center.size() < 2:
 		return
 	var p = Vector2(float(center[0]), float(center[1]))
-	if p.length() > (230.0 if pc_max_mode else 150.0):
+	var distance_limit = 100.0 if low_spec_mode else (230.0 if pc_max_mode else 150.0)
+	if p.length() > distance_limit:
 		return
-	_add_world_label(parent, Vector3(p.x, 3.2, p.y), name, Color(0.95, 0.93, 0.86), 34, 170.0)
+	_add_world_label(parent, Vector3(p.x, 3.2, p.y), name, Color(0.95, 0.93, 0.86), 25 if low_spec_mode else 34, 105.0 if low_spec_mode else 170.0)
 
 func _visual_box(parent: Node3D, pos: Vector3, size: Vector3, material):
 	var mesh = MeshInstance3D.new()
@@ -1012,6 +1016,8 @@ func _on_map_ready(map_data: Dictionary):
 				marking_budget += 1
 			map_segments.append([[a.x, a.y], [b.x, b.y], width, kind, oneway])
 
+	var exact_building_count := 0
+	var fallback_building_count := 0
 	for building in buildings:
 		if not building is Dictionary:
 			continue
@@ -1026,10 +1032,13 @@ func _on_map_ready(map_data: Dictionary):
 		var cz = float(center[1])
 		var seed = int(abs(cx * 17.0 + cz * 31.0 + sx * 11.0 + sz * 7.0))
 		var kind = str(building.get("kind", "yes"))
-		var exact_radius = 135.0 if low_spec_mode else (620.0 if pc_max_mode else 260.0)
+		var exact_radius = LOW_SPEC_EXACT_FOOTPRINT_RADIUS if low_spec_mode else (620.0 if pc_max_mode else 260.0)
 		var exact = Vector2(cx, cz).length() <= exact_radius and _add_exact_osm_building(map_root, building, h, seed)
 		if not exact:
 			_add_edinburgh_building(map_root, Vector3(cx, 0.0, cz), Vector3(sx, h, sz), seed, kind)
+			fallback_building_count += 1
+		else:
+			exact_building_count += 1
 		_add_named_building_marker(map_root, building)
 
 	_add_mapped_linear_features(map_root, linear_features)
@@ -1051,6 +1060,8 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_data_source", map_data.get("source", "offline"))
 		car.set_meta("map_road_count", roads.size())
 		car.set_meta("map_building_count", buildings.size())
+		car.set_meta("map_exact_building_count", exact_building_count)
+		car.set_meta("map_fallback_building_count", fallback_building_count)
 		car.set_meta("map_linear_feature_count", linear_features.size())
 		car.set_meta("map_point_feature_count", point_features.size())
 		car.set_meta("map_poi_feature_count", poi_features.size())
