@@ -23,16 +23,21 @@ var _overlay_root: Control
 var _overlay_map: TextureRect
 var _overlay_marker: ColorRect
 var _overlay_title: Label
+var _overlay_street: Label
+var _overlay_coords: Label
 var _tile_textures := {}
 var _overlay_tile := Vector2i(-1, -1)
+var _overlay_user_visible := true
+var _location_clock := 0.0
+var _last_postcode := "EH15 2BZ"
 
 func _ready():
 	_root = Node3D.new()
 	_root.name = "OSMMapGround"
 	add_child(_root)
-	if OS.has_feature("pc_max"):
+	if OS.has_feature("pc_max") or OS.has_feature("projector_max"):
 		_build_live_map_overlay()
-	set_process(OS.has_feature("pc_max"))
+	set_process(OS.has_feature("pc_max") or OS.has_feature("projector_max"))
 	call_deferred("_bind_map_stream")
 
 func _bind_map_stream():
@@ -48,17 +53,20 @@ func _bind_map_stream():
 		_on_map_ready(existing)
 
 func _on_map_ready(map_data: Dictionary):
+	_last_postcode = str(map_data.get("start_postcode", _last_postcode))
 	_on_location_ready(
 		float(map_data.get("center_lat", 0.0)),
 		float(map_data.get("center_lon", 0.0)),
-		str(map_data.get("start_postcode", ""))
+		_last_postcode
 	)
+	_update_location_text(true)
 
 func _on_location_ready(latitude: float, longitude: float, _postcode: String = ""):
 	_center_lat = latitude
 	_center_lon = longitude
+	_last_postcode = _postcode if _postcode != "" else _last_postcode
 	if _overlay_title:
-		_overlay_title.text = "LIVE OSM · %s" % _postcode
+		_overlay_title.text = "OSM · %s  [M]" % _last_postcode
 	if abs(_center_lat) < 0.001 and abs(_center_lon) < 0.001:
 		return
 	var sig = "%.6f:%.6f:%d" % [_center_lat, _center_lon, TILE_ZOOM]
@@ -123,7 +131,7 @@ func _fetch_next():
 	_request.request_completed.connect(_on_tile_received)
 	var headers = PackedStringArray([
 		"Accept: image/png",
-		"User-Agent: ProceedUntilApprehended/0.74 (personal Godot prototype; cached OSM context)"
+		"User-Agent: ProceedUntilApprehended/0.75 (personal Godot prototype; cached OSM context)"
 	])
 	var err = _request.request(TILE_URL % [TILE_ZOOM, _pending.x, _pending.y], headers, HTTPClient.METHOD_GET)
 	if err != OK:
@@ -219,7 +227,7 @@ func _build_live_map_overlay():
 	layer.layer = 40
 	add_child(layer)
 	_overlay_root = Control.new()
-	_overlay_root.size = Vector2(252, 286)
+	_overlay_root.size = Vector2(252, 330)
 	layer.add_child(_overlay_root)
 	var back = ColorRect.new()
 	back.size = _overlay_root.size
@@ -228,7 +236,7 @@ func _build_live_map_overlay():
 	_overlay_title = Label.new()
 	_overlay_title.position = Vector2(12, 8)
 	_overlay_title.size = Vector2(228, 22)
-	_overlay_title.text = "LIVE OSM · EH15 2BZ"
+	_overlay_title.text = "OSM · EH15 2BZ  [M]"
 	_overlay_title.add_theme_font_size_override("font_size", 14)
 	_overlay_root.add_child(_overlay_title)
 	_overlay_map = TextureRect.new()
@@ -240,15 +248,39 @@ func _build_live_map_overlay():
 	_overlay_marker.size = Vector2(8, 8)
 	_overlay_marker.color = Color(1.0, 0.25, 0.12, 1.0)
 	_overlay_root.add_child(_overlay_marker)
+	_overlay_street = Label.new()
+	_overlay_street.position = Vector2(12, 264)
+	_overlay_street.size = Vector2(228, 20)
+	_overlay_street.text = "NEAREST MAPPED ROAD"
+	_overlay_street.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_overlay_street.add_theme_font_size_override("font_size", 13)
+	_overlay_root.add_child(_overlay_street)
+	_overlay_coords = Label.new()
+	_overlay_coords.position = Vector2(12, 284)
+	_overlay_coords.size = Vector2(228, 20)
+	_overlay_coords.text = "POSTCODE CENTROID · NOT SURVEYED"
+	_overlay_coords.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	_overlay_coords.add_theme_font_size_override("font_size", 9)
+	_overlay_root.add_child(_overlay_coords)
 	var credit = Label.new()
-	credit.position = Vector2(12, 264)
+	credit.position = Vector2(12, 307)
 	credit.size = Vector2(228, 18)
 	credit.text = "© OpenStreetMap contributors"
 	credit.add_theme_font_size_override("font_size", 10)
 	_overlay_root.add_child(credit)
 
-func _process(_delta):
+func _unhandled_key_input(event):
+	if event.pressed and not event.echo and event.keycode == KEY_M and _overlay_root:
+		_overlay_user_visible = not _overlay_user_visible
+		get_viewport().set_input_as_handled()
+
+func _process(delta):
 	if _overlay_root == null or _overlay_map == null:
+		return
+	var bay = get_node_or_null("../BayProjection")
+	var calibrating = bay != null and int(bay.get("mode")) == 2
+	_overlay_root.visible = _overlay_user_visible and not calibrating
+	if not _overlay_root.visible:
 		return
 	var view_size = get_viewport().get_visible_rect().size
 	_overlay_root.position = Vector2(max(8.0, view_size.x - _overlay_root.size.x - 14.0), 14.0)
@@ -258,6 +290,10 @@ func _process(_delta):
 	var meters_per_lon = 111320.0 * cos(deg_to_rad(_center_lat))
 	var lat = _center_lat - car.global_position.z / 111320.0
 	var lon = _center_lon + car.global_position.x / meters_per_lon
+	_location_clock += delta
+	if _location_clock >= 0.25:
+		_location_clock = 0.0
+		_update_location_text()
 	var tile_float = _lat_lon_to_tile_float(lat, lon)
 	var tile = Vector2i(int(floor(tile_float.x)), int(floor(tile_float.y)))
 	var key = "%d:%d" % [tile.x, tile.y]
@@ -270,6 +306,30 @@ func _process(_delta):
 		_overlay_marker.visible = true
 	else:
 		_overlay_marker.visible = false
+
+func _update_location_text(force: bool = false):
+	if not _overlay_street or not _overlay_coords or not _map_stream:
+		return
+	if not force and _location_clock > 0.0:
+		return
+	var car = get_node_or_null("../Car")
+	if not car:
+		return
+	var local_position = Vector2(car.global_position.x, car.global_position.z)
+	var nearest = _map_stream.nearest_named_road(local_position) if _map_stream.has_method("nearest_named_road") else {}
+	if nearest.is_empty():
+		_overlay_street.text = "NO NAMED OSM ROAD IN PATCH"
+	else:
+		var road_name = str(nearest.get("name", "")).to_upper()
+		var road_ref = str(nearest.get("ref", "")).to_upper()
+		if road_name == "":
+			road_name = road_ref
+		elif road_ref != "":
+			road_name += " · " + road_ref
+		_overlay_street.text = "%s · %.0f m" % [road_name, float(nearest.get("distance_m", 0.0))]
+	var lat_lon = _map_stream.local_to_lat_lon(local_position) if _map_stream.has_method("local_to_lat_lon") else Vector2(_center_lat, _center_lon)
+	var source_date = _map_stream.map_source_date() if _map_stream.has_method("map_source_date") else "OFFLINE"
+	_overlay_coords.text = "%s · %.5f, %.5f" % [source_date, lat_lon.x, lat_lon.y]
 
 func _lat_lon_to_tile_float(lat_deg: float, lon_deg: float) -> Vector2:
 	var n = pow(2.0, float(TILE_ZOOM))

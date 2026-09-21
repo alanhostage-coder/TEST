@@ -50,6 +50,17 @@ func _finish():
 	if map_stream.data.get("roads", []).size() < 100 or map_stream.data.get("buildings", []).size() < 100:
 		_fail("packaged OSM patch incomplete")
 		return
+	var nearest_origin_road = map_stream.nearest_named_road(Vector2.ZERO)
+	if str(nearest_origin_road.get("name", "")) != "Pittville Street" or float(nearest_origin_road.get("distance_m", INF)) > 30.0:
+		_fail("verified Pittville Street context missing near postcode centroid")
+		return
+	var origin_lat_lon = map_stream.local_to_lat_lon(Vector2.ZERO)
+	if abs(origin_lat_lon.x - 55.951507) > 0.000001 or abs(origin_lat_lon.y + 3.107122) > 0.000001:
+		_fail("local map coordinate conversion regressed")
+		return
+	if map_stream.map_source_date() != "2026-09-20":
+		_fail("source date missing from packaged map")
+		return
 	if bay == null or bay.surfaces.size() != 5 or bay.cal_offsets_five.size() != 5:
 		_fail("five-surface projector calibration missing")
 		return
@@ -89,7 +100,7 @@ func _finish():
 			_fail("directive missing " + key)
 			return
 	var moved = start_position.distance_to(car.global_position)
-	print("PUA_SOAK_OK moved=%.2f traffic=%.2f lamps=%.2f moment=%s map=%s roads=%d buildings=%d surfaces=%d sources=%s" % [
+	print("PUA_SOAK_OK moved=%.2f traffic=%.2f lamps=%.2f moment=%s map=%s roads=%d buildings=%d nearest=%s distance=%.1fm surfaces=%d sources=%s" % [
 		moved,
 		float(directive.get("traffic_factor", 0.0)),
 		float(directive.get("lamp_factor", 0.0)),
@@ -97,6 +108,8 @@ func _finish():
 		str(map_stream.data.get("start_postcode", "")),
 		map_stream.data.get("roads", []).size(),
 		map_stream.data.get("buildings", []).size(),
+		str(nearest_origin_road.get("name", "")),
+		float(nearest_origin_road.get("distance_m", 0.0)),
 		bay.surfaces.size(),
 		JSON.stringify(snapshot.get("sources", {}))
 	])

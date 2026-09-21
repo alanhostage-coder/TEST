@@ -44,7 +44,8 @@ func _draw():
 	if weather:
 		draw_string(font, Vector2(viewport_size.x * 0.5 - 100, viewport_size.y - 119), "WEATHER: %s  [F6]" % str(weather.state.get("source", "offline")).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.9, 0.85, 0.7))
 	if not OS.has_feature("mobile"):
-		draw_string(font, Vector2(viewport_size.x * 0.5 - 210, viewport_size.y - 22), "WASD  DRIVE   SPACE  BRAKE   R  RECOVER   F11  FULLSCREEN", HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.85, 0.87, 0.87, 0.8))
+		var map_control = "   M  MAP" if OS.has_feature("pc_max") or OS.has_feature("projector_max") else ""
+		draw_string(font, Vector2(viewport_size.x * 0.5 - 250, viewport_size.y - 22), "WASD  DRIVE   SPACE  BRAKE   R  RECOVER%s   F11  FULLSCREEN" % map_control, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.85, 0.87, 0.87, 0.8))
 	# Subtle sight marker keeps the eye aligned with the road at speed.
 	var centre = viewport_size * 0.5
 	draw_line(centre - Vector2(13, 0), centre - Vector2(4, 0), Color(1, 0.82, 0.55, 0.30), 1.0)

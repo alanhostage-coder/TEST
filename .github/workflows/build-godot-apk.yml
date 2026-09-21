@@ -40,13 +40,13 @@ jobs:
         run: |
           mkdir -p build/android
           EXPORT_DIR="$(readlink -f build/android)"
-          godot --headless --verbose --path godot --export-debug "Android" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_74.apk"
-          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_74.apk"
-          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_74.apk"
+          godot --headless --verbose --path godot --export-debug "Android" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_75.apk"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_75.apk"
+          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_75.apk"
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.74-ANDROID
-          path: build/android/PROCEED_UNTIL_APPREHENDED_0_74.apk
+          name: PUA-0.75-ANDROID
+          path: build/android/PROCEED_UNTIL_APPREHENDED_0_75.apk
           if-no-files-found: error
           retention-days: 30

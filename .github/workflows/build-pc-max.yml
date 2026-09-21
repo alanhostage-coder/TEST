@@ -63,21 +63,21 @@ jobs:
         run: |
           mkdir -p build/pcmax
           EXPORT_DIR="$(readlink -f build/pcmax)"
-          godot --headless --verbose --path godot --export-release "Windows PC Max" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_74_PC_MAX.exe"
-          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_74_PC_MAX.exe"
+          godot --headless --verbose --path godot --export-release "Windows PC Max" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe"
           cd "$EXPORT_DIR"
           cat > PLAY_PUA_PC_MAX.cmd <<'EOF'
           @echo off
           cd /d "%~dp0"
-          PROCEED_UNTIL_APPREHENDED_0_74_PC_MAX.exe --resolution 1920x1080
+          PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe --resolution 1920x1080
           EOF
           cat > PLAY_PUA_PC_MAX_FULLSCREEN.cmd <<'EOF'
           @echo off
           cd /d "%~dp0"
-          PROCEED_UNTIL_APPREHENDED_0_74_PC_MAX.exe --resolution 1920x1080 --fullscreen
+          PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe --resolution 1920x1080 --fullscreen
           EOF
           cat > README-PC-MAX.txt <<'EOF'
-          PROCEED UNTIL APPREHENDED 0.74 - PC MAX
+          PROCEED UNTIL APPREHENDED 0.75 - PC MAX
 
           Tuned for a modern Windows laptop/desktop with a discrete or capable integrated GPU.
           Recommended: PLAY_PUA_PC_MAX.cmd for a 1920x1080 window.
@@ -88,6 +88,7 @@ jobs:
           CAL supports five separate surfaces or the optional three-bay-only layout.
           The five-surface defaults are an unmeasured starting layout; align every corner
           and yaw to the closed shutters before judging the physical projection.
+          The OSM panel names the nearest mapped road and source date; M toggles it.
           F6 cycles WEATHER through live / clear / rain / fog.
 
           Controller:
@@ -98,8 +99,8 @@ jobs:
           X = handbrake
           Y / right shoulder = Bay Window view toggle
           EOF
-          sha256sum PROCEED_UNTIL_APPREHENDED_0_74_PC_MAX.exe > SHA256-PC-MAX.txt
-          zip -9 PUA-0.74-PC-MAX-PORTABLE.zip PROCEED_UNTIL_APPREHENDED_0_74_PC_MAX.exe PLAY_PUA_PC_MAX.cmd PLAY_PUA_PC_MAX_FULLSCREEN.cmd README-PC-MAX.txt SHA256-PC-MAX.txt
+          sha256sum PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe > SHA256-PC-MAX.txt
+          zip -9 PUA-0.75-PC-MAX-PORTABLE.zip PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe PLAY_PUA_PC_MAX.cmd PLAY_PUA_PC_MAX_FULLSCREEN.cmd README-PC-MAX.txt SHA256-PC-MAX.txt
 
       - name: Build Windows installer
         run: |
@@ -108,8 +109,8 @@ jobs:
           Unicode True
           !include "MUI2.nsh"
 
-          Name "PROCEED UNTIL APPREHENDED 0.74 PC MAX"
-          OutFile "PUA-0.74-PC-MAX-Setup.exe"
+          Name "PROCEED UNTIL APPREHENDED 0.75 PC MAX"
+          OutFile "PUA-0.75-PC-MAX-Setup.exe"
           InstallDir "$LOCALAPPDATA\Programs\ProceedUntilApprehended"
           RequestExecutionLevel user
           SetCompressor /SOLID lzma
@@ -118,7 +119,7 @@ jobs:
           !insertmacro MUI_PAGE_WELCOME
           !insertmacro MUI_PAGE_DIRECTORY
           !insertmacro MUI_PAGE_INSTFILES
-          !define MUI_FINISHPAGE_RUN "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_74_PC_MAX.exe"
+          !define MUI_FINISHPAGE_RUN "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe"
           !insertmacro MUI_PAGE_FINISH
           !insertmacro MUI_UNPAGE_CONFIRM
           !insertmacro MUI_UNPAGE_INSTFILES
@@ -126,18 +127,18 @@ jobs:
 
           Section "Game" SecGame
             SetOutPath "$INSTDIR"
-            File "PROCEED_UNTIL_APPREHENDED_0_74_PC_MAX.exe"
+            File "PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe"
             File "README-PC-MAX.txt"
             File "SHA256-PC-MAX.txt"
 
             CreateDirectory "$SMPROGRAMS\PROCEED UNTIL APPREHENDED"
-            CreateShortCut "$DESKTOP\PROCEED UNTIL APPREHENDED.lnk" "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_74_PC_MAX.exe" "--resolution 1920x1080"
-            CreateShortCut "$SMPROGRAMS\PROCEED UNTIL APPREHENDED\Play PUA PC MAX.lnk" "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_74_PC_MAX.exe" "--resolution 1920x1080"
-            CreateShortCut "$SMPROGRAMS\PROCEED UNTIL APPREHENDED\Play PUA PC MAX Fullscreen.lnk" "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_74_PC_MAX.exe" "--resolution 1920x1080 --fullscreen"
+            CreateShortCut "$DESKTOP\PROCEED UNTIL APPREHENDED.lnk" "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe" "--resolution 1920x1080"
+            CreateShortCut "$SMPROGRAMS\PROCEED UNTIL APPREHENDED\Play PUA PC MAX.lnk" "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe" "--resolution 1920x1080"
+            CreateShortCut "$SMPROGRAMS\PROCEED UNTIL APPREHENDED\Play PUA PC MAX Fullscreen.lnk" "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe" "--resolution 1920x1080 --fullscreen"
 
             WriteUninstaller "$INSTDIR\Uninstall.exe"
-            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAPCMax" "DisplayName" "PROCEED UNTIL APPREHENDED 0.74 PC MAX"
-            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAPCMax" "DisplayVersion" "0.74"
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAPCMax" "DisplayName" "PROCEED UNTIL APPREHENDED 0.75 PC MAX"
+            WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAPCMax" "DisplayVersion" "0.75"
             WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAPCMax" "Publisher" "Abbey Hill"
             WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAPCMax" "UninstallString" "$\"$INSTDIR\Uninstall.exe$\""
             WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\PUAPCMax" "NoModify" 1
@@ -149,7 +150,7 @@ jobs:
             Delete "$SMPROGRAMS\PROCEED UNTIL APPREHENDED\Play PUA PC MAX.lnk"
             Delete "$SMPROGRAMS\PROCEED UNTIL APPREHENDED\Play PUA PC MAX Fullscreen.lnk"
             RMDir "$SMPROGRAMS\PROCEED UNTIL APPREHENDED"
-            Delete "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_74_PC_MAX.exe"
+            Delete "$INSTDIR\PROCEED_UNTIL_APPREHENDED_0_75_PC_MAX.exe"
             Delete "$INSTDIR\README-PC-MAX.txt"
             Delete "$INSTDIR\SHA256-PC-MAX.txt"
             Delete "$INSTDIR\Uninstall.exe"
@@ -158,16 +159,16 @@ jobs:
           SectionEnd
           EOF
           makensis installer.nsi
-          test -s PUA-0.74-PC-MAX-Setup.exe
-          sha256sum PUA-0.74-PC-MAX-Setup.exe > SHA256-INSTALLER.txt
-          ls -lh PUA-0.74-PC-MAX-Setup.exe PUA-0.74-PC-MAX-PORTABLE.zip
+          test -s PUA-0.75-PC-MAX-Setup.exe
+          sha256sum PUA-0.75-PC-MAX-Setup.exe > SHA256-INSTALLER.txt
+          ls -lh PUA-0.75-PC-MAX-Setup.exe PUA-0.75-PC-MAX-PORTABLE.zip
 
       - name: Upload PC Max installer
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.74-PC-MAX-INSTALLER
+          name: PUA-0.75-PC-MAX-INSTALLER
           path: |
-            build/pcmax/PUA-0.74-PC-MAX-Setup.exe
+            build/pcmax/PUA-0.75-PC-MAX-Setup.exe
             build/pcmax/SHA256-INSTALLER.txt
           if-no-files-found: error
           retention-days: 30
@@ -175,7 +176,7 @@ jobs:
       - name: Upload PC Max portable
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.74-PC-MAX-PORTABLE
-          path: build/pcmax/PUA-0.74-PC-MAX-PORTABLE.zip
+          name: PUA-0.75-PC-MAX-PORTABLE
+          path: build/pcmax/PUA-0.75-PC-MAX-PORTABLE.zip
           if-no-files-found: error
           retention-days: 30

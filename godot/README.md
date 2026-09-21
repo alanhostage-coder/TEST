@@ -6,12 +6,14 @@ Acceptance rule: if a road, yard, light or transmitter makes the player think "I
 
 First slice: Godot Mobile renderer, real 3D collision space, reversible free driving, chase camera, deterministic streamed world cells. No missions, scores, streaks or completion state. AI EYES remains identity-free.
 
-## 0.74 geographic and projector baseline
+## 0.75 geographic and projector baseline
 
 - The start patch is `patches/eh15_2bz.json`, centred on the verified postcodes.io
   centroid `55.951507,-3.107122`. That origin is not a surveyed window position.
 - Roads, junction topology, footprints, street names and mapped POIs come from
   source-dated OpenStreetMap data. OSM attribution remains visible.
+- PC Max and Projector Max show the nearest genuine mapped road, its distance,
+  source date and map-frame coordinate. Press `M` to hide or restore the map.
 - Each road width and building height says whether it is OSM-tagged or estimated.
   Generic facade treatment is visual only and is not a claim about a real facade.
 - Projector Max starts in five-surface mode: three bay shutters and two separate

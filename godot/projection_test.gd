@@ -15,10 +15,24 @@ func run():
 	assert(bay.black_mask.visible)
 	for camera in bay.cameras:
 		assert(camera.global_position.is_finite())
+	var osm_overlay = world.get_node("OSMGroundTiles")
+	osm_overlay._build_live_map_overlay()
+	osm_overlay._bind_map_stream()
+	var car = world.get_node("Car")
+	var saved_car_position = car.global_position
+	car.global_position = Vector3.ZERO
+	osm_overlay._update_location_text(true)
+	assert("PITTVILLE STREET" in osm_overlay._overlay_street.text)
+	assert("2026-09-20" in osm_overlay._overlay_coords.text)
+	car.global_position = saved_car_position
 	bay._set_mode(2)
-	assert(not world.get_node("Car").is_physics_processing())
+	osm_overlay._process(0.3)
+	assert(not osm_overlay._overlay_root.visible)
+	assert(not car.is_physics_processing())
 	bay._set_mode(0)
-	assert(world.get_node("Car").is_physics_processing())
+	osm_overlay._process(0.3)
+	assert(osm_overlay._overlay_root.visible)
+	assert(car.is_physics_processing())
 	var weather = world.get_node("WorldState")
 	weather.set_weather_mode("RAIN")
 	assert(weather.state.rain == 4.0)

@@ -12,10 +12,16 @@ centred on the quality-1 postcodes.io centroid for EH15 2BZ:
 Every building height and road width states whether it came from an OSM tag or
 was estimated. No photograph-derived geometry is included.
 
+The source snapshot currently validates as 220 roads, 1,107 road segments,
+214 shared-road junction nodes, 320 OSM building footprints, 132 named roads
+and 173 named POIs. All 320 building heights are clearly labelled estimates
+because this source snapshot contains no usable OSM height tags.
+
 Rebuild with:
 
 ```bash
 python3 tools/build_osm_patch.py
+python3 tools/validate_location_patch.py
 ```
 
 Data © OpenStreetMap contributors, ODbL 1.0.

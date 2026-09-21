@@ -2,7 +2,7 @@ name: Validate PUA Godot
 on:
   push:
     branches: [ main ]
-    paths: [ 'godot/**', 'tools/build_osm_patch.py', '.github/workflows/validate-godot.yml' ]
+    paths: [ 'godot/**', 'tools/build_osm_patch.py', 'tools/validate_location_patch.py', '.github/workflows/validate-godot.yml' ]
   workflow_dispatch:
 jobs:
   validate:
@@ -51,21 +51,10 @@ jobs:
           grep -q 'const FALLBACK_LON := -3.107122' godot/map_stream.gd
           grep -q 'const MAX_SURFACES := 5' godot/bay_projection.gd
           grep -q 'set_weather_mode' godot/world_state.gd
-          python3 - <<'PY'
-          import json, pathlib
-          root=pathlib.Path('godot/patches')
-          p=json.load(open(root/'eh15_2bz.json'))
-          for feature,names in p['parts'].items():
-              p[feature]=[]
-              for name in names:
-                  p[feature].extend(json.load(open(root/name))['items'])
-          assert p['start_postcode']=='EH15 2BZ'
-          assert (p['center_lat'],p['center_lon'])==(55.951507,-3.107122)
-          assert len(p['roads']) >= 100 and len(p['buildings']) >= 100
-          assert any(r['name']=='Pittville Street' for r in p['roads'])
-          assert all('width_source' in r for r in p['roads'])
-          assert all('height_source' in b for b in p['buildings'])
-          PY
+          grep -q 'nearest_named_road' godot/map_stream.gd
+          grep -q 'OS.has_feature("projector_max")' godot/osm_ground_tiles.gd
+          mkdir -p build/location-patch
+          python3 tools/validate_location_patch.py --json build/location-patch/EH15-2BZ-VALIDATION.json
           grep -q 'poi_features' godot/map_stream.gd
           grep -q '_add_mapped_road_name_signs' godot/world.gd
           grep -q '_add_named_poi_markers' godot/world.gd
@@ -76,7 +65,7 @@ jobs:
       - name: Package independent EH15 location patch
         run: |
           mkdir -p build/location-patch
-          zip -j build/location-patch/PUA-EH15-2BZ-OSM-PATCH-2026-09-20.zip godot/patches/README.md godot/patches/eh15_2bz*.json
+          zip -j build/location-patch/PUA-EH15-2BZ-OSM-PATCH-2026-09-20.zip godot/patches/README.md godot/patches/eh15_2bz*.json build/location-patch/EH15-2BZ-VALIDATION.json
           sha256sum build/location-patch/PUA-EH15-2BZ-OSM-PATCH-2026-09-20.zip > build/location-patch/SHA256-EH15-PATCH.txt
           test -s build/location-patch/PUA-EH15-2BZ-OSM-PATCH-2026-09-20.zip
 
@@ -87,5 +76,6 @@ jobs:
           path: |
             build/location-patch/PUA-EH15-2BZ-OSM-PATCH-2026-09-20.zip
             build/location-patch/SHA256-EH15-PATCH.txt
+            build/location-patch/EH15-2BZ-VALIDATION.json
           if-no-files-found: error
           retention-days: 30

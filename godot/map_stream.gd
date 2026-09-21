@@ -41,6 +41,7 @@ var data := {
 }
 
 var _request: HTTPRequest
+var _named_road_segments: Array = []
 
 func _ready():
 	var cache_fresh = _load_cache()
@@ -50,6 +51,7 @@ func _ready():
 		center_lat = float(data.get("center_lat", FALLBACK_LAT))
 		center_lon = float(data.get("center_lon", FALLBACK_LON))
 		resolved_postcode = str(data.get("start_postcode", START_POSTCODE))
+		_rebuild_named_road_index()
 		location_ready.emit(center_lat, center_lon, resolved_postcode)
 		map_ready.emit(data)
 	if not cache_fresh:
@@ -137,7 +139,7 @@ func _fetch_osm():
 	var url = OVERPASS_URL + "?data=" + query.uri_encode()
 	var headers = PackedStringArray([
 		"Accept: application/json",
-		"User-Agent: ProceedUntilApprehended/0.74 (Godot; EH15 source-labelled cached OSM geometry)"
+		"User-Agent: ProceedUntilApprehended/0.75 (Godot; EH15 source-labelled cached OSM geometry)"
 	])
 	var err = _request.request(url, headers, HTTPClient.METHOD_GET)
 	if err != OK:
@@ -273,8 +275,78 @@ func _on_request_completed(result: int, response_code: int, _headers, body: Pack
 		"poi_features": poi_features,
 		"updated_unix": int(Time.get_unix_time_from_system())
 	}
+	_rebuild_named_road_index()
 	_save_cache()
 	map_ready.emit(data)
+
+func _rebuild_named_road_index():
+	_named_road_segments.clear()
+	for road in data.get("roads", []):
+		if not road is Dictionary:
+			continue
+		var name = str(road.get("name", "")).strip_edges()
+		var ref = str(road.get("ref", "")).strip_edges()
+		if name == "" and ref == "":
+			continue
+		var points = road.get("points", [])
+		if not points is Array:
+			continue
+		for i in range(points.size() - 1):
+			var p0 = points[i]
+			var p1 = points[i + 1]
+			if not p0 is Array or not p1 is Array or p0.size() < 2 or p1.size() < 2:
+				continue
+			var a = Vector2(float(p0[0]), float(p0[1]))
+			var b = Vector2(float(p1[0]), float(p1[1]))
+			if a.distance_squared_to(b) < 0.01:
+				continue
+			_named_road_segments.append({
+				"a": a,
+				"b": b,
+				"name": name,
+				"ref": ref,
+				"osm_id": int(road.get("osm_id", 0))
+			})
+
+func nearest_named_road(local_position: Vector2) -> Dictionary:
+	var best_distance := INF
+	var best: Dictionary = {}
+	for segment in _named_road_segments:
+		var a: Vector2 = segment["a"]
+		var b: Vector2 = segment["b"]
+		var ab = b - a
+		var denominator = ab.length_squared()
+		if denominator < 0.001:
+			continue
+		var t = clamp((local_position - a).dot(ab) / denominator, 0.0, 1.0)
+		var nearest = a + ab * t
+		var distance = local_position.distance_to(nearest)
+		if distance < best_distance:
+			best_distance = distance
+			best = {
+				"name": str(segment["name"]),
+				"ref": str(segment["ref"]),
+				"osm_id": int(segment["osm_id"]),
+				"distance_m": distance,
+				"nearest_local": nearest
+			}
+	return best
+
+func local_to_lat_lon(local_position: Vector2) -> Vector2:
+	var meters_per_lon = 111320.0 * cos(deg_to_rad(center_lat))
+	var latitude = center_lat - local_position.y / 111320.0
+	var longitude = center_lon + local_position.x / max(1.0, meters_per_lon)
+	return Vector2(latitude, longitude)
+
+func map_source_date() -> String:
+	var timestamp = str(data.get("source_timestamp_utc", ""))
+	if timestamp.length() >= 10:
+		return timestamp.substr(0, 10)
+	var unix_time = int(data.get("updated_unix", 0))
+	if unix_time > 0:
+		var date = Time.get_date_dict_from_unix_time(unix_time)
+		return "%04d-%02d-%02d" % [int(date.get("year", 0)), int(date.get("month", 0)), int(date.get("day", 0))]
+	return "OFFLINE"
 
 func _line_feature_closer(a: Dictionary, b: Dictionary) -> bool:
 	return _line_feature_distance(a) < _line_feature_distance(b)
