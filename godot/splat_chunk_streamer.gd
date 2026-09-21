@@ -16,6 +16,7 @@ var viewer: Node3D = null
 var chunks: Array[Node3D] = []
 var last_visible_count := -1
 var peak_visible_count := 0
+var stream_enabled := true
 
 func _ready() -> void:
 	viewer = get_viewport().get_camera_3d()
@@ -25,6 +26,8 @@ func _ready() -> void:
 	set_process(true)
 
 func _process(delta: float) -> void:
+	if not stream_enabled:
+		return
 	update_accum += delta
 	if update_accum < update_interval_s:
 		return
@@ -63,3 +66,9 @@ func _process(delta: float) -> void:
 	if visible_count != last_visible_count:
 		last_visible_count = visible_count
 		print("PUA_SPLAT_STREAM: active_chunks=", visible_count, " total_chunks=", chunks.size(), " peak=", peak_visible_count)
+
+func set_stream_enabled(enabled: bool) -> void:
+	stream_enabled = enabled
+	if not enabled:
+		for chunk in chunks:
+			chunk.visible = false
