@@ -52,6 +52,8 @@ var path_mat
 var sign_white_mat
 var sign_red_mat
 var sign_blue_mat
+var road_patch_mat
+var weed_mat
 
 func _ready():
 	projector_max_mode = OS.has_feature("projector_max")
@@ -118,6 +120,9 @@ func _make_materials():
 	sign_white_mat = _mat(Color(0.88, 0.88, 0.84), 0.72, 0.0)
 	sign_red_mat = _mat(Color(0.62, 0.045, 0.035), 0.66, 0.0)
 	sign_blue_mat = _mat(Color(0.055, 0.18, 0.48), 0.64, 0.0)
+	# Shared materials keep close-range texture cheap on old integrated GPUs.
+	road_patch_mat = _mat(Color(0.035, 0.038, 0.041), 0.46, 0.03)
+	weed_mat = _mat(Color(0.15, 0.21, 0.08), 0.98, 0.0)
 
 func _mat(color: Color, roughness: float, metallic: float):
 	var m = StandardMaterial3D.new()
@@ -125,6 +130,19 @@ func _mat(color: Color, roughness: float, metallic: float):
 	m.roughness = roughness
 	m.metallic = metallic
 	return m
+
+func _apply_secondary_visual_budget(mesh: GeometryInstance3D, low_spec_range := 0.0):
+	# Five projector cameras multiply shadow work. Keep the geometry and material cue,
+	# but secondary trim/furniture does not need to enter every low-spec shadow map.
+	mesh.set_meta("secondary_visual", true)
+	if low_spec_mode:
+		mesh.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		mesh.set_meta("low_spec_shadow_disabled", true)
+		if low_spec_range > 0.0:
+			if mesh.visibility_range_end <= 0.0:
+				mesh.visibility_range_end = low_spec_range
+			else:
+				mesh.visibility_range_end = min(mesh.visibility_range_end, low_spec_range)
 
 func _box(parent: Node3D, pos: Vector3, size: Vector3, material = null):
 	var body = StaticBody3D.new()
@@ -178,6 +196,7 @@ func _live_road_markings(parent: Node3D, pos: Vector3, length: float, width: flo
 		dash.position = Vector3(p.x, 0.091, p.y)
 		dash.rotation.y = angle
 		dash.visibility_range_end = 135.0
+		_apply_secondary_visual_budget(dash, 105.0)
 		parent.add_child(dash)
 
 func _street_edges_rotated(parent: Node3D, pos: Vector3, length: float, width: float, angle: float, kind: String):
@@ -197,6 +216,7 @@ func _street_edges_rotated(parent: Node3D, pos: Vector3, length: float, width: f
 		pavement.position = pos + Vector3(off.x, 0.075, off.y)
 		pavement.rotation.y = angle
 		pavement.visibility_range_end = 180.0
+		_apply_secondary_visual_budget(pavement, 120.0)
 		parent.add_child(pavement)
 
 		var kerb_off = normal * side * (width * 0.5 + 0.08)
@@ -208,6 +228,7 @@ func _street_edges_rotated(parent: Node3D, pos: Vector3, length: float, width: f
 		kerb.position = pos + Vector3(kerb_off.x, 0.10, kerb_off.y)
 		kerb.rotation.y = angle
 		kerb.visibility_range_end = 145.0
+		_apply_secondary_visual_budget(kerb, 110.0)
 		parent.add_child(kerb)
 
 func _road_material_for(surface: String):
@@ -296,6 +317,7 @@ func _add_mapped_point_features(parent: Node3D, features: Array):
 			trunk.position = p + Vector3(0, 1.1, 0)
 			trunk.material_override = _mat(Color(0.16, 0.10, 0.055), 0.96, 0.0)
 			trunk.visibility_range_end = 150.0 if not low_spec_mode else 90.0
+			_apply_secondary_visual_budget(trunk, 90.0)
 			parent.add_child(trunk)
 			var crown = MeshInstance3D.new()
 			var sm = SphereMesh.new()
@@ -307,6 +329,7 @@ func _add_mapped_point_features(parent: Node3D, features: Array):
 			crown.position = p + Vector3(0, 3.0, 0)
 			crown.material_override = hedge_mat
 			crown.visibility_range_end = 165.0 if not low_spec_mode else 95.0
+			_apply_secondary_visual_budget(crown, 95.0)
 			parent.add_child(crown)
 		elif kind == "traffic_signals":
 			_visual_box(parent, p + Vector3(0, 1.55, 0), Vector3(0.12, 3.1, 0.12), metal_mat)
@@ -437,6 +460,7 @@ func _visual_box(parent: Node3D, pos: Vector3, size: Vector3, material):
 	mesh.mesh = bm
 	mesh.material_override = material
 	mesh.position = pos
+	_apply_secondary_visual_budget(mesh)
 	parent.add_child(mesh)
 
 func _road_micro_detail(parent: Node3D, a: Vector2, b: Vector2, width: float, seed: int, budget: int) -> int:
@@ -480,8 +504,9 @@ func _road_micro_detail(parent: Node3D, a: Vector2, b: Vector2, width: float, se
 			patch.mesh = pm
 			patch.position = Vector3(p.x, 0.091, p.y)
 			patch.rotation.y = atan2(tangent.x, tangent.y) + float(((seed + i) % 5) - 2) * 0.035
-			patch.material_override = _mat(Color(0.035, 0.038, 0.041), 0.46, 0.03)
+			patch.material_override = road_patch_mat
 			patch.visibility_range_end = 105.0
+			_apply_secondary_visual_budget(patch, 72.0)
 			parent.add_child(patch)
 		elif kind == 2:
 			var side = -1.0 if (seed + i) % 2 == 0 else 1.0
@@ -492,8 +517,9 @@ func _road_micro_detail(parent: Node3D, a: Vector2, b: Vector2, width: float, se
 			weed.mesh = qm
 			weed.position = Vector3(verge.x, 0.20, verge.y)
 			weed.rotation.y = atan2(normal.x, normal.y) + float(i) * 0.37
-			weed.material_override = _mat(Color(0.15, 0.21, 0.08), 0.98, 0.0)
+			weed.material_override = weed_mat
 			weed.visibility_range_end = 72.0
+			_apply_secondary_visual_budget(weed, 54.0)
 			parent.add_child(weed)
 	return count
 
