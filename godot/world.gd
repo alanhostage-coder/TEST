@@ -498,7 +498,7 @@ func _add_opening_anchor_annotation(parent: Node3D, car: Node, pois: Array, buil
 		# verified first-impression cue. At the selected EH15 opening distance this
 		# produces a compact, legible projector annotation instead of a two-pixel
 		# trace, while perspective scaling still prevents a screen-filling banner.
-		label.pixel_size = 0.014
+		label.pixel_size = 0.012
 		# Depth-independent rendering makes this unambiguously a map overlay rather
 		# than a claim that a physical sign exists on the facade. Keep ordinary
 		# perspective scaling: fixed_size turns a long business name into a giant
@@ -513,7 +513,7 @@ func _add_opening_anchor_annotation(parent: Node3D, car: Node, pois: Array, buil
 		# Keep the anchor at the exact OSM coordinate, but lay the annotation out to
 		# its right so the name is not bisected by a physical shutter gap.
 		label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
-		label.offset = Vector2(6.0, 0.0)
+		label.offset = Vector2(18.0, 0.0)
 		label.no_depth_test = true
 		label.visibility_range_end = 140.0 if low_spec_mode else 210.0
 		label.set_meta("annotation_only", true)

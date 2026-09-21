@@ -68,6 +68,12 @@ jobs:
           test -s /tmp/pua-projector-proof.png
           test -s /tmp/pua-projector-continuity.png
           test -s /tmp/pua-projector-proof.json
+          # Preserve the complete raster evidence even when a visual assertion
+          # fails, so the next correction is based on pixels rather than logs.
+          cp /tmp/pua-projector-proof.png build/projector-proof/
+          cp /tmp/pua-projector-continuity.png build/projector-proof/
+          cp /tmp/pua-projector-panel-*.png build/projector-proof/
+          cp /tmp/pua-projector-proof.json build/projector-proof/
           python3 - <<'PY'
           import json
           from glob import glob
@@ -84,6 +90,7 @@ jobs:
           opening_marker_max_width = 0
           opening_marker_max_height = 0
           opening_marker_touches_edge = False
+          opening_marker_bounds = []
           for panel in panels:
               rendered = Image.open(panel).convert('RGB')
               assert rendered.width >= 64 and rendered.height >= 180, (panel, rendered.size)
@@ -97,6 +104,7 @@ jobs:
               if marker_points:
                   marker_xs = [point[0] for point in marker_points]
                   marker_ys = [point[1] for point in marker_points]
+                  opening_marker_bounds.append((panel, min(marker_xs), min(marker_ys), max(marker_xs), max(marker_ys)))
                   opening_marker_max_width = max(opening_marker_max_width, max(marker_xs) - min(marker_xs) + 1)
                   opening_marker_max_height = max(opening_marker_max_height, max(marker_ys) - min(marker_ys) + 1)
                   opening_marker_touches_edge |= min(marker_xs) <= 1 or max(marker_xs) >= rendered.width - 2
@@ -105,7 +113,7 @@ jobs:
           assert 60 <= opening_marker_max_width <= 175, f'opening anchor width is not projector-legible: {opening_marker_max_width}'
           assert opening_marker_max_height >= 4, f'opening anchor is too short to read: {opening_marker_max_height}'
           assert opening_marker_max_height <= 32, f'opening anchor became too tall for a restrained annotation: {opening_marker_max_height}'
-          assert not opening_marker_touches_edge, 'opening anchor is clipped by a panel edge'
+          assert not opening_marker_touches_edge, f'opening anchor is clipped by a panel edge: {opening_marker_bounds}'
           with open('/tmp/pua-projector-proof.json', encoding='utf-8') as handle:
               proof = json.load(handle)
           assert proof['proof_profile'] == 'deterministic-clear-five-surface-v1', proof
