@@ -5,6 +5,8 @@ extends Node3D
 @export var load_radius_m := 220.0
 @export var unload_radius_m := 270.0
 @export var update_interval_s := 0.15
+@export var preload_radius_m := 320.0
+@export var max_preload_chunks := 5
 var update_accum := 0.0
 
 var viewer: Node3D = null
@@ -32,9 +34,12 @@ func _process(delta: float) -> void:
 		ranked.append({"node": chunk, "distance": d})
 	ranked.sort_custom(func(a, b): return a["distance"] < b["distance"])
 	var visible_count := 0
+	var preload_count := 0
 	for item in ranked:
 		var chunk: Node3D = item["node"]
 		var distance: float = item["distance"]
+		if distance <= preload_radius_m and preload_count < max_preload_chunks:
+			preload_count += 1
 		var should_show := distance <= load_radius_m and visible_count < max_loaded_chunks
 		if chunk.visible and distance <= unload_radius_m and visible_count < max_loaded_chunks:
 			should_show = true
