@@ -6,6 +6,7 @@ signal changed(state)
 const WEATHER_URL := "https://api.open-meteo.com/v1/forecast?latitude=55.951507&longitude=-3.107122&current=temperature_2m,relative_humidity_2m,precipitation,rain,weather_code,cloud_cover,wind_speed_10m,wind_direction_10m,wind_gusts_10m,visibility&daily=sunrise,sunset&timezone=Europe%2FLondon&forecast_days=1"
 const MARINE_URL := "https://marine-api.open-meteo.com/v1/marine?latitude=56.00&longitude=-3.10&current=wave_height,wave_direction,wave_period,sea_surface_temperature&timezone=Europe%2FLondon"
 const AIR_URL := "https://air-quality-api.open-meteo.com/v1/air-quality?latitude=55.951507&longitude=-3.107122&current=pm10,pm2_5,nitrogen_dioxide,european_aqi&timezone=Europe%2FLondon"
+const SEPA_RAIN_URL := "https://timeseries.sepa.org.uk/KiWIS/KiWIS?service=kisters&type=queryServices&datasource=0&request=getTimeseriesValues&ts_path=1/15201/RE/15m.Total&returnfields=Timestamp,Value,Quality%20Code&format=csv&csvdiv=,"
 const CACHE_PATH := "user://pua_world_state_eh15_v2.json"
 const REFRESH_SECONDS := 900.0
 
@@ -29,6 +30,8 @@ var state := {
 	"pm2_5": 7.0,
 	"no2": 18.0,
 	"aqi": 28.0,
+	"observed_rain_15m_mm": 0.0,
+	"observed_rain_station": "Edinburgh Royal Botanic Gardens · SEPA 15201",
 	"updated_unix": 0
 }
 
@@ -74,6 +77,7 @@ func _fetch_all():
 	_fetch("weather", WEATHER_URL)
 	_fetch("marine", MARINE_URL)
 	_fetch("air", AIR_URL)
+	_fetch("sepa_rain", SEPA_RAIN_URL)
 
 func _fetch(kind: String, url: String):
 	if _requests.has(kind):
@@ -92,6 +96,11 @@ func _on_request_completed(result: int, response_code: int, _headers, body: Pack
 	_requests.erase(kind)
 	request.queue_free()
 	if result != HTTPRequest.RESULT_SUCCESS or response_code < 200 or response_code >= 300:
+		return
+	if kind == "sepa_rain":
+		_apply_sepa_rain(body.get_string_from_utf8())
+		_save_cache()
+		_publish_weather()
 		return
 	var parsed = JSON.parse_string(body.get_string_from_utf8())
 	if not parsed is Dictionary:
@@ -136,6 +145,24 @@ func _apply_air(c: Dictionary):
 	state["pm2_5"] = float(c.get("pm2_5", state["pm2_5"]))
 	state["no2"] = float(c.get("nitrogen_dioxide", state["no2"]))
 	state["aqi"] = float(c.get("european_aqi", state["aqi"]))
+
+func _apply_sepa_rain(csv_text: String):
+	var latest := -1.0
+	for raw_line in csv_text.split("\n"):
+		var line = raw_line.strip_edges()
+		if line == "" or line.begins_with("#"):
+			continue
+		var fields = line.split(",")
+		if fields.size() < 2:
+			fields = line.split(";")
+		if fields.size() < 2:
+			continue
+		var candidate = str(fields[1]).strip_edges().trim_prefix("\"").trim_suffix("\"")
+		if candidate.is_valid_float():
+			latest = float(candidate)
+	if latest >= 0.0:
+		live_state["observed_rain_15m_mm"] = latest
+		live_state["observed_rain_station"] = "Edinburgh Royal Botanic Gardens · SEPA 15201"
 
 func _save_cache():
 	var file = FileAccess.open(CACHE_PATH, FileAccess.WRITE)
