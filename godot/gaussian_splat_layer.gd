@@ -61,7 +61,7 @@ func _metadata_is_safe() -> bool:
 	if bool(meta.get("redistribution_allowed", false)) != true:
 		return false
 	var digest := str(meta.get("asset_sha256", "")).strip_edges().to_lower()
-	if digest.length() != 64 or not digest.is_valid_hex_number():
+	if digest.length() != 64 or not digest.is_valid_hex_number(false):
 		return false
 	if str(meta.get("source", "")).strip_edges() == "":
 		return false
