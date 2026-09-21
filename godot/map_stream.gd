@@ -54,7 +54,9 @@ func _ready():
 		_rebuild_named_road_index()
 		location_ready.emit(center_lat, center_lon, resolved_postcode)
 		map_ready.emit(data)
-	if not cache_fresh:
+	# Headless validation must exercise the packaged, source-dated patch
+	# deterministically. Playable builds still refresh from Overpass when online.
+	if not cache_fresh and DisplayServer.get_name() != "headless":
 		_fetch_osm()
 
 func _load_packaged_patch() -> bool:

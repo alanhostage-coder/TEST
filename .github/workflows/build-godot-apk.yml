@@ -33,8 +33,12 @@ jobs:
           if grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/pua-godot.log; then exit 1; fi
       - name: PUA headless soak gate
         run: |
+          set +e
           timeout 30s godot --headless --path godot res://pua_soak_test.tscn > /tmp/pua-soak.log 2>&1
+          status=$?
+          set -e
           cat /tmp/pua-soak.log
+          test "$status" -eq 0
           grep -q 'PUA_SOAK_OK' /tmp/pua-soak.log
       - name: Export Android debug APK
         run: |

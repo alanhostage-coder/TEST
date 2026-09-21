@@ -43,8 +43,12 @@ jobs:
 
       - name: PUA runtime soak
         run: |
+          set +e
           timeout 30s godot --headless --path godot res://pua_soak_test.tscn > /tmp/pua-pcmax-soak.log 2>&1
+          status=$?
+          set -e
           cat /tmp/pua-pcmax-soak.log
+          test "$status" -eq 0
           grep -q 'PUA_SOAK_OK' /tmp/pua-pcmax-soak.log
           if grep -E 'SCRIPT ERROR|Parse Error|PUA_SOAK_FAIL' /tmp/pua-pcmax-soak.log; then exit 1; fi
 

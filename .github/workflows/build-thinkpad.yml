@@ -43,8 +43,12 @@ jobs:
 
       - name: PUA headless soak gate
         run: |
+          set +e
           timeout 30s godot --headless --path godot res://pua_soak_test.tscn > /tmp/pua-thinkpad-soak.log 2>&1
+          status=$?
+          set -e
           cat /tmp/pua-thinkpad-soak.log
+          test "$status" -eq 0
           grep -q 'PUA_SOAK_OK' /tmp/pua-thinkpad-soak.log
           ! grep -E 'SCRIPT ERROR|Parse Error|PUA_SOAK_FAIL' /tmp/pua-thinkpad-soak.log
 
