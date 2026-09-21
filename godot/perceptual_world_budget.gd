@@ -24,6 +24,7 @@ var candidate_cursor := 0
 var cycle_near_used := 0
 var cycle_mid_used := 0
 var cycle_landmarks_used := 0
+var candidate_sort_origin := Vector3.ZERO
 @export var candidates_per_tick := 96
 @export var candidate_refresh_s := 1.0
 var candidate_refresh_accum := 0.0
@@ -38,8 +39,22 @@ func _refresh_candidates() -> void:
 	for n in get_tree().get_nodes_in_group("pua_world_detail"):
 		if n is Node3D and is_instance_valid(n):
 			candidates.append(n)
+	if is_instance_valid(viewer):
+		candidate_sort_origin = viewer.global_position
+	candidates.sort_custom(_candidate_before)
 	candidate_cursor = 0
 	_reset_cycle_budget()
+
+func _candidate_before(a: Node3D, b: Node3D) -> bool:
+	var a_landmark := a.is_in_group("pua_landmark")
+	var b_landmark := b.is_in_group("pua_landmark")
+	if a_landmark != b_landmark:
+		return a_landmark
+	var a_distance := a.global_position.distance_squared_to(candidate_sort_origin)
+	var b_distance := b.global_position.distance_squared_to(candidate_sort_origin)
+	if not is_equal_approx(a_distance, b_distance):
+		return a_distance < b_distance
+	return str(a.get_path()) < str(b.get_path())
 
 func _reset_cycle_budget() -> void:
 	cycle_near_used = 0

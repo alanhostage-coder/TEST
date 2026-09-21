@@ -2,7 +2,7 @@ name: Build PUA ThinkPad
 on:
   workflow_dispatch:
   push:
-    branches: [ main ]
+    branches: [ main, experiment/gaussian-splat ]
     paths:
       - 'godot/**'
       - '.github/workflows/build-thinkpad.yml'
@@ -51,6 +51,13 @@ jobs:
           test "$status" -eq 0
           grep -q 'PUA_SOAK_OK' /tmp/pua-thinkpad-soak.log
           ! grep -E 'SCRIPT ERROR|Parse Error|PUA_SOAK_FAIL' /tmp/pua-thinkpad-soak.log
+
+      - name: Perceptual budget regression
+        run: |
+          timeout 30s godot --headless --path godot --script res://perceptual_budget_test.gd > /tmp/pua-thinkpad-budget.log 2>&1
+          cat /tmp/pua-thinkpad-budget.log
+          grep -q 'PUA_PERCEPTUAL_BUDGET_OK' /tmp/pua-thinkpad-budget.log
+          if grep -E 'SCRIPT ERROR|Parse Error|Assertion failed' /tmp/pua-thinkpad-budget.log; then exit 1; fi
 
       - name: Greybeard invariants
         run: |
