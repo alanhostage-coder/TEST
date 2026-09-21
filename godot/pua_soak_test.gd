@@ -69,6 +69,20 @@ func _finish():
 	if int(car.get_meta("map_exact_building_count", -1)) != map_stream.data.get("buildings", []).size() or int(car.get_meta("map_fallback_building_count", -1)) != 0:
 		_fail("projector profile did not use exact packaged OSM footprint geometry")
 		return
+	var road_annotation_count = int(car.get_meta("map_road_annotation_count", 0))
+	if road_annotation_count <= 0:
+		_fail("mapped road-name annotations missing")
+		return
+	var verified_annotations := 0
+	for child in world.map_root.get_children():
+		if str(child.name).begins_with("MappedRoadName_"):
+			if not child is Label3D or not bool(child.get_meta("annotation_only", false)) or str(child.get_meta("source_field", "")) != "osm:name":
+				_fail("road name rendered as unverified physical signage")
+				return
+			verified_annotations += 1
+	if verified_annotations != road_annotation_count:
+		_fail("mapped road-name annotation count mismatch")
+		return
 	var nearest_origin_road = map_stream.nearest_named_road(Vector2.ZERO)
 	if str(nearest_origin_road.get("name", "")) != "Pittville Street" or float(nearest_origin_road.get("distance_m", INF)) > 30.0:
 		_fail("verified Pittville Street context missing near postcode centroid")
