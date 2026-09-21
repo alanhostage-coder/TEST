@@ -31,8 +31,12 @@ jobs:
       - name: Strict Godot 4.5.1 parse with GDGS
         run: |
           godot --version
+          set +e
           godot --headless --verbose --path godot --editor --quit > /tmp/splat-parse.log 2>&1
+          status=$?
+          set -e
           cat /tmp/splat-parse.log
+          test "$status" -eq 0
           ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/splat-parse.log
 
       - name: Provenance guard invariants
@@ -73,7 +77,6 @@ jobs:
           cat /tmp/splat-import.log
           test -d godot/.godot/imported
           ! grep -E 'SCRIPT ERROR|Parse Error|Failed to load script' /tmp/splat-import.log
-          rm -rf godot/splat_probe
 
       - name: Render GDGS visual smoke frame
         run: |
