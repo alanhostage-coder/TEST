@@ -19,6 +19,7 @@ var peak_visible_count := 0
 var stream_enabled := true
 var last_camera_position := Vector3.ZERO
 @export var min_camera_move_m := 1.0
+@export var max_chunk_distance_m := 1000.0
 
 func _ready() -> void:
 	viewer = get_viewport().get_camera_3d()
@@ -52,6 +53,9 @@ func _process(delta: float) -> void:
 	var ranked: Array = []
 	for chunk in chunks:
 		var d := viewer.global_position.distance_to(chunk.global_position)
+		if d > max_chunk_distance_m:
+			chunk.visible = false
+			continue
 		ranked.append({"node": chunk, "distance": d})
 	ranked.sort_custom(func(a, b): return a["distance"] < b["distance"])
 	var visible_count := 0
