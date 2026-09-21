@@ -350,8 +350,12 @@ func _select_next_surface():
 	queue_redraw()
 
 func _nudge_yaw(amount_degrees: float):
+	# Keep the five views one contiguous panorama during optical calibration.
+	# Independent yaw creates a duplicate or missing world wedge at a seam.
 	var adjustments = camera_yaw_adjust_five if layout_surface_count == 5 else camera_yaw_adjust_three
-	adjustments[selected_surface] = clamp(float(adjustments[selected_surface]) + deg_to_rad(amount_degrees), deg_to_rad(-35.0), deg_to_rad(35.0))
+	var delta := deg_to_rad(amount_degrees)
+	for i in range(layout_surface_count):
+		adjustments[i] = clamp(float(adjustments[i]) + delta, deg_to_rad(-35.0), deg_to_rad(35.0))
 	_update_camera_frustums()
 	_update_calibration_controls()
 
