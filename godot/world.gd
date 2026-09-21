@@ -942,6 +942,7 @@ func _on_world_state_changed(state: Dictionary):
 	if car:
 		car.set_meta("world_wetness", wetness)
 		car.set_meta("world_wind_kph", wind)
+		car.set_meta("world_wind_direction_deg", float(state.get("wind_direction", 0.0)))
 		car.set_meta("world_wave_height", wave)
 		car.set_meta("world_observed_rain_15m_mm", observed_rain_15m)
 		car.set_meta("world_temperature", float(state.get("temperature", 8.0)))
