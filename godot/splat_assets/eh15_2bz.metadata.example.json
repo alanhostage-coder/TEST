@@ -12,5 +12,16 @@
   "alignment_method": "REQUIRED: describe OSM control points or survey",
   "scale_status": "estimated",
   "orientation_status": "estimated",
-  "notes": "Template only. Do not rename to eh15_2bz.json until all REQUIRED fields are replaced and the visual asset is correctly matched."
+  "notes": "Template only. Transform fields register the splat to PUA local OSM coordinates. Do not rename to eh15_2bz.json until REQUIRED fields are replaced and alignment is checked.",
+  "local_offset_m": [
+    0,
+    0,
+    0
+  ],
+  "rotation_degrees": [
+    0,
+    0,
+    0
+  ],
+  "uniform_scale": 1
 }
