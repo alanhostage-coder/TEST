@@ -32,6 +32,7 @@ var state := {
 	"aqi": 28.0,
 	"observed_rain_15m_mm": 0.0,
 	"observed_rain_station": "Edinburgh Royal Botanic Gardens · SEPA 15201",
+	"observed_rain_source": "offline",
 	"updated_unix": 0
 }
 
@@ -163,6 +164,7 @@ func _apply_sepa_rain(csv_text: String):
 	if latest >= 0.0:
 		live_state["observed_rain_15m_mm"] = latest
 		live_state["observed_rain_station"] = "Edinburgh Royal Botanic Gardens · SEPA 15201"
+		live_state["observed_rain_source"] = "SEPA"
 
 func _save_cache():
 	var file = FileAccess.open(CACHE_PATH, FileAccess.WRITE)
