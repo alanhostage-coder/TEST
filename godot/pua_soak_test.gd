@@ -132,9 +132,20 @@ func _finish():
 	if world_state.weather_mode != "FOG" or float(world_state.state.get("visibility", 99999.0)) > 1000.0:
 		_fail("fog override failed")
 		return
+	var wetness_before_rain = float(world.atmosphere_wetness)
 	world_state.set_weather_mode("RAIN")
 	if float(world_state.state.get("rain", 0.0)) < 2.0:
 		_fail("rain override failed")
+		return
+	if float(world.atmosphere_target_wetness) < 0.95:
+		_fail("rain visual target missing")
+		return
+	if float(world.atmosphere_wetness) >= float(world.atmosphere_target_wetness):
+		_fail("weather visuals snapped instead of transitioning")
+		return
+	world._update_weather_visuals(0.10)
+	if float(world.atmosphere_wetness) <= wetness_before_rain or float(world.atmosphere_wetness) >= float(world.atmosphere_target_wetness):
+		_fail("weather visual transition envelope regressed")
 		return
 	world_state.set_weather_mode("LIVE")
 	if not api.has_method("get_snapshot") or not api.has_method("get_directive"):
