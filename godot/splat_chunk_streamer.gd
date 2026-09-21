@@ -17,6 +17,8 @@ var chunks: Array[Node3D] = []
 var last_visible_count := -1
 var peak_visible_count := 0
 var stream_enabled := true
+var last_camera_position := Vector3.ZERO
+@export var min_camera_move_m := 1.0
 
 func _ready() -> void:
 	viewer = get_viewport().get_camera_3d()
@@ -36,6 +38,9 @@ func _process(delta: float) -> void:
 		viewer = get_viewport().get_camera_3d()
 		if viewer == null:
 			return
+	if last_camera_position != Vector3.ZERO and viewer.global_position.distance_to(last_camera_position) < min_camera_move_m:
+		return
+	last_camera_position = viewer.global_position
 	var effective_max := max_loaded_chunks
 	if OS.has_feature("projector_max"):
 		effective_max = min(max_loaded_chunks, projector_max_loaded_chunks)
