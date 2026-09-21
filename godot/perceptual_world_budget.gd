@@ -7,6 +7,11 @@ extends Node3D
 @export var update_interval_s := 0.12
 @export var max_near_details := 48
 @export var max_mid_details := 140
+@export var turn_lookahead_s := 1.4
+@export var speed_lookahead_s := 2.2
+@export var min_forward_bias_m := 18.0
+var previous_position := Vector3.ZERO
+var predicted_focus := Vector3.ZERO
 
 var viewer: Camera3D
 var accum := 0.0
@@ -29,6 +34,12 @@ func _process(delta: float) -> void:
 		if viewer == null:
 			return
 	var forward := -viewer.global_transform.basis.z
+	var velocity := Vector3.ZERO
+	if previous_position != Vector3.ZERO:
+		velocity = (viewer.global_position - previous_position) / max(update_interval_s, 0.001)
+	previous_position = viewer.global_position
+	var speed := velocity.length()
+	predicted_focus = viewer.global_position + forward * min_forward_bias_m + velocity * speed_lookahead_s
 	var near_used := 0
 	var mid_used := 0
 	for n in candidates:
@@ -36,6 +47,7 @@ func _process(delta: float) -> void:
 			continue
 		var offset := n.global_position - viewer.global_position
 		var distance := offset.length()
+		var predicted_distance := n.global_position.distance_to(predicted_focus)
 		var ahead := offset.normalized().dot(forward) if distance > 0.01 else 1.0
 		var keep := false
 		if distance <= rear_keep_radius_m:
@@ -43,7 +55,7 @@ func _process(delta: float) -> void:
 		elif ahead > -0.15 and distance <= near_radius_m and near_used < max_near_details:
 			keep = true
 			near_used += 1
-		elif ahead > 0.15 and distance <= mid_radius_m and mid_used < max_mid_details:
+		elif ahead > 0.15 and min(distance, predicted_distance) <= mid_radius_m and mid_used < max_mid_details:
 			keep = true
 			mid_used += 1
 		n.visible = keep
