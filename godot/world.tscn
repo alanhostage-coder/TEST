@@ -11,6 +11,7 @@
 [ext_resource path="res://osm_ground_tiles.gd" type="Script" id="9"]
 [ext_resource path="res://gaussian_splat_layer.gd" type="Script" id="10"]
 [ext_resource path="res://visual_reference_feed.gd" type="Script" id="11"]
+[ext_resource path="res://perceptual_world_budget.gd" type="Script" id="pua_perceptual"]
 
 [sub_resource type="BoxShape3D" id="road_shape"]
 size = Vector3(60, 0.5, 240)
@@ -57,8 +58,6 @@ radial_segments = 12
 
 [sub_resource type="BoxShape3D" id="car_shape"]
 size = Vector3(1.9, 0.9, 4.2)
-
-[ext_resource path="res://perceptual_world_budget.gd" type="Script" id="pua_perceptual"]
 
 [node name="World" type="Node3D"]
 script = ExtResource("1")
