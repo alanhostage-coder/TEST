@@ -138,8 +138,8 @@ func _projector_profile_aspect_error(bay: Node, screen_size: Vector2) -> float:
 	for rect in bay.FIVE_RECTS:
 		var surface_size := Vector2(screen_size.x * rect.size.x, screen_size.y * rect.size.y)
 		var viewport_size: Vector2i = bay.viewport_size_for_surface(surface_size, bay.PROJECTOR_MAX_RENDER_SCALE)
-		var destination_aspect := surface_size.x / max(1.0, surface_size.y)
-		var viewport_aspect := float(viewport_size.x) / max(1.0, float(viewport_size.y))
+		var destination_aspect: float = surface_size.x / max(1.0, surface_size.y)
+		var viewport_aspect: float = float(viewport_size.x) / max(1.0, float(viewport_size.y))
 		worst = max(worst, abs(destination_aspect - viewport_aspect))
 	return worst
 
