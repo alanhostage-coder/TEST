@@ -4,6 +4,8 @@ extends Node3D
 @export var max_loaded_chunks := 3
 @export var load_radius_m := 220.0
 @export var unload_radius_m := 270.0
+@export var update_interval_s := 0.15
+var update_accum := 0.0
 
 var viewer: Node3D = null
 var chunks: Array[Node3D] = []
@@ -15,7 +17,11 @@ func _ready() -> void:
 			chunks.append(child)
 	set_process(true)
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
+	update_accum += delta
+	if update_accum < update_interval_s:
+		return
+	update_accum = 0.0
 	if viewer == null or not is_instance_valid(viewer):
 		viewer = get_viewport().get_camera_3d()
 		if viewer == null:
