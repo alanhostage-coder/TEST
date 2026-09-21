@@ -50,7 +50,7 @@ jobs:
           if-no-files-found: warn
 
       - name: Stop on strict parse failure
-        if: steps.strict_parse.outcome == 'failure'
+        if: steps.strict_parse.outcome == 'failure' && steps.strict_parse.conclusion == 'failure'
         run: |
           echo "::error::Strict Godot parse failed; diagnostics artifact uploaded."
           exit 1
