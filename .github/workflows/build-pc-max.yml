@@ -81,12 +81,20 @@ jobs:
           grep -q 'PUA_PROJECTOR_RENDER_OK' /tmp/pua-projector-proof.log
           test -s /tmp/pua-projector-proof.png
           python3 - <<'PY'
+          from glob import glob
           from PIL import Image, ImageStat
           image = Image.open('/tmp/pua-projector-proof.png').convert('RGB')
           assert image.size == (1920, 1080), image.size
           assert max(ImageStat.Stat(image).stddev) > 3.0, 'projector proof is visually blank'
+          panels = sorted(glob('/tmp/pua-projector-panel-*.png'))
+          assert len(panels) == 5, panels
+          for panel in panels:
+              rendered = Image.open(panel).convert('RGB')
+              assert rendered.width >= 112 and rendered.height >= 180, (panel, rendered.size)
+              assert max(ImageStat.Stat(rendered).stddev) > 3.0, f'{panel} is visually blank'
           PY
           cp /tmp/pua-projector-proof.png build/projector-proof/
+          cp /tmp/pua-projector-panel-*.png build/projector-proof/
           sha256sum build/projector-proof/pua-projector-proof.png > build/projector-proof/SHA256.txt
 
       - name: Upload projector render proof

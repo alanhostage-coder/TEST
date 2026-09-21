@@ -17,6 +17,17 @@ func run() -> void:
 	bay._set_mode(1)
 	for _frame in range(8):
 		await process_frame
+	for panel_index in range(5):
+		var panel_image = bay.viewports[panel_index].get_texture().get_image()
+		if panel_image == null or panel_image.is_empty():
+			push_error("PUA_PROJECTOR_RENDER_FAIL empty panel %d" % panel_index)
+			quit(2)
+			return
+		var panel_error = panel_image.save_png("/tmp/pua-projector-panel-%d.png" % panel_index)
+		if panel_error != OK:
+			push_error("PUA_PROJECTOR_RENDER_FAIL panel %d save error %d" % [panel_index, panel_error])
+			quit(2)
+			return
 	var image := root.get_texture().get_image()
 	if image == null or image.is_empty():
 		push_error("PUA_PROJECTOR_RENDER_FAIL empty viewport")
