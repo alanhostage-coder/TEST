@@ -913,7 +913,9 @@ func _bind_world_state():
 		_on_world_state_changed(world_state.state)
 
 func _on_world_state_changed(state: Dictionary):
-	var rain = clamp(float(state.get("rain", 0.0)) + float(state.get("precipitation", 0.0)), 0.0, 6.0)
+	var model_rain = float(state.get("rain", 0.0)) + float(state.get("precipitation", 0.0))
+	var observed_rain_15m = max(0.0, float(state.get("observed_rain_15m_mm", 0.0)))
+	var rain = clamp(max(model_rain, observed_rain_15m * 4.0), 0.0, 6.0)
 	var wetness = clamp(rain / 2.5, 0.0, 1.0)
 	var cloud = clamp(float(state.get("cloud", 60.0)) / 100.0, 0.0, 1.0)
 	var visibility = clamp(float(state.get("visibility", 12000.0)), 800.0, 30000.0)
@@ -941,6 +943,7 @@ func _on_world_state_changed(state: Dictionary):
 		car.set_meta("world_wetness", wetness)
 		car.set_meta("world_wind_kph", wind)
 		car.set_meta("world_wave_height", wave)
+		car.set_meta("world_observed_rain_15m_mm", observed_rain_15m)
 		car.set_meta("world_temperature", float(state.get("temperature", 8.0)))
 		car.set_meta("world_data_source", state.get("source", "offline"))
 
