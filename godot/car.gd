@@ -35,6 +35,7 @@ var motion_sensor_live := false
 var assisted_target_speed := 17.5
 var wheel_spin := 0.0
 var steering_velocity := 0.0
+var lateral_load := 0.0
 
 
 func _ready():
@@ -199,6 +200,11 @@ func _physics_process(delta):
 	var steering_at_speed = lerp(1.0, 0.48, speed_ratio)
 	var steering_authority = clamp(abs(speed) / 6.0, 0.0, 1.0)
 	var travel_sign = sign(speed) if abs(speed) > 0.1 else 1.0
+	# Build a restrained lateral-load signal from actual steering and speed. It is
+	# shared by chassis and camera below, so the visual response agrees with the
+	# car's turn rather than layering unrelated shake on top.
+	var lateral_target = steer_smoothed * speed_ratio * speed_ratio * travel_sign
+	lateral_load = lerp(lateral_load, lateral_target, 1.0 - exp(-delta * 5.8))
 	rotate_y(-steer_smoothed * steer_rate * steering_at_speed * steering_authority * delta * travel_sign)
 	var desired_velocity = -global_transform.basis.z * speed
 	var wetness = clamp(float(get_meta("world_wetness", 0.0)), 0.0, 1.0)
@@ -270,6 +276,7 @@ func recover_to_road():
 	velocity = Vector3.ZERO
 	steer_smoothed = 0.0
 	steering_velocity = 0.0
+	lateral_load = 0.0
 	previous_position = global_position
 	camera_lag = Vector3.ZERO
 
@@ -281,7 +288,7 @@ func _point_segment_distance(p: Vector2, a: Vector2, b: Vector2) -> float:
 	return p.distance_to(a + ab * t)
 
 func _update_visuals(delta, speed_ratio):
-	var body_roll = -steer_smoothed * speed_ratio * 0.045
+	var body_roll = -lateral_load * 0.052
 	var body_pitch = -suspension_pitch * 0.65
 	$Body.rotation.z = lerp_angle($Body.rotation.z, body_roll, 1.0 - exp(-delta * 6.0))
 	$Body.rotation.x = lerp_angle($Body.rotation.x, body_pitch, 1.0 - exp(-delta * 7.0))
@@ -311,10 +318,13 @@ func _update_camera(delta, speed_ratio):
 
 	# Cinematic road-reading: at speed the camera subtly opens into the bend before
 	# the car gets there, while retaining manual right-side free look.
-	var bend_preview = -steer_smoothed * speed_ratio * 0.24
+	var bend_preview = -steer_smoothed * speed_ratio * 0.20
 	camera_look_ahead = lerp(camera_look_ahead, bend_preview, 1.0 - exp(-delta * 2.5))
 	var shake = sin(Time.get_ticks_msec() * 0.04) * impact_kick * 0.14
-	var lateral = steer_smoothed * 1.28 + camera_lag.x
+	# Sim-rig pass: lateral camera travel is deliberately smaller than the chassis
+	# response. The eye gets cornering load from a few millimetres of roll and a
+	# stable horizon instead of the old exaggerated side-to-side chase-camera slide.
+	var lateral = lateral_load * 0.72 + camera_lag.x * 0.55
 	var road_texture = sin(distance_driven * 0.72) * speed_camera_pulse * 0.035
 	var chase_height = 2.35 + speed_ratio * 0.62 + shake + road_texture - suspension_heave
 	var chase_distance = 7.7 + speed_ratio * 3.7 + camera_lag.z
@@ -323,7 +333,7 @@ func _update_camera(delta, speed_ratio):
 	rig.position.z = lerp(rig.position.z, chase_distance, 1.0 - exp(-delta * 1.7))
 	rig.rotation.x = lerp_angle(rig.rotation.x, deg_to_rad(-4.8 + speed_ratio * 0.8) + camera_pitch + suspension_pitch, 1.0 - exp(-delta * 3.0))
 	rig.rotation.y = lerp_angle(rig.rotation.y, camera_yaw + camera_look_ahead - camera_lag.x * 0.025, 1.0 - exp(-delta * 3.1))
-	rig.rotation.z = lerp_angle(rig.rotation.z, -steer_smoothed * speed_ratio * 0.012, 1.0 - exp(-delta * 4.0))
+	rig.rotation.z = lerp_angle(rig.rotation.z, -lateral_load * 0.006, 1.0 - exp(-delta * 4.8))
 	$CameraRig/Camera3D.fov = lerp($CameraRig/Camera3D.fov, 60.0 + speed_ratio * 13.0, 1.0 - exp(-delta * 1.65))
 
 func _save_state():
