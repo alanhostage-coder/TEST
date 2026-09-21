@@ -4,6 +4,7 @@ const OUTPUT_PATH := "/tmp/pua-projector-proof.png"
 const CONTINUITY_PATH := "/tmp/pua-projector-continuity.png"
 const MANIFEST_PATH := "/tmp/pua-projector-proof.json"
 const MAP_READY_FRAME_BUDGET := 240
+const EXPECTED_PACKAGED_PATCH_TIMESTAMP := "2026-09-20T22:47:11Z"
 
 func _initialize() -> void:
 	call_deferred("run")
@@ -34,6 +35,20 @@ func run() -> void:
 	world.atmosphere_aqi = world.atmosphere_target_aqi
 	world._apply_weather_visuals()
 	var bay = world.get_node("BayProjection")
+	# Projector release must remain geographically useful without internet.
+	# Exercise the bundled source-dated map itself, not merely a live/cache refresh.
+	var map_stream = world.get_node("MapStream")
+	if not map_stream._load_packaged_patch():
+		push_error("PUA_PROJECTOR_RENDER_FAIL packaged map patch unavailable")
+		quit(2)
+		return
+	var packaged = map_stream.data
+	if str(packaged.get("source_timestamp_utc", "")) != EXPECTED_PACKAGED_PATCH_TIMESTAMP \
+	or packaged.get("roads", []).is_empty() \
+	or packaged.get("buildings", []).is_empty():
+		push_error("PUA_PROJECTOR_RENDER_FAIL packaged map provenance/geometry invalid")
+		quit(2)
+		return
 	if bay.layout_surface_count != 5:
 		bay._toggle_layout()
 	bay._set_mode(1)
@@ -86,7 +101,10 @@ func run() -> void:
 		"opening_anchor": str(car.get_meta("map_opening_verified_anchor", "")),
 		"surface_count": bay.layout_surface_count,
 		"camera_count": bay.cameras.size(),
-		"composite_size": [composite.get_width(), composite.get_height()]
+		"composite_size": [composite.get_width(), composite.get_height()],
+		"packaged_patch_timestamp": str(packaged.get("source_timestamp_utc", "")),
+		"packaged_roads": packaged.get("roads", []).size(),
+		"packaged_buildings": packaged.get("buildings", []).size()
 	}
 	var manifest_file = FileAccess.open(MANIFEST_PATH, FileAccess.WRITE)
 	if manifest_file == null:
