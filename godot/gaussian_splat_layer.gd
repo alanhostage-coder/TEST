@@ -67,7 +67,17 @@ func _metadata_is_safe() -> bool:
 		var ch := digest.substr(i, 1)
 		if "0123456789abcdef".find(ch) < 0:
 			return false
+	var source_text := str(meta.get("source", "")).strip_edges()
+	if source_text == "":
 		return false
+	var source_lower := source_text.to_lower()
+	# Google Maps/Street View/Photorealistic 3D Tiles may be rendered through
+	# their licensed services, but PUA must not derive an offline splat/model
+	# from that content. Keep the distributable splat chain clean.
+	for blocked in ["google maps", "street view", "photorealistic 3d tiles", "maps tile api"]:
+		if blocked in source_lower:
+			push_warning("PUA_SPLAT_PROVENANCE_REJECTED: derived Google Maps content is not accepted")
+			return false
 	if str(meta.get("source", "")).strip_edges() == "":
 		return false
 	if str(meta.get("capture_date", "")).strip_edges() == "":
