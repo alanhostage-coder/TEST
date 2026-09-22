@@ -56,7 +56,13 @@ var sandstone_warm_mat
 var soot_stone_cool_mat
 var tenement_weathered_mat
 var tenement_warm_mat
+var tenement_soot_mat
+var tenement_sash_frame_mat
+var tenement_sash_glass_mat
+var tenement_door_mats: Array = []
 var generic_tenement_facade_count := 0
+var generic_tenement_window_count := 0
+var generic_tenement_door_count := 0
 var brick_mat
 var render_mat
 var hedge_mat
@@ -146,6 +152,14 @@ func _make_materials():
 	weed_mat = _mat(Color(0.15, 0.21, 0.08), 0.98, 0.0)
 	tenement_weathered_mat = _tenement_texture_mat("res://assets/edinburgh_tenement/walls/edin_ten_wall_weathered_a_alb.png", Color(0.98, 0.98, 0.97), 0.93)
 	tenement_warm_mat = _tenement_texture_mat("res://assets/edinburgh_tenement/walls/edin_ten_wall_warm_a_alb.png", Color(0.98, 0.97, 0.94), 0.92)
+	tenement_soot_mat = _tenement_texture_mat("res://assets/edinburgh_tenement/walls/edin_ten_wall_weathered_a_alb.png", Color(0.72, 0.73, 0.70), 0.95)
+	tenement_sash_frame_mat = _mat(Color(0.77, 0.76, 0.69), 0.78, 0.0)
+	tenement_sash_glass_mat = _mat(Color(0.055, 0.082, 0.092), 0.18, 0.22)
+	tenement_door_mats = [
+		_mat(Color(0.075, 0.16, 0.12), 0.72, 0.0),
+		_mat(Color(0.17, 0.055, 0.05), 0.74, 0.0),
+		_mat(Color(0.055, 0.10, 0.17), 0.70, 0.0)
+	]
 
 func _tenement_texture_mat(path: String, tint: Color, roughness: float):
 	var material = _mat(tint, roughness, 0.0)
@@ -644,7 +658,13 @@ func _osm_building_material(building: Dictionary, seed: int):
 	if _uses_generic_edinburgh_tenement_texture(building):
 		# Generic visual approximation only. The OSM footprint stays authoritative;
 		# these shared textures do not claim surveyed facade accuracy.
-		return tenement_warm_mat if abs(seed) % 5 == 0 else tenement_weathered_mat
+		match abs(seed) % 10:
+			0, 1:
+				return tenement_warm_mat
+			2, 3:
+				return tenement_soot_mat
+			_:
+				return tenement_weathered_mat
 	if "brick" in tagged:
 		return brick_mat
 	if "concrete" in tagged:
@@ -664,9 +684,8 @@ func _osm_building_material(building: Dictionary, seed: int):
 			return sandstone_warm_mat
 
 func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height: float, seed: int, building: Dictionary):
-	# Keep the mapped polygon authoritative. Detail is attached directly to its real
-	# wall edges, never to a replacement bounding box. PC Max only, and only near
-	# the spawn, so the extra street-level read does not leak into low-spec targets.
+	# Keep the mapped polygon authoritative. All facade treatment is generic visual
+	# approximation attached to real OSM wall edges, never replacement geometry.
 	if not pc_max_mode or low_spec_mode or poly.size() < 3:
 		return
 	var centroid := Vector2.ZERO
@@ -678,6 +697,7 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 		return
 	var kind = str(building.get("kind", "yes")).to_lower()
 	var industrial = kind in ["industrial", "warehouse", "commercial", "retail"]
+	var generic_tenement = _uses_generic_edinburgh_tenement_texture(building) and not industrial
 	var floors = clamp(int(floor(height / 3.0)), 1, 5 if xps_9530_mode else 3)
 	var door_edge = abs(seed) % poly.size()
 	var edge_budget := 0
@@ -694,10 +714,8 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 		var tangent = delta / length
 		var angle = atan2(tangent.x, tangent.y)
 		var edge_mid = (p0 + p1) * 0.5
-		var slots = clamp(int(floor(length / (5.8 if industrial else 3.6))), 1, 6 if xps_9530_mode else 4)
+		var slots = clamp(int(floor(length / (5.8 if industrial else 3.55))), 1, 7 if xps_9530_mode else 4)
 
-		# A dark plinth and a thin roofline make the exact footprint meet the street
-		# and sky cleanly without altering its mapped position.
 		_visual_box(body, Vector3(edge_mid.x, min(0.42, height * 0.08), edge_mid.y), Vector3(0.10, min(0.84, height * 0.16), length * 0.96), roof_mat)
 		var plinth = body.get_child(body.get_child_count() - 1)
 		if plinth is MeshInstance3D:
@@ -711,32 +729,66 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 				cornice.visibility_range_end = 165.0
 
 		for floor_index in range(floors):
-			var y = 1.75 + float(floor_index) * 2.85
+			var y = 1.78 + float(floor_index) * 2.85
 			if y > height - 0.65:
 				continue
 			for slot in range(slots):
 				var t = (float(slot) + 0.5) / float(slots)
 				var p = p0.lerp(p1, t)
-				var panel_w = min(1.45 if industrial else 1.05, max(0.72, length / float(slots) * 0.46))
-				var panel_h = 1.25 if industrial else 1.32
-				var panel_y = y
-				var panel_mat = glass_mat
-				# One plausible recessed entrance on one mapped wall only. Everything else
-				# remains quiet fenestration so geometry, not decoration, does the work.
-				if edge_index == door_edge and floor_index == 0 and slot == abs(seed / 7) % slots and not industrial:
-					panel_w = min(1.25, max(0.9, length / float(slots) * 0.55))
-					panel_h = 2.15
-					panel_y = 1.08
-					panel_mat = roof_mat
-				_visual_box(body, Vector3(p.x, panel_y, p.y), Vector3(0.075, panel_h, panel_w), panel_mat)
+				var panel_w = min(1.45 if industrial else 1.08, max(0.74, length / float(slots) * 0.46))
+				var panel_h = 1.25 if industrial else 1.40
+				var is_door = edge_index == door_edge and floor_index == 0 and slot == abs(seed / 7) % slots and generic_tenement
+				if is_door:
+					var door_w = min(1.28, max(0.94, length / float(slots) * 0.56))
+					var door_h = 2.18
+					var door_mat = tenement_door_mats[abs(seed + edge_index) % tenement_door_mats.size()]
+					_visual_box(body, Vector3(p.x, 1.09, p.y), Vector3(0.105, door_h, door_w), door_mat)
+					var door = body.get_child(body.get_child_count() - 1)
+					if door is MeshInstance3D:
+						door.rotation.y = angle
+						door.visibility_range_end = 220.0
+					# Pale stone surround and a dark glazed fanlight sell the shared stair close.
+					for side in [-1.0, 1.0]:
+						var fp = p + tangent * side * (door_w * 0.5 + 0.085)
+						_visual_box(body, Vector3(fp.x, 1.19, fp.y), Vector3(0.12, door_h + 0.22, 0.14), tenement_sash_frame_mat)
+						var jamb = body.get_child(body.get_child_count() - 1)
+						if jamb is MeshInstance3D:
+							jamb.rotation.y = angle
+					_visual_box(body, Vector3(p.x, 2.30, p.y), Vector3(0.12, 0.18, door_w + 0.30), tenement_sash_frame_mat)
+					var lintel = body.get_child(body.get_child_count() - 1)
+					if lintel is MeshInstance3D:
+						lintel.rotation.y = angle
+					_visual_box(body, Vector3(p.x, 2.16, p.y), Vector3(0.115, 0.22, door_w * 0.78), tenement_sash_glass_mat)
+					var fanlight = body.get_child(body.get_child_count() - 1)
+					if fanlight is MeshInstance3D:
+						fanlight.rotation.y = angle
+					generic_tenement_door_count += 1
+					continue
+
+				var panel_mat = tenement_sash_glass_mat if generic_tenement else glass_mat
+				_visual_box(body, Vector3(p.x, y, p.y), Vector3(0.085, panel_h, panel_w), panel_mat)
 				var panel = body.get_child(body.get_child_count() - 1)
 				if panel is MeshInstance3D:
 					panel.rotation.y = angle
-					panel.visibility_range_end = 210.0 if xps_9530_mode else 145.0
-				if xps_9530_mode and not industrial and panel_mat == glass_mat:
-					# Shallow stone sill adds shadow/parallax while remaining attached to the
-					# mapped wall edge. It is architectural texture, not location evidence.
-					_visual_box(body, Vector3(p.x, panel_y - panel_h * 0.5 - 0.07, p.y), Vector3(0.11, 0.10, panel_w + 0.16), kerb_mat)
+					panel.visibility_range_end = 230.0 if xps_9530_mode else 145.0
+
+				if generic_tenement:
+					# Low-cost sash silhouette: two jambs, head/sill and a central meeting rail.
+					var frame_w = 0.085
+					for side in [-1.0, 1.0]:
+						var fp = p + tangent * side * (panel_w * 0.5 + frame_w * 0.15)
+						_visual_box(body, Vector3(fp.x, y, fp.y), Vector3(0.105, panel_h + 0.12, frame_w), tenement_sash_frame_mat)
+						var jamb = body.get_child(body.get_child_count() - 1)
+						if jamb is MeshInstance3D:
+							jamb.rotation.y = angle
+					for rail_y in [y - panel_h * 0.5 - 0.035, y, y + panel_h * 0.5 + 0.035]:
+						_visual_box(body, Vector3(p.x, rail_y, p.y), Vector3(0.105, 0.075, panel_w + 0.10), tenement_sash_frame_mat)
+						var rail = body.get_child(body.get_child_count() - 1)
+						if rail is MeshInstance3D:
+							rail.rotation.y = angle
+					generic_tenement_window_count += 1
+				elif xps_9530_mode and not industrial:
+					_visual_box(body, Vector3(p.x, y - panel_h * 0.5 - 0.07, p.y), Vector3(0.11, 0.10, panel_w + 0.16), kerb_mat)
 					var sill = body.get_child(body.get_child_count() - 1)
 					if sill is MeshInstance3D:
 						sill.rotation.y = angle
@@ -763,17 +815,17 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 		var p0 = poly[int(tris[t])]
 		var p1 = poly[int(tris[t + 1])]
 		var p2 = poly[int(tris[t + 2])]
-		st.set_uv(Vector2(p0.x / 5.0, p0.y / 5.0))
+		st.set_uv(Vector2(p0.x / 8.0, p0.y / 8.0))
 		st.add_vertex(Vector3(p0.x, height, p0.y))
-		st.set_uv(Vector2(p1.x / 5.0, p1.y / 5.0))
+		st.set_uv(Vector2(p1.x / 8.0, p1.y / 8.0))
 		st.add_vertex(Vector3(p1.x, height, p1.y))
-		st.set_uv(Vector2(p2.x / 5.0, p2.y / 5.0))
+		st.set_uv(Vector2(p2.x / 8.0, p2.y / 8.0))
 		st.add_vertex(Vector3(p2.x, height, p2.y))
 	for i in range(poly.size()):
 		var p0 = poly[i]
 		var p1 = poly[(i + 1) % poly.size()]
-		var wall_u = maxf(0.2, p0.distance_to(p1) / 5.0)
-		var wall_v = maxf(1.0, height / 3.0)
+		var wall_u = maxf(0.2, p0.distance_to(p1) / 8.0)
+		var wall_v = maxf(1.0, height / 4.2)
 		st.set_uv(Vector2(0.0, wall_v))
 		st.add_vertex(Vector3(p0.x, 0.0, p0.y))
 		st.set_uv(Vector2(wall_u, wall_v))
@@ -1275,6 +1327,8 @@ func _on_map_ready(map_data: Dictionary):
 	var exact_building_count := 0
 	var fallback_building_count := 0
 	generic_tenement_facade_count = 0
+	generic_tenement_window_count = 0
+	generic_tenement_door_count = 0
 	for building in buildings:
 		if not building is Dictionary:
 			continue
@@ -1319,6 +1373,8 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_building_count", buildings.size())
 		car.set_meta("map_exact_building_count", exact_building_count)
 		car.set_meta("generic_tenement_facade_count", generic_tenement_facade_count)
+		car.set_meta("generic_tenement_window_count", generic_tenement_window_count)
+		car.set_meta("generic_tenement_door_count", generic_tenement_door_count)
 		car.set_meta("map_fallback_building_count", fallback_building_count)
 		car.set_meta("map_linear_feature_count", linear_features.size())
 		car.set_meta("map_point_feature_count", point_features.size())
