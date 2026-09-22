@@ -35,6 +35,8 @@ const XPS_9530_SURFACE_RENDER_SCALES := [0.86, 0.96, 0.86, 0.60, 0.60]
 const CORNER_PICK_RADIUS := 82.0
 const MIN_VIEWPORT_WIDTH := 64.0
 const MIN_VIEWPORT_HEIGHT := 180.0
+const MIN_CALIBRATION_AREA_RATIO := 0.22
+const MIN_CALIBRATION_EDGE_RATIO := 0.15
 
 var mode := 0 # 0 normal, 1 cab, 2 calibration
 var car: Node3D
@@ -505,8 +507,58 @@ func _drag_corner(position: Vector2):
 		var base: PackedVector2Array = base_quads[active_plane]
 		var raw = (position - base[active_corner]) / size
 		var offsets = cal_offsets_five if layout_surface_count == 5 else cal_offsets_three
-		offsets[active_plane][active_corner] = Vector2(clamp(raw.x, -0.30, 0.30), clamp(raw.y, -0.30, 0.30))
-		_rescale_surfaces()
+		var proposed_offset := Vector2(clamp(raw.x, -0.30, 0.30), clamp(raw.y, -0.30, 0.30))
+		var candidate := PackedVector2Array()
+		for corner in range(4):
+			var offset: Vector2 = proposed_offset if corner == active_corner else offsets[active_plane][corner]
+			candidate.append(base[corner] + offset * size)
+		if _is_safe_calibration_quad(candidate, base):
+			offsets[active_plane][active_corner] = proposed_offset
+			_rescale_surfaces()
+			_update_calibration_controls()
+		else:
+			title.text = "CAL LIMIT · KEEP %s OPEN AND UNFOLDED" % SURFACE_NAMES[active_plane]
+
+
+func _is_safe_calibration_quad(candidate: PackedVector2Array, base: PackedVector2Array) -> bool:
+	# A projected rectangle can be strongly keystoned, but it must remain a convex
+	# quadrilateral with the same winding as its source. Reject foldovers and tiny
+	# slivers before they can be saved as an apparently missing shutter surface.
+	if candidate.size() != 4 or base.size() != 4:
+		return false
+	for point in candidate:
+		if not point.is_finite():
+			return false
+	var base_area := absf(_quad_signed_area(base))
+	var candidate_area := absf(_quad_signed_area(candidate))
+	if base_area < 1.0 or candidate_area < base_area * MIN_CALIBRATION_AREA_RATIO:
+		return false
+	if _quad_signed_area(candidate) * _quad_signed_area(base) <= 0.0:
+		return false
+	var winding := 0.0
+	for i in range(4):
+		var edge_a: Vector2 = candidate[(i + 1) % 4] - candidate[i]
+		var edge_b: Vector2 = candidate[(i + 2) % 4] - candidate[(i + 1) % 4]
+		var base_edge: Vector2 = base[(i + 1) % 4] - base[i]
+		if edge_a.length() < base_edge.length() * MIN_CALIBRATION_EDGE_RATIO:
+			return false
+		var cross_z: float = edge_a.cross(edge_b)
+		if absf(cross_z) < 0.001:
+			return false
+		var corner_winding := signf(cross_z)
+		if winding == 0.0:
+			winding = corner_winding
+		elif corner_winding != winding:
+			return false
+	return true
+
+
+func _quad_signed_area(points: PackedVector2Array) -> float:
+	var area := 0.0
+	for i in range(points.size()):
+		var next: Vector2 = points[(i + 1) % points.size()]
+		area += points[i].x * next.y - next.x * points[i].y
+	return area * 0.5
 
 func _pick_corner(pos: Vector2):
 	var best_distance = CORNER_PICK_RADIUS

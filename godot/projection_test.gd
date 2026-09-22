@@ -15,6 +15,21 @@ func run():
 	assert(bay.black_mask.visible)
 	for camera in bay.cameras:
 		assert(camera.global_position.is_finite())
+	var calibration_base := PackedVector2Array([
+		Vector2(0, 0), Vector2(100, 0), Vector2(100, 100), Vector2(0, 100)
+	])
+	var calibration_keystone := PackedVector2Array([
+		Vector2(12, 8), Vector2(94, 2), Vector2(100, 96), Vector2(3, 90)
+	])
+	var calibration_foldover := PackedVector2Array([
+		Vector2(0, 0), Vector2(100, 100), Vector2(100, 0), Vector2(0, 100)
+	])
+	var calibration_sliver := PackedVector2Array([
+		Vector2(0, 0), Vector2(100, 0), Vector2(100, 5), Vector2(0, 5)
+	])
+	assert(bay._is_safe_calibration_quad(calibration_keystone, calibration_base))
+	assert(not bay._is_safe_calibration_quad(calibration_foldover, calibration_base))
+	assert(not bay._is_safe_calibration_quad(calibration_sliver, calibration_base))
 	var osm_overlay = world.get_node("OSMGroundTiles")
 	osm_overlay._build_live_map_overlay()
 	osm_overlay._bind_map_stream()
