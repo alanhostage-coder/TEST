@@ -2,7 +2,10 @@ extends Control
 
 @onready var car = get_node("../Car")
 @onready var parkview_credit = get_node_or_null("ParkviewCredit")
+@onready var map_credit = get_node_or_null("MapCredit")
+@onready var human_credit = get_node_or_null("HumanCredit")
 var credit_clock := 0.0
+const HUD_Z_INDEX := 20
 const DEFAULT_CREDIT_HOLD_SECONDS := 6.0
 const DEFAULT_CREDIT_FADE_SECONDS := 2.0
 const PROJECTOR_CREDIT_HOLD_SECONDS := 2.5
@@ -21,6 +24,9 @@ var performance_visible := false
 
 func _ready():
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# The instruments are painted onto the cockpit, so they must sit above its
+	# z=12/14 dash and wheel while remaining below the z=40 calibration controls.
+	z_index = HUD_Z_INDEX
 	_reset_frame_stats()
 
 func _process(delta: float):
@@ -30,6 +36,11 @@ func _process(delta: float):
 	if frame_stats_clock >= 0.5:
 		frame_stats_clock = fmod(frame_stats_clock, 0.5)
 		_refresh_frame_stats()
+	var calibration_active := _projector_calibration_active()
+	if map_credit:
+		map_credit.visible = not calibration_active
+	if human_credit:
+		human_credit.visible = not calibration_active
 	_update_parkview_credit(delta)
 	queue_redraw()
 
@@ -56,6 +67,10 @@ func _projector_driving_view_active() -> bool:
 	var bay = get_node_or_null("../BayProjection")
 	return bay != null and int(bay.mode) == 1
 
+func _projector_calibration_active() -> bool:
+	var bay = get_node_or_null("../BayProjection")
+	return bay != null and int(bay.mode) == 2
+
 func _credit_hold_seconds() -> float:
 	return PROJECTOR_CREDIT_HOLD_SECONDS if _projector_driving_view_active() else DEFAULT_CREDIT_HOLD_SECONDS
 
@@ -64,6 +79,9 @@ func _credit_fade_seconds() -> float:
 
 func _update_parkview_credit(delta: float):
 	if parkview_credit == null:
+		return
+	if _projector_calibration_active():
+		parkview_credit.visible = false
 		return
 	credit_clock += delta / maxf(Engine.time_scale, 0.001)
 	var viewport_size := get_viewport_rect().size
@@ -131,7 +149,7 @@ func _refresh_frame_stats():
 	worst_frame_ms = float(sorted[frame_sample_count - 1])
 
 func _draw():
-	if car == null:
+	if car == null or _projector_calibration_active():
 		return
 	var radio_strength = float(car.get_meta("radio_signal", 0.0))
 	var speed = abs(float(car.get("speed"))) * 3.6

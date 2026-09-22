@@ -24,6 +24,8 @@ First slice: Godot Mobile renderer, real 3D collision space, reversible free dri
   controls fade after six idle seconds and return immediately on mouse movement.
 - Projector instruments, sight marker and opening credit follow the calibrated
   forward shutter instead of the geometric centre of the complete 16:9 canvas.
+  Instruments render above the cockpit but below controls; calibration hides the
+  HUD so labels cannot obscure a physical shutter edge.
 - `CAL` supports mouse/touch corner warping, surface selection and whole-panorama
   yaw. Black gaps mask walls and frames. `SAVE` persists both layouts; `RESTORE`
   recovers the calibration that existed before the last save or reset.

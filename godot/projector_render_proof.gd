@@ -137,6 +137,10 @@ func run() -> void:
 		quit(2)
 		return
 	var hud = world.get_node("HUD")
+	if hud.z_index <= bay.steering_ring.z_index or hud.z_index >= bay.button.z_index:
+		push_error("PUA_PROJECTOR_RENDER_FAIL HUD layer %d must sit between cockpit %d and controls %d" % [hud.z_index, bay.steering_ring.z_index, bay.button.z_index])
+		quit(2)
+		return
 	var driver_focus_rect: Rect2 = hud._driver_focus_rect(world.get_viewport().get_visible_rect().size)
 	var forward_quad: PackedVector2Array = bay.surfaces[1].polygon
 	var expected_driver_focus_x: float = (forward_quad[0].x + forward_quad[1].x + forward_quad[2].x + forward_quad[3].x) * 0.25
@@ -241,6 +245,9 @@ func run() -> void:
 		"driver_focus_x": driver_focus_rect.get_center().x,
 		"driver_focus_expected_x": expected_driver_focus_x,
 		"opening_credit_retired": true,
+		"hud_z_index": hud.z_index,
+		"cockpit_z_index": bay.steering_ring.z_index,
+		"control_z_index": bay.button.z_index,
 		"xps_profile_exercised": true,
 		"xps_panel_render_scales": xps_scales,
 		"xps_panel_render_sizes": xps_panel_sizes,
