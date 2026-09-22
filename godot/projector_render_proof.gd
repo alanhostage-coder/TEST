@@ -275,6 +275,7 @@ func run() -> void:
 		"generic_tenement_recesses": int(car.get_meta("generic_tenement_recess_count", 0)),
 		"generic_tenement_chimneys": int(car.get_meta("generic_tenement_chimney_count", 0)),
 		"generic_tenement_railings": int(car.get_meta("generic_tenement_railing_count", 0)),
+		"xps_light_grade": str(car.get_meta("xps_light_grade", "default")),
 		"opening_policy": str(car.get_meta("map_opening_policy", "")),
 		"opening_anchor": str(car.get_meta("map_opening_verified_anchor", "")),
 		"opening_anchor_annotation": str(opening_anchor_label.text),

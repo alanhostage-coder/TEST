@@ -25,6 +25,7 @@ const ROAD_MICRO_STEP := 6.5
 # while remaining a bounded low-spec draw/collision radius for future patches.
 const LOW_SPEC_EXACT_FOOTPRINT_RADIUS := 220.0
 const DRIVER_DETAIL_RADIUS := 38.0
+const XPS_LIGHT_GRADE := "edinburgh-side-light-v1"
 var low_spec_mode := false
 var projector_max_mode := false
 var pc_max_mode := false
@@ -88,10 +89,12 @@ func _ready():
 	xps_9530_mode = OS.has_feature("xps_9530") or force_xps_proof
 	low_spec_mode = OS.has_feature("thinkpad_low") or (projector_max_mode and not xps_9530_mode)
 	if xps_9530_mode:
-		# Five cameras multiply shadow cost. Preserve full mapped geometry and nearby
-		# driver-readable detail, but spend the 4 GB GPU budget on image stability.
+		# Final reference-machine grade: slightly lower, more lateral light makes the
+		# sandstone relief and recessed sash/close geometry readable from the driver seat.
 		api_detail_pressure = 0.96
 		$Sun.directional_shadow_max_distance = 145.0
+		$Sun.rotation_degrees = Vector3(-27.0, -47.0, 0.0)
+		$Sun.light_color = Color(1.0, 0.91, 0.78)
 	elif projector_max_mode:
 		api_detail_pressure = 0.32
 		$Sun.directional_shadow_max_distance = 58.0
@@ -157,11 +160,11 @@ func _make_materials():
 	# Shared materials keep close-range texture cheap on old integrated GPUs.
 	road_patch_mat = _mat(Color(0.035, 0.038, 0.041), 0.46, 0.03)
 	weed_mat = _mat(Color(0.15, 0.21, 0.08), 0.98, 0.0)
-	tenement_weathered_mat = _tenement_texture_mat("res://assets/edinburgh_tenement/walls/edin_ten_wall_weathered_a_alb.png", Color(0.98, 0.98, 0.97), 0.93)
-	tenement_warm_mat = _tenement_texture_mat("res://assets/edinburgh_tenement/walls/edin_ten_wall_warm_a_alb.png", Color(0.98, 0.97, 0.94), 0.92)
-	tenement_soot_mat = _tenement_texture_mat("res://assets/edinburgh_tenement/walls/edin_ten_wall_weathered_a_alb.png", Color(0.72, 0.73, 0.70), 0.95)
-	tenement_sash_frame_mat = _mat(Color(0.77, 0.76, 0.69), 0.78, 0.0)
-	tenement_sash_glass_mat = _mat(Color(0.055, 0.082, 0.092), 0.18, 0.22)
+	tenement_weathered_mat = _tenement_texture_mat("res://assets/edinburgh_tenement/walls/edin_ten_wall_weathered_a_alb.png", Color(1.0, 0.975, 0.93), 0.93)
+	tenement_warm_mat = _tenement_texture_mat("res://assets/edinburgh_tenement/walls/edin_ten_wall_warm_a_alb.png", Color(1.0, 0.95, 0.86), 0.92)
+	tenement_soot_mat = _tenement_texture_mat("res://assets/edinburgh_tenement/walls/edin_ten_wall_weathered_a_alb.png", Color(0.68, 0.675, 0.63), 0.95)
+	tenement_sash_frame_mat = _mat(Color(0.83, 0.81, 0.74), 0.78, 0.0)
+	tenement_sash_glass_mat = _mat(Color(0.035, 0.052, 0.060), 0.18, 0.22)
 	tenement_door_mats = [
 		_mat(Color(0.075, 0.16, 0.12), 0.72, 0.0),
 		_mat(Color(0.17, 0.055, 0.05), 0.74, 0.0),
@@ -1399,16 +1402,21 @@ func _apply_weather_visuals():
 	pavement_mat.roughness = lerp(0.90, 0.58, wetness)
 	kerb_mat.roughness = lerp(0.94, 0.68, wetness)
 	concrete_mat.roughness = lerp(0.86, 0.62, wetness)
-	weather_sun_energy = lerp(0.95, 0.56, cloud) * lerp(1.0, 0.90, wetness)
+	weather_sun_energy = (lerp(1.03, 0.58, cloud) if xps_9530_mode else lerp(0.95, 0.56, cloud)) * lerp(1.0, 0.90, wetness)
 	var env = $WorldEnvironment.environment
 	if env:
 		env.fog_enabled = true
 		var visibility_fog = clamp(1.0 - visibility / 22000.0, 0.0, 0.92)
 		env.fog_density = 0.0022 + visibility_fog * 0.008 + clamp(aqi / 150.0, 0.0, 1.0) * 0.002
 		env.fog_light_color = Color(0.46, 0.50, 0.51).lerp(Color(0.36, 0.40, 0.42), cloud)
-		env.ambient_light_energy = lerp(0.88, 0.66, cloud) * lerp(1.0, 0.94, wetness)
-		env.ambient_light_color = Color(0.54, 0.57, 0.58).lerp(Color(0.42, 0.46, 0.48), cloud)
-		env.tonemap_exposure = lerp(1.24, 1.08, cloud) * lerp(1.0, 0.98, wetness)
+		if xps_9530_mode:
+			env.ambient_light_energy = lerp(0.78, 0.63, cloud) * lerp(1.0, 0.94, wetness)
+			env.ambient_light_color = Color(0.53, 0.54, 0.54).lerp(Color(0.41, 0.45, 0.47), cloud)
+			env.tonemap_exposure = lerp(1.18, 1.06, cloud) * lerp(1.0, 0.98, wetness)
+		else:
+			env.ambient_light_energy = lerp(0.88, 0.66, cloud) * lerp(1.0, 0.94, wetness)
+			env.ambient_light_color = Color(0.54, 0.57, 0.58).lerp(Color(0.42, 0.46, 0.48), cloud)
+			env.tonemap_exposure = lerp(1.24, 1.08, cloud) * lerp(1.0, 0.98, wetness)
 
 
 func _bind_map_stream():
@@ -1577,6 +1585,7 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("generic_tenement_recess_count", generic_tenement_recess_count)
 		car.set_meta("generic_tenement_chimney_count", generic_tenement_chimney_count)
 		car.set_meta("generic_tenement_railing_count", generic_tenement_railing_count)
+		car.set_meta("xps_light_grade", XPS_LIGHT_GRADE if xps_9530_mode else "default")
 		car.set_meta("map_fallback_building_count", fallback_building_count)
 		car.set_meta("map_linear_feature_count", linear_features.size())
 		car.set_meta("map_point_feature_count", point_features.size())
