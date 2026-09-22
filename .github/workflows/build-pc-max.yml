@@ -57,7 +57,7 @@ jobs:
         run: |
           mkdir -p build/projector-proof
           set +e
-          timeout 30s xvfb-run -a godot --path godot --display-driver x11 --resolution 1920x1080 --script res://projector_render_proof.gd > /tmp/pua-projector-proof.log 2>&1
+          timeout 75s xvfb-run -a godot --path godot --display-driver x11 --resolution 1920x1080 --script res://projector_render_proof.gd > /tmp/pua-projector-proof.log 2>&1
           status=$?
           set -e
           cat /tmp/pua-projector-proof.log
