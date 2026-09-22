@@ -136,6 +136,7 @@ jobs:
           assert proof['legacy_yaw_normalised'] is True, proof
           assert proof['xps_profile_exercised'] is True, proof
           assert proof['laptop_max_hd_size'] == [1920, 1080], proof
+          assert proof['xps_visual_density_policy'] == 'mapped-detail-priority-v1', proof
           assert 0.95 <= proof['xps_pixel_budget_ratio'] <= 1.02, proof
           scales = proof['xps_panel_render_scales']
           assert len(scales) == 5, scales
@@ -163,6 +164,9 @@ jobs:
           grep -q 'custom_features="pc_max,projector_max,xps_9530"' godot/export_presets.cfg
           grep -q 'XPS_9530_SURFACE_RENDER_SCALES' godot/bay_projection.gd
           grep -q 'xps_9530_mode' godot/world.gd
+          grep -q 'street_edge_limit := 420 if xps_9530_mode' godot/world.gd
+          grep -q 'micro_budget := 650 if xps_9530_mode' godot/world.gd
+          grep -q 'facade_radius := 175.0 if xps_9530_mode' godot/world.gd
           grep -q 'pc_max_mode' godot/open_world_director.gd
           grep -q 'map_road_segments' godot/world.gd
           grep -q 'const START_POSTCODE := "EH15 2BZ"' godot/map_stream.gd

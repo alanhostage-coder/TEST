@@ -74,8 +74,8 @@ func _ready():
 	if xps_9530_mode:
 		# Five cameras multiply shadow cost. Preserve full mapped geometry and nearby
 		# driver-readable detail, but spend the 4 GB GPU budget on image stability.
-		api_detail_pressure = 0.82
-		$Sun.directional_shadow_max_distance = 118.0
+		api_detail_pressure = 0.96
+		$Sun.directional_shadow_max_distance = 145.0
 	elif projector_max_mode:
 		api_detail_pressure = 0.32
 		$Sun.directional_shadow_max_distance = 58.0
@@ -268,7 +268,7 @@ func _road_rotated_material(parent: Node3D, pos: Vector3, length: float, width: 
 	parent.add_child(mesh)
 
 func _add_mapped_linear_features(parent: Node3D, features: Array):
-	var cap = 80 if projector_max_mode else (110 if low_spec_mode else (320 if pc_max_mode else 240))
+	var cap = 260 if xps_9530_mode else (80 if projector_max_mode else (110 if low_spec_mode else (320 if pc_max_mode else 240)))
 	var made := 0
 	for feature in features:
 		if made >= cap or not feature is Dictionary:
@@ -314,7 +314,7 @@ func _add_mapped_linear_features(parent: Node3D, features: Array):
 			made += 1
 
 func _add_mapped_point_features(parent: Node3D, features: Array):
-	var cap = 55 if projector_max_mode else (95 if low_spec_mode else (240 if pc_max_mode else 180))
+	var cap = 210 if xps_9530_mode else (55 if projector_max_mode else (95 if low_spec_mode else (240 if pc_max_mode else 180)))
 	var made := 0
 	for feature in features:
 		if made >= cap or not feature is Dictionary:
@@ -330,28 +330,32 @@ func _add_mapped_point_features(parent: Node3D, features: Array):
 			tm.top_radius = 0.12
 			tm.bottom_radius = 0.18
 			tm.height = 2.2
-			tm.radial_segments = 7
+			tm.radial_segments = 10 if xps_9530_mode else 7
 			trunk.mesh = tm
 			trunk.position = p + Vector3(0, 1.1, 0)
 			trunk.material_override = _mat(Color(0.16, 0.10, 0.055), 0.96, 0.0)
-			trunk.visibility_range_end = 150.0 if not low_spec_mode else 90.0
+			trunk.visibility_range_end = 240.0 if xps_9530_mode else (150.0 if not low_spec_mode else 90.0)
 			_apply_secondary_visual_budget(trunk, 90.0)
 			parent.add_child(trunk)
 			var crown = MeshInstance3D.new()
 			var sm = SphereMesh.new()
 			sm.radius = 1.25
 			sm.height = 2.5
-			sm.radial_segments = 8 if not low_spec_mode else 6
-			sm.rings = 5 if not low_spec_mode else 3
+			sm.radial_segments = 12 if xps_9530_mode else (8 if not low_spec_mode else 6)
+			sm.rings = 7 if xps_9530_mode else (5 if not low_spec_mode else 3)
 			crown.mesh = sm
 			crown.position = p + Vector3(0, 3.0, 0)
 			crown.material_override = hedge_mat
-			crown.visibility_range_end = 165.0 if not low_spec_mode else 95.0
+			crown.visibility_range_end = 260.0 if xps_9530_mode else (165.0 if not low_spec_mode else 95.0)
 			_apply_secondary_visual_budget(crown, 95.0)
 			parent.add_child(crown)
 		elif kind == "traffic_signals":
 			_visual_box(parent, p + Vector3(0, 1.55, 0), Vector3(0.12, 3.1, 0.12), metal_mat)
 			_visual_box(parent, p + Vector3(0, 2.75, 0), Vector3(0.34, 0.72, 0.24), roof_mat)
+			if xps_9530_mode:
+				_visual_box(parent, p + Vector3(0.0, 2.98, -0.13), Vector3(0.18, 0.14, 0.04), sign_red_mat)
+				_visual_box(parent, p + Vector3(0.0, 2.76, -0.13), Vector3(0.18, 0.14, 0.04), marking_mat)
+				_visual_box(parent, p + Vector3(0.0, 2.54, -0.13), Vector3(0.18, 0.14, 0.04), hedge_mat)
 		elif kind == "bus_stop":
 			_visual_box(parent, p + Vector3(0, 1.25, 0), Vector3(0.09, 2.5, 0.09), metal_mat)
 			_visual_box(parent, p + Vector3(0, 2.35, 0), Vector3(0.52, 0.42, 0.10), marking_mat)
@@ -386,7 +390,7 @@ func _add_mapped_road_name_signs(parent: Node3D, roads: Array) -> int:
 	# street-name board exists at an arbitrary segment midpoint. Keep generic names
 	# as unobtrusive world annotations; actual mapped traffic signs are created only
 	# by _add_mapped_point_features at their sourced coordinates.
-	var cap = 8 if projector_max_mode else (10 if low_spec_mode else (34 if pc_max_mode else 18))
+	var cap = 26 if xps_9530_mode else (8 if projector_max_mode else (10 if low_spec_mode else (34 if pc_max_mode else 18)))
 	var distance_limit = 125.0 if low_spec_mode else 260.0
 	var label_range = 115.0 if low_spec_mode else 180.0
 	var label_size = 24 if low_spec_mode else 31
@@ -440,7 +444,7 @@ func _add_mapped_road_name_signs(parent: Node3D, roads: Array) -> int:
 	return made
 
 func _add_named_poi_markers(parent: Node3D, pois: Array):
-	var cap = 5 if projector_max_mode else (7 if low_spec_mode else (32 if pc_max_mode else 14))
+	var cap = 22 if xps_9530_mode else (5 if projector_max_mode else (7 if low_spec_mode else (32 if pc_max_mode else 14)))
 	var distance_limit = 120.0 if low_spec_mode else 300.0
 	var label_range = 110.0 if low_spec_mode else 200.0
 	var label_size = 25 if low_spec_mode else 32
@@ -543,7 +547,8 @@ func _road_micro_detail(parent: Node3D, a: Vector2, b: Vector2, width: float, se
 	var segment_mid = (a + b) * 0.5
 	var driver = get_node_or_null("Car")
 	var driver_pos = Vector2(driver.global_position.x, driver.global_position.z) if driver else Vector2.ZERO
-	if segment_mid.distance_to(driver_pos) > DRIVER_DETAIL_RADIUS + (b - a).length() * 0.5:
+	var detail_radius := 68.0 if xps_9530_mode else DRIVER_DETAIL_RADIUS
+	if segment_mid.distance_to(driver_pos) > detail_radius + (b - a).length() * 0.5:
 		return 0
 	var delta = b - a
 	var length = delta.length()
@@ -551,7 +556,8 @@ func _road_micro_detail(parent: Node3D, a: Vector2, b: Vector2, width: float, se
 		return 0
 	var tangent = delta.normalized()
 	var normal = Vector2(-tangent.y, tangent.x)
-	var count = min(budget, max(1, int(floor(length / ROAD_MICRO_STEP))))
+	var micro_step := 4.8 if xps_9530_mode else ROAD_MICRO_STEP
+	var count = min(budget, max(1, int(floor(length / micro_step))))
 	for i in range(count):
 		var t = (float(i) + 0.5) / float(count)
 		var p = a.lerp(b, t)
@@ -592,6 +598,19 @@ func _road_micro_detail(parent: Node3D, a: Vector2, b: Vector2, width: float, se
 			weed.visibility_range_end = 72.0
 			_apply_secondary_visual_budget(weed, 54.0)
 			parent.add_child(weed)
+		elif kind == 3 and xps_9530_mode:
+			# Procedural wear only: a subdued repair seam gives the asphalt scale and
+			# speed cues without claiming a mapped pothole or road defect.
+			var seam = MeshInstance3D.new()
+			var seam_mesh = PlaneMesh.new()
+			seam_mesh.size = Vector2(0.10, min(2.8, max(1.2, length / float(count) * 0.55)))
+			seam.mesh = seam_mesh
+			seam.position = Vector3(p.x + normal.x * 0.35, 0.092, p.y + normal.y * 0.35)
+			seam.rotation.y = atan2(tangent.x, tangent.y)
+			seam.material_override = road_patch_mat
+			seam.visibility_range_end = 120.0
+			_apply_secondary_visual_budget(seam)
+			parent.add_child(seam)
 	return count
 
 func _osm_building_material(building: Dictionary, seed: int):
@@ -624,15 +643,17 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 	for p in poly:
 		centroid += p
 	centroid /= float(poly.size())
-	if centroid.length() > 125.0:
+	var facade_radius := 175.0 if xps_9530_mode else 125.0
+	if centroid.length() > facade_radius:
 		return
 	var kind = str(building.get("kind", "yes")).to_lower()
 	var industrial = kind in ["industrial", "warehouse", "commercial", "retail"]
-	var floors = clamp(int(floor(height / 3.0)), 1, 3)
+	var floors = clamp(int(floor(height / 3.0)), 1, 5 if xps_9530_mode else 3)
 	var door_edge = abs(seed) % poly.size()
 	var edge_budget := 0
+	var max_edges := 8 if xps_9530_mode else 6
 	for edge_index in range(poly.size()):
-		if edge_budget >= 6:
+		if edge_budget >= max_edges:
 			break
 		var p0 = poly[edge_index]
 		var p1 = poly[(edge_index + 1) % poly.size()]
@@ -643,7 +664,7 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 		var tangent = delta / length
 		var angle = atan2(tangent.x, tangent.y)
 		var edge_mid = (p0 + p1) * 0.5
-		var slots = clamp(int(floor(length / (5.8 if industrial else 3.6))), 1, 4)
+		var slots = clamp(int(floor(length / (5.8 if industrial else 3.6))), 1, 6 if xps_9530_mode else 4)
 
 		# A dark plinth and a thin roofline make the exact footprint meet the street
 		# and sky cleanly without altering its mapped position.
@@ -681,7 +702,15 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 				var panel = body.get_child(body.get_child_count() - 1)
 				if panel is MeshInstance3D:
 					panel.rotation.y = angle
-					panel.visibility_range_end = 145.0
+					panel.visibility_range_end = 210.0 if xps_9530_mode else 145.0
+				if xps_9530_mode and not industrial and panel_mat == glass_mat:
+					# Shallow stone sill adds shadow/parallax while remaining attached to the
+					# mapped wall edge. It is architectural texture, not location evidence.
+					_visual_box(body, Vector3(p.x, panel_y - panel_h * 0.5 - 0.07, p.y), Vector3(0.11, 0.10, panel_w + 0.16), kerb_mat)
+					var sill = body.get_child(body.get_child_count() - 1)
+					if sill is MeshInstance3D:
+						sill.rotation.y = angle
+						sill.visibility_range_end = 190.0
 		edge_budget += 1
 
 func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float, seed: int) -> bool:
@@ -725,7 +754,7 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 	var visual = MeshInstance3D.new()
 	visual.mesh = mesh
 	visual.material_override = _osm_building_material(building, seed)
-	visual.visibility_range_end = 360.0 if not low_spec_mode else 220.0
+	visual.visibility_range_end = 520.0 if xps_9530_mode else (360.0 if not low_spec_mode else 220.0)
 	body.add_child(visual)
 	var collision = CollisionShape3D.new()
 	collision.shape = mesh.create_trimesh_shape()
@@ -1160,9 +1189,9 @@ func _on_map_ready(map_data: Dictionary):
 	)
 	var street_edge_budget := 0
 	var marking_budget := 0
-	var street_edge_limit := 70 if projector_max_mode else (90 if low_spec_mode else (620 if pc_max_mode else 240))
-	var marking_limit := 46 if projector_max_mode else (55 if low_spec_mode else (360 if pc_max_mode else 130))
-	var micro_budget := 80 if projector_max_mode else (110 if low_spec_mode else (1100 if pc_max_mode else 320))
+	var street_edge_limit := 420 if xps_9530_mode else (70 if projector_max_mode else (90 if low_spec_mode else (620 if pc_max_mode else 240)))
+	var marking_limit := 240 if xps_9530_mode else (46 if projector_max_mode else (55 if low_spec_mode else (360 if pc_max_mode else 130)))
+	var micro_budget := 650 if xps_9530_mode else (80 if projector_max_mode else (110 if low_spec_mode else (1100 if pc_max_mode else 320)))
 
 	for road in detail_roads:
 		if not road is Dictionary:

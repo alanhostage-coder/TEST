@@ -275,7 +275,8 @@ func run() -> void:
 		"xps_profile_exercised": true,
 		"xps_panel_render_scales": xps_scales,
 		"xps_panel_render_sizes": xps_panel_sizes,
-		"xps_pixel_budget_ratio": xps_pixel_budget_ratio
+		"xps_pixel_budget_ratio": xps_pixel_budget_ratio,
+		"xps_visual_density_policy": "mapped-detail-priority-v1"
 	}
 	var manifest_file = FileAccess.open(MANIFEST_PATH, FileAccess.WRITE)
 	if manifest_file == null:
