@@ -2,6 +2,7 @@ extends SceneTree
 
 const OUTPUT_PATH := "/tmp/pua-projector-proof.png"
 const CONTINUITY_PATH := "/tmp/pua-projector-continuity.png"
+const CALIBRATION_PATH := "/tmp/pua-projector-calibration.png"
 const LAPTOP_MAX_HD_PATH := "/tmp/pua-xps-laptop-max-hd.png"
 const MANIFEST_PATH := "/tmp/pua-projector-proof.json"
 const MAP_READY_FRAME_BUDGET := 240
@@ -199,6 +200,23 @@ func run() -> void:
 		quit(2)
 		return
 
+	# Capture the operator-facing optical aid separately. Its warped quarter-grid,
+	# centre target and named corners are what make physical shutter alignment
+	# repeatable; they must never be inferred from the clean driving frame.
+	bay._set_mode(2)
+	bay.selected_surface = 1
+	bay._update_calibration_controls()
+	bay.queue_redraw()
+	await process_frame
+	await process_frame
+	var calibration := root.get_texture().get_image()
+	if calibration == null or calibration.is_empty() or calibration.save_png(CALIBRATION_PATH) != OK:
+		push_error("PUA_PROJECTOR_RENDER_FAIL calibration guide frame save error")
+		quit(2)
+		return
+	bay._set_mode(1)
+	await process_frame
+
 	# Capture the ordinary single-camera 1920x1080 laptop view from the same
 	# source-backed world. This is evidence for the Max-HD laptop presentation,
 	# not a crop of the five-surface composite.
@@ -269,6 +287,8 @@ func run() -> void:
 		"driver_focus_expected_x": expected_driver_focus_x,
 		"opening_credit_retired": true,
 		"idle_control_hint_hidden": true,
+		"calibration_guide_proof": true,
+		"calibration_guide_divisions": bay.CALIBRATION_GUIDE_DIVISIONS,
 		"hud_z_index": hud.z_index,
 		"cockpit_z_index": bay.steering_ring.z_index,
 		"control_z_index": bay.button.z_index,

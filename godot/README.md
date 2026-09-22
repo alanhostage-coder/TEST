@@ -30,7 +30,8 @@ First slice: Godot Mobile renderer, real 3D collision space, reversible free dri
   Instruments render above the cockpit but below controls; calibration hides the
   HUD so labels cannot obscure a physical shutter edge.
 - `CAL` supports mouse/touch corner warping, surface selection and whole-panorama
-  yaw. Black gaps mask walls and frames. `SAVE` persists both layouts; `RESTORE`
+  yaw. Each surface has its own warped quarter-grid, centre target and named corner
+  fiducials for optical alignment. Black gaps mask walls and frames. `SAVE` persists both layouts; `RESTORE`
   recovers the calibration that existed before the last save or reset.
 - The layout is deliberately marked unmeasured until calibrated to the closed
   shutters. The supplied open-shutter photographs are references, not survey data.

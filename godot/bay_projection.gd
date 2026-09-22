@@ -41,6 +41,14 @@ const MIN_CALIBRATION_EDGE_RATIO := 0.15
 const DRIVER_CHROME_HOLD_SECONDS := 6.0
 const DRIVER_CHROME_FADE_SECONDS := 1.25
 const DRIVER_CHROME_MOUSE_WAKE_DISTANCE := 3.0
+const CALIBRATION_GUIDE_DIVISIONS := 4
+const CALIBRATION_SURFACE_COLOURS := [
+	Color(1.00, 0.55, 0.16, 0.96),
+	Color(0.20, 0.86, 1.00, 0.96),
+	Color(0.74, 1.00, 0.32, 0.96),
+	Color(1.00, 0.34, 0.72, 0.96),
+	Color(0.64, 0.48, 1.00, 0.96)
+]
 
 var mode := 0 # 0 normal, 1 cab, 2 calibration
 var car: Node3D
@@ -613,6 +621,15 @@ func _quad_signed_area(points: PackedVector2Array) -> float:
 		area += points[i].x * next.y - next.x * points[i].y
 	return area * 0.5
 
+func _quad_point(points: PackedVector2Array, u: float, v: float) -> Vector2:
+	# Bilinear surface coordinates keep the calibration mesh attached to a
+	# keystoned quad instead of the unwarped 16:9 canvas.
+	if points.size() != 4:
+		return Vector2.ZERO
+	var top := points[0].lerp(points[1], clampf(u, 0.0, 1.0))
+	var bottom := points[3].lerp(points[2], clampf(u, 0.0, 1.0))
+	return top.lerp(bottom, clampf(v, 0.0, 1.0))
+
 func _pick_corner(pos: Vector2):
 	var best_distance = CORNER_PICK_RADIUS
 	active_plane = -1
@@ -665,13 +682,26 @@ func _draw():
 
 	for plane in range(layout_surface_count):
 		var poly: PackedVector2Array = surfaces[plane].polygon
+		var surface_colour: Color = CALIBRATION_SURFACE_COLOURS[plane]
+		var guide_colour := Color(surface_colour.r, surface_colour.g, surface_colour.b, 0.48 if plane == selected_surface else 0.28)
+		for division in range(1, CALIBRATION_GUIDE_DIVISIONS):
+			var fraction := float(division) / float(CALIBRATION_GUIDE_DIVISIONS)
+			draw_line(_quad_point(poly, fraction, 0.0), _quad_point(poly, fraction, 1.0), guide_colour, 1.5)
+			draw_line(_quad_point(poly, 0.0, fraction), _quad_point(poly, 1.0, fraction), guide_colour, 1.5)
 		for edge in range(4):
-			draw_line(poly[edge], poly[(edge + 1) % 4], line, 2.5)
+			draw_line(poly[edge], poly[(edge + 1) % 4], surface_colour, 3.5 if plane == selected_surface else 2.5)
+		var centre := _quad_point(poly, 0.5, 0.5)
+		draw_line(_quad_point(poly, 0.43, 0.5), _quad_point(poly, 0.57, 0.5), surface_colour, 3.0)
+		draw_line(_quad_point(poly, 0.5, 0.43), _quad_point(poly, 0.5, 0.57), surface_colour, 3.0)
+		draw_circle(centre, 9.0, surface_colour, false, 2.5)
 		for corner in range(4):
 			var selected = plane == active_plane and corner == active_corner
-			draw_circle(poly[corner], 13.0 if selected else 9.0, Color(1.0, 0.52, 0.18, 1.0), false, 3.0)
+			draw_circle(poly[corner], 13.0 if selected else 9.0, surface_colour, false, 3.0)
+			var corner_name: String = ["TL", "TR", "BR", "BL"][corner]
+			var label_offset := Vector2(12.0 if corner in [0, 3] else -32.0, 22.0 if corner in [0, 1] else -12.0)
+			draw_string(ThemeDB.fallback_font, poly[corner] + label_offset, corner_name, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, surface_colour)
 		var label_position = poly[0] + Vector2(12, 24)
-		draw_string(ThemeDB.fallback_font, label_position, "%d  %s" % [plane + 1, SURFACE_NAMES[plane]], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, Color(1, 0.78, 0.38, 0.95))
+		draw_string(ThemeDB.fallback_font, label_position, "%d  %s" % [plane + 1, SURFACE_NAMES[plane]], HORIZONTAL_ALIGNMENT_LEFT, -1, 14, surface_colour)
 
 func _blank_offsets(count: int) -> Array:
 	var result: Array = []

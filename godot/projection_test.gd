@@ -44,6 +44,12 @@ func run():
 	assert(bay._is_safe_calibration_quad(calibration_keystone, calibration_base))
 	assert(not bay._is_safe_calibration_quad(calibration_foldover, calibration_base))
 	assert(not bay._is_safe_calibration_quad(calibration_sliver, calibration_base))
+	assert(bay._quad_point(calibration_keystone, 0.0, 0.0).is_equal_approx(calibration_keystone[0]))
+	assert(bay._quad_point(calibration_keystone, 1.0, 0.0).is_equal_approx(calibration_keystone[1]))
+	assert(bay._quad_point(calibration_keystone, 1.0, 1.0).is_equal_approx(calibration_keystone[2]))
+	assert(bay._quad_point(calibration_keystone, 0.0, 1.0).is_equal_approx(calibration_keystone[3]))
+	var expected_quad_centre := (calibration_keystone[0] + calibration_keystone[1] + calibration_keystone[2] + calibration_keystone[3]) * 0.25
+	assert(bay._quad_point(calibration_keystone, 0.5, 0.5).is_equal_approx(expected_quad_centre))
 	# A mistaken RESET must be recoverable after a physical shutter alignment.
 	# RESET saves defaults, and that save must first preserve the prior file.
 	bay.layout_surface_count = 5

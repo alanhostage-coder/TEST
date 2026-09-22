@@ -67,12 +67,14 @@ jobs:
           grep -q 'map_source=' /tmp/pua-projector-proof.log
           test -s /tmp/pua-projector-proof.png
           test -s /tmp/pua-projector-continuity.png
+          test -s /tmp/pua-projector-calibration.png
           test -s /tmp/pua-xps-laptop-max-hd.png
           test -s /tmp/pua-projector-proof.json
           # Preserve the complete raster evidence even when a visual assertion
           # fails, so the next correction is based on pixels rather than logs.
           cp /tmp/pua-projector-proof.png build/projector-proof/
           cp /tmp/pua-projector-continuity.png build/projector-proof/
+          cp /tmp/pua-projector-calibration.png build/projector-proof/
           cp /tmp/pua-xps-laptop-max-hd.png build/projector-proof/
           cp /tmp/pua-projector-panel-*.png build/projector-proof/
           cp /tmp/pua-projector-proof.json build/projector-proof/
@@ -86,6 +88,14 @@ jobs:
           continuity = Image.open('/tmp/pua-projector-continuity.png').convert('RGB')
           assert continuity.size == (1920, 1080), continuity.size
           assert max(ImageStat.Stat(continuity).stddev) > 3.0, 'continuity frame is visually blank'
+          calibration = Image.open('/tmp/pua-projector-calibration.png').convert('RGB')
+          assert calibration.size == (1920, 1080), calibration.size
+          assert max(ImageStat.Stat(calibration).stddev) > 3.0, 'calibration frame is visually blank'
+          guide_pixels = sum(
+              1 for red, green, blue in calibration.getdata()
+              if max(red, green, blue) > 180 and max(red, green, blue) - min(red, green, blue) > 65
+          )
+          assert guide_pixels > 2500, f'calibration fiducials are not visible enough: {guide_pixels}'
           laptop = Image.open('/tmp/pua-xps-laptop-max-hd.png').convert('RGB')
           assert laptop.size == (1920, 1080), laptop.size
           assert max(ImageStat.Stat(laptop).stddev) > 3.0, 'laptop max-hd frame is visually blank'
@@ -134,6 +144,8 @@ jobs:
           assert proof['opening_anchor_annotation_source'] in ('poi', 'building', 'point'), proof
           assert proof['projector_1024_aspect_error'] < 0.01, proof
           assert proof['legacy_yaw_normalised'] is True, proof
+          assert proof['calibration_guide_proof'] is True, proof
+          assert proof['calibration_guide_divisions'] == 4, proof
           assert proof['xps_profile_exercised'] is True, proof
           assert proof['laptop_max_hd_size'] == [1920, 1080], proof
           assert proof['xps_visual_density_policy'] == 'mapped-detail-priority-v1', proof
@@ -145,6 +157,8 @@ jobs:
           PY
           cp /tmp/pua-projector-proof.png build/projector-proof/
           cp /tmp/pua-projector-continuity.png build/projector-proof/
+          cp /tmp/pua-projector-calibration.png build/projector-proof/
+          cp /tmp/pua-xps-laptop-max-hd.png build/projector-proof/
           cp /tmp/pua-projector-panel-*.png build/projector-proof/
           cp /tmp/pua-projector-proof.json build/projector-proof/
           sha256sum build/projector-proof/*.png > build/projector-proof/SHA256.txt
