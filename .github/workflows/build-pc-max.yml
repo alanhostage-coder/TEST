@@ -69,6 +69,11 @@ jobs:
           test -s /tmp/pua-projector-continuity.png
           test -s /tmp/pua-projector-calibration.png
           test -s /tmp/pua-xps-laptop-max-hd.png
+          test -s /tmp/pua-driveabout/pitville-street.png
+          test -s /tmp/pua-driveabout/hugh-dewar-fountain.png
+          test -s /tmp/pua-driveabout/bellfield-community-hub.png
+          test -s /tmp/pua-driveabout/st-marks-church.png
+          test -s /tmp/pua-driveabout/twelve-triangles-high-street.png
           test -s /tmp/pua-projector-proof.json
           # Preserve the complete raster evidence even when a visual assertion
           # fails, so the next correction is based on pixels rather than logs.
@@ -76,6 +81,8 @@ jobs:
           cp /tmp/pua-projector-continuity.png build/projector-proof/
           cp /tmp/pua-projector-calibration.png build/projector-proof/
           cp /tmp/pua-xps-laptop-max-hd.png build/projector-proof/
+          mkdir -p build/projector-proof/driveabout
+          cp /tmp/pua-driveabout/*.png build/projector-proof/driveabout/
           cp /tmp/pua-projector-panel-*.png build/projector-proof/
           cp /tmp/pua-projector-proof.json build/projector-proof/
           python3 - <<'PY'
@@ -99,6 +106,11 @@ jobs:
           laptop = Image.open('/tmp/pua-xps-laptop-max-hd.png').convert('RGB')
           assert laptop.size == (1920, 1080), laptop.size
           assert max(ImageStat.Stat(laptop).stddev) > 3.0, 'laptop max-hd frame is visually blank'
+          for driveabout_path in sorted(Path('/tmp/pua-driveabout').glob('*.png')):
+              drive = Image.open(driveabout_path).convert('RGB')
+              assert drive.size == (1920, 1080), (driveabout_path, drive.size)
+              assert max(ImageStat.Stat(drive).stddev) > 3.0, f'driveabout frame blank: {driveabout_path}'
+          assert len(list(Path('/tmp/pua-driveabout').glob('*.png'))) == 5
           panels = sorted(glob('/tmp/pua-projector-panel-*.png'))
           assert len(panels) == 5, panels
           opening_marker_pixels = 0

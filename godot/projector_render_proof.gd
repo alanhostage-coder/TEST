@@ -5,6 +5,7 @@ const CONTINUITY_PATH := "/tmp/pua-projector-continuity.png"
 const CALIBRATION_PATH := "/tmp/pua-projector-calibration.png"
 const LAPTOP_MAX_HD_PATH := "/tmp/pua-xps-laptop-max-hd.png"
 const MANIFEST_PATH := "/tmp/pua-projector-proof.json"
+const DRIVEABOUT_DIR := "/tmp/pua-driveabout"
 const MAP_READY_FRAME_BUDGET := 240
 const EXPECTED_PACKAGED_PATCH_TIMESTAMP := "2026-09-20T22:47:11Z"
 
@@ -319,6 +320,15 @@ func run() -> void:
 	manifest_file.store_string(JSON.stringify(manifest, "  "))
 	manifest_file.close()
 
+	# A small source-backed drive-about: place the real player car on the nearest
+	# mapped road to each named anchor, settle the normal chase camera, then capture
+	# the same 1920x1080 Max-HD view the user sees on the XPS.
+	var driveabout := await _capture_driveabout(world, bay, hud)
+	if driveabout.size() != 5:
+		push_error("PUA_PROJECTOR_RENDER_FAIL driveabout captured %d/5 stops" % driveabout.size())
+		quit(2)
+		return
+
 	print("PUA_PROJECTOR_RENDER_OK size=%dx%d surfaces=%d cameras=%d map_source=%s roads=%d buildings=%d anchor=%s" % [
 		composite.get_width(),
 		composite.get_height(),
@@ -331,6 +341,101 @@ func run() -> void:
 	])
 	quit(0)
 
+
+
+func _capture_driveabout(world: Node, bay: Node, hud: Node) -> Array:
+	DirAccess.make_dir_recursive_absolute(DRIVEABOUT_DIR)
+	var targets: Array = [
+		{"slug": "pitville-street", "label": "Pitville Street", "point": Vector2(21.397, 77.011)},
+		{"slug": "hugh-dewar-fountain", "label": "Dr Hugh Dewar Memorial Fountain", "point": Vector2(56.157, 65.189)},
+		{"slug": "bellfield-community-hub", "label": "Bellfield Community Hub", "point": Vector2(-91.668, -76.972)},
+		{"slug": "st-marks-church", "label": "St Mark's Church", "point": Vector2(-110.398, 90.453)},
+		{"slug": "twelve-triangles-high-street", "label": "Twelve Triangles / Portobello High Street", "point": Vector2(-117.849, -2.438)}
+	]
+	var car = world.get_node("Car")
+	bay._set_mode(0)
+	hud.visible = true
+	var captures: Array = []
+	for target in targets:
+		var target_point: Vector2 = target["point"]
+		var pose := _road_pose_for_target(car, target_point)
+		if pose.is_empty():
+			push_error("PUA_PROJECTOR_RENDER_FAIL no mapped road near %s" % target["label"])
+			return []
+		var road_position: Vector2 = pose["position"]
+		car.global_position = Vector3(road_position.x, 0.58, road_position.y)
+		car.rotation.y = float(pose["heading"])
+		car.speed = 0.0
+		car.velocity = Vector3.ZERO
+		car.steer_smoothed = 0.0
+		car.steering_velocity = 0.0
+		car.lateral_load = 0.0
+		car.camera_yaw = 0.0
+		car.camera_pitch = 0.0
+		car.camera_idle = 2.0
+		car.camera_lag = Vector3.ZERO
+		car.previous_position = car.global_position
+		for _settle in range(10):
+			await process_frame
+		var image := root.get_texture().get_image()
+		var path := "%s/%s.png" % [DRIVEABOUT_DIR, target["slug"]]
+		if image == null or image.is_empty() or image.save_png(path) != OK:
+			push_error("PUA_PROJECTOR_RENDER_FAIL driveabout save failed %s" % target["label"])
+			return []
+		captures.append({
+			"label": target["label"],
+			"path": path,
+			"target": [target_point.x, target_point.y],
+			"car": [car.global_position.x, car.global_position.z]
+		})
+	return captures
+
+
+func _road_pose_for_target(car: Node, target: Vector2) -> Dictionary:
+	var best_distance := INF
+	var best_projection := Vector2.ZERO
+	var best_direction := Vector2.ZERO
+	var best_t := 0.0
+	var best_length := 0.0
+	for segment in car.get_meta("map_road_segments", []):
+		if not segment is Array or segment.size() < 2:
+			continue
+		if not segment[0] is Array or not segment[1] is Array:
+			continue
+		var a := Vector2(float(segment[0][0]), float(segment[0][1]))
+		var b := Vector2(float(segment[1][0]), float(segment[1][1]))
+		var delta := b - a
+		var length := delta.length()
+		if length < 2.0:
+			continue
+		var t := clamp((target - a).dot(delta) / delta.length_squared(), 0.0, 1.0)
+		var projection := a + delta * t
+		var distance := projection.distance_squared_to(target)
+		if distance < best_distance:
+			best_distance = distance
+			best_projection = projection
+			best_direction = delta / length
+			best_t = t
+			best_length = length
+	if best_length <= 0.0:
+		return {}
+	var room_to_a := best_t * best_length
+	var room_to_b := (1.0 - best_t) * best_length
+	var direction := best_direction
+	var road_position := best_projection
+	if room_to_a >= room_to_b:
+		var back := min(16.0, max(4.0, room_to_a * 0.72))
+		road_position = best_projection - best_direction * back
+		direction = best_direction
+	else:
+		var back := min(16.0, max(4.0, room_to_b * 0.72))
+		road_position = best_projection + best_direction * back
+		direction = -best_direction
+	return {
+		"position": road_position,
+		"heading": atan2(-direction.x, -direction.y),
+		"distance_to_anchor": sqrt(best_distance)
+	}
 
 func _projector_profile_aspect_error(bay: Node, screen_size: Vector2) -> float:
 	var worst := 0.0
