@@ -88,6 +88,7 @@ jobs:
           python3 - <<'PY'
           import json
           from glob import glob
+          from pathlib import Path
           from PIL import Image, ImageStat
           composite = Image.open('/tmp/pua-projector-proof.png').convert('RGB')
           assert composite.size == (1920, 1080), composite.size
