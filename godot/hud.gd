@@ -3,6 +3,10 @@ extends Control
 @onready var car = get_node("../Car")
 @onready var parkview_credit = get_node_or_null("ParkviewCredit")
 var credit_clock := 0.0
+const DEFAULT_CREDIT_HOLD_SECONDS := 6.0
+const DEFAULT_CREDIT_FADE_SECONDS := 2.0
+const PROJECTOR_CREDIT_HOLD_SECONDS := 2.5
+const PROJECTOR_CREDIT_FADE_SECONDS := 0.75
 const FRAME_SAMPLE_CAPACITY := 120
 const HITCH_THRESHOLD_MS := 33.333
 var frame_samples := PackedFloat32Array()
@@ -26,14 +30,60 @@ func _process(delta: float):
 	if frame_stats_clock >= 0.5:
 		frame_stats_clock = fmod(frame_stats_clock, 0.5)
 		_refresh_frame_stats()
-	credit_clock += delta
-	if parkview_credit:
-		var alpha = 1.0
-		if credit_clock > 6.0:
-			alpha = clamp(1.0 - (credit_clock - 6.0) / 2.0, 0.0, 1.0)
-		parkview_credit.modulate.a = alpha
-		parkview_credit.visible = alpha > 0.01
+	_update_parkview_credit(delta)
 	queue_redraw()
+
+func _driver_focus_rect(viewport_size: Vector2) -> Rect2:
+	var fallback := Rect2(Vector2.ZERO, viewport_size)
+	var bay = get_node_or_null("../BayProjection")
+	if bay == null or int(bay.mode) != 1 or int(bay.layout_surface_count) < 3 or bay.surfaces.size() < 2:
+		return fallback
+	var forward_quad: PackedVector2Array = bay.surfaces[1].polygon
+	if forward_quad.size() != 4:
+		return fallback
+	var minimum := forward_quad[0]
+	var maximum := forward_quad[0]
+	for point in forward_quad:
+		minimum.x = minf(minimum.x, point.x)
+		minimum.y = minf(minimum.y, point.y)
+		maximum.x = maxf(maximum.x, point.x)
+		maximum.y = maxf(maximum.y, point.y)
+	if maximum.x - minimum.x < 2.0 or maximum.y - minimum.y < 2.0:
+		return fallback
+	return Rect2(minimum, maximum - minimum)
+
+func _projector_driving_view_active() -> bool:
+	var bay = get_node_or_null("../BayProjection")
+	return bay != null and int(bay.mode) == 1
+
+func _credit_hold_seconds() -> float:
+	return PROJECTOR_CREDIT_HOLD_SECONDS if _projector_driving_view_active() else DEFAULT_CREDIT_HOLD_SECONDS
+
+func _credit_fade_seconds() -> float:
+	return PROJECTOR_CREDIT_FADE_SECONDS if _projector_driving_view_active() else DEFAULT_CREDIT_FADE_SECONDS
+
+func _update_parkview_credit(delta: float):
+	if parkview_credit == null:
+		return
+	credit_clock += delta / maxf(Engine.time_scale, 0.001)
+	var viewport_size := get_viewport_rect().size
+	var focus_rect := _driver_focus_rect(viewport_size)
+	var credit_width := minf(440.0, maxf(260.0, focus_rect.size.x - 40.0))
+	parkview_credit.anchor_left = 0.0
+	parkview_credit.anchor_right = 0.0
+	parkview_credit.anchor_top = 0.0
+	parkview_credit.anchor_bottom = 0.0
+	parkview_credit.position = Vector2(
+		focus_rect.position.x + (focus_rect.size.x - credit_width) * 0.5,
+		maxf(14.0, focus_rect.position.y + 18.0)
+	)
+	parkview_credit.size = Vector2(credit_width, 86.0)
+	var hold_seconds := _credit_hold_seconds()
+	var alpha := 1.0
+	if credit_clock > hold_seconds:
+		alpha = clampf(1.0 - (credit_clock - hold_seconds) / _credit_fade_seconds(), 0.0, 1.0)
+	parkview_credit.modulate.a = alpha
+	parkview_credit.visible = alpha > 0.01
 
 func _unhandled_input(event):
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F8:
@@ -91,8 +141,10 @@ func _draw():
 	var buildings = int(car.get_meta("map_building_count", 0))
 	var font = ThemeDB.fallback_font
 	var viewport_size = get_viewport_rect().size
+	var focus_rect := _driver_focus_rect(viewport_size)
+	var focus_x := focus_rect.position.x + focus_rect.size.x * 0.5
 	# Keep instruments clear of the bay calibration controls at the upper left.
-	draw_set_transform(Vector2(viewport_size.x * 0.5 - 109.0, viewport_size.y - 154.0))
+	draw_set_transform(Vector2(focus_x - 109.0, viewport_size.y - 154.0))
 	# A restrained instrument layer gives the driving view a readable centre of gravity
 	# without covering the mapped scene. It scales from the PC projector canvas down to
 	# the mobile viewport automatically.
@@ -105,7 +157,7 @@ func _draw():
 	draw_set_transform(Vector2.ZERO)
 	var weather = get_node_or_null("../WorldState")
 	if weather:
-		draw_string(font, Vector2(viewport_size.x * 0.5 - 100, viewport_size.y - 119), "WEATHER: %s  [F6]" % str(weather.state.get("source", "offline")).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.9, 0.85, 0.7))
+		draw_string(font, Vector2(focus_x - 100.0, viewport_size.y - 119), "WEATHER: %s  [F6]" % str(weather.state.get("source", "offline")).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.9, 0.85, 0.7))
 	if not OS.has_feature("mobile"):
 		var map_control = "   M  MAP" if OS.has_feature("pc_max") or OS.has_feature("projector_max") else ""
 		draw_string(font, Vector2(viewport_size.x * 0.5 - 300, viewport_size.y - 22), "WASD  DRIVE   SPACE  BRAKE   R  RECOVER%s   F8  FRAME   F11  FULLSCREEN" % map_control, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.85, 0.87, 0.87, 0.8))
@@ -125,7 +177,7 @@ func _draw():
 		draw_string(font, panel_position + Vector2(12, 42), "AVG %.1f ms   P95 %.1f ms   MAX %.1f ms" % [average_frame_ms, p95_frame_ms, worst_frame_ms], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.88, 0.90, 0.88, 0.90))
 		draw_string(font, panel_position + Vector2(12, 56), "%d FPS   %d HITCHES / %d FRAMES" % [int(round(1000.0 / maxf(average_frame_ms, 0.001))), frame_hitch_count, frame_sample_count], HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.64, 0.70, 0.70, 0.84))
 	# Subtle sight marker keeps the eye aligned with the road at speed.
-	var centre = viewport_size * 0.5
+	var centre := Vector2(focus_x, viewport_size.y * 0.5)
 	draw_line(centre - Vector2(13, 0), centre - Vector2(4, 0), Color(1, 0.82, 0.55, 0.30), 1.0)
 	draw_line(centre + Vector2(4, 0), centre + Vector2(13, 0), Color(1, 0.82, 0.55, 0.30), 1.0)
 	draw_line(centre - Vector2(0, 13), centre - Vector2(0, 4), Color(1, 0.82, 0.55, 0.30), 1.0)

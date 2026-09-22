@@ -60,6 +60,16 @@ func run():
 	# impression. Exercise the rolling average, percentile and hitch counter with
 	# deterministic samples so the F8 panel cannot report decorative figures.
 	var hud = world.get_node("HUD")
+	var viewport_size: Vector2 = hud.get_viewport_rect().size
+	var focus_rect: Rect2 = hud._driver_focus_rect(viewport_size)
+	var forward_quad: PackedVector2Array = bay.surfaces[1].polygon
+	var expected_focus_x: float = (forward_quad[0].x + forward_quad[1].x + forward_quad[2].x + forward_quad[3].x) * 0.25
+	assert(absf(focus_rect.get_center().x - expected_focus_x) < 0.01)
+	assert(absf(focus_rect.get_center().x - viewport_size.x * 0.5) > viewport_size.x * 0.05)
+	assert(is_equal_approx(hud._credit_hold_seconds(), hud.PROJECTOR_CREDIT_HOLD_SECONDS))
+	hud.credit_clock = hud.PROJECTOR_CREDIT_HOLD_SECONDS + hud.PROJECTOR_CREDIT_FADE_SECONDS
+	hud._update_parkview_credit(0.0)
+	assert(not hud.parkview_credit.visible)
 	hud._reset_frame_stats()
 	for _i in range(90):
 		hud._record_frame_time_ms(16.0)

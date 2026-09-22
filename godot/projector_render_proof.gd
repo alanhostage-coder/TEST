@@ -136,6 +136,20 @@ func run() -> void:
 		push_error("PUA_PROJECTOR_RENDER_FAIL idle driver chrome remained visible")
 		quit(2)
 		return
+	var hud = world.get_node("HUD")
+	var driver_focus_rect: Rect2 = hud._driver_focus_rect(world.get_viewport().get_visible_rect().size)
+	var forward_quad: PackedVector2Array = bay.surfaces[1].polygon
+	var expected_driver_focus_x: float = (forward_quad[0].x + forward_quad[1].x + forward_quad[2].x + forward_quad[3].x) * 0.25
+	if absf(driver_focus_rect.get_center().x - expected_driver_focus_x) > 0.01:
+		push_error("PUA_PROJECTOR_RENDER_FAIL HUD focus %.2f expected calibrated forward pane %.2f" % [driver_focus_rect.get_center().x, expected_driver_focus_x])
+		quit(2)
+		return
+	hud.credit_clock = hud.PROJECTOR_CREDIT_HOLD_SECONDS + hud.PROJECTOR_CREDIT_FADE_SECONDS
+	hud._update_parkview_credit(0.0)
+	if hud.parkview_credit.visible:
+		push_error("PUA_PROJECTOR_RENDER_FAIL opening credit did not retire")
+		quit(2)
+		return
 	for _frame in range(8):
 		await process_frame
 	var panel_render_sizes: Array = []
@@ -177,7 +191,7 @@ func run() -> void:
 
 	# Keep the normal gameplay frame above, then remove interface chrome for a
 	# second image whose sole job is exposing cross-surface geometry and seams.
-	world.get_node("HUD").visible = false
+	hud.visible = false
 	for control in [bay.button, bay.cal_button, bay.layout_button, bay.drive_button, bay.centre_button, bay.title]:
 		control.visible = false
 	await process_frame
@@ -224,6 +238,9 @@ func run() -> void:
 		"projector_1024_aspect_error": projector_1024_aspect_error,
 		"legacy_yaw_normalised": true,
 		"idle_driver_chrome_hidden": true,
+		"driver_focus_x": driver_focus_rect.get_center().x,
+		"driver_focus_expected_x": expected_driver_focus_x,
+		"opening_credit_retired": true,
 		"xps_profile_exercised": true,
 		"xps_panel_render_scales": xps_scales,
 		"xps_panel_render_sizes": xps_panel_sizes,
