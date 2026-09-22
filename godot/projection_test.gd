@@ -72,6 +72,15 @@ func run():
 	hud.credit_clock = hud.PROJECTOR_CREDIT_HOLD_SECONDS + hud.PROJECTOR_CREDIT_FADE_SECONDS
 	hud._update_parkview_credit(0.0)
 	assert(not hud.parkview_credit.visible)
+	# The persistent keyboard legend is useful on entry but visually joins the
+	# five physical surfaces. It must retire once learned and wake on input.
+	hud._update_projector_hint(hud.PROJECTOR_HINT_HOLD_SECONDS + hud.PROJECTOR_HINT_FADE_SECONDS)
+	assert(is_zero_approx(hud.projector_hint_alpha))
+	var wake_event := InputEventKey.new()
+	wake_event.keycode = KEY_W
+	wake_event.pressed = true
+	hud._unhandled_input(wake_event)
+	assert(is_equal_approx(hud.projector_hint_alpha, 1.0))
 	bay._set_mode(2)
 	hud._process(0.0)
 	assert(not hud.map_credit.visible)

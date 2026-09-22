@@ -10,6 +10,8 @@ const DEFAULT_CREDIT_HOLD_SECONDS := 6.0
 const DEFAULT_CREDIT_FADE_SECONDS := 2.0
 const PROJECTOR_CREDIT_HOLD_SECONDS := 2.5
 const PROJECTOR_CREDIT_FADE_SECONDS := 0.75
+const PROJECTOR_HINT_HOLD_SECONDS := 8.0
+const PROJECTOR_HINT_FADE_SECONDS := 1.0
 const FRAME_SAMPLE_CAPACITY := 120
 const HITCH_THRESHOLD_MS := 33.333
 var frame_samples := PackedFloat32Array()
@@ -21,6 +23,9 @@ var p95_frame_ms := 0.0
 var worst_frame_ms := 0.0
 var frame_hitch_count := 0
 var performance_visible := false
+var projector_hint_clock := 0.0
+var projector_hint_alpha := 1.0
+var projector_hint_was_active := false
 
 func _ready():
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -41,6 +46,7 @@ func _process(delta: float):
 		map_credit.visible = not calibration_active
 	if human_credit:
 		human_credit.visible = not calibration_active
+	_update_projector_hint(unscaled_delta)
 	_update_parkview_credit(delta)
 	queue_redraw()
 
@@ -77,6 +83,28 @@ func _credit_hold_seconds() -> float:
 func _credit_fade_seconds() -> float:
 	return PROJECTOR_CREDIT_FADE_SECONDS if _projector_driving_view_active() else DEFAULT_CREDIT_FADE_SECONDS
 
+func _update_projector_hint(unscaled_delta: float):
+	var projector_active := _projector_driving_view_active()
+	if projector_active and not projector_hint_was_active:
+		_wake_projector_hint()
+	projector_hint_was_active = projector_active
+	if not projector_active:
+		projector_hint_alpha = 1.0
+		return
+	projector_hint_clock += maxf(unscaled_delta, 0.0)
+	if projector_hint_clock <= PROJECTOR_HINT_HOLD_SECONDS:
+		projector_hint_alpha = 1.0
+	else:
+		projector_hint_alpha = clampf(
+			1.0 - (projector_hint_clock - PROJECTOR_HINT_HOLD_SECONDS) / PROJECTOR_HINT_FADE_SECONDS,
+			0.0,
+			1.0
+		)
+
+func _wake_projector_hint():
+	projector_hint_clock = 0.0
+	projector_hint_alpha = 1.0
+
 func _update_parkview_credit(delta: float):
 	if parkview_credit == null:
 		return
@@ -104,6 +132,15 @@ func _update_parkview_credit(delta: float):
 	parkview_credit.visible = alpha > 0.01
 
 func _unhandled_input(event):
+	if _projector_driving_view_active():
+		if event is InputEventKey and event.pressed and not event.echo:
+			_wake_projector_hint()
+		elif event is InputEventJoypadButton and event.pressed:
+			_wake_projector_hint()
+		elif event is InputEventMouseMotion and event.relative.length_squared() >= 9.0:
+			_wake_projector_hint()
+		elif event is InputEventScreenTouch and event.pressed:
+			_wake_projector_hint()
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F8:
 		_toggle_performance_overlay()
 		get_viewport().set_input_as_handled()
@@ -176,9 +213,10 @@ func _draw():
 	var weather = get_node_or_null("../WorldState")
 	if weather:
 		draw_string(font, Vector2(focus_x - 100.0, viewport_size.y - 119), "WEATHER: %s  [F6]" % str(weather.state.get("source", "offline")).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.9, 0.85, 0.7))
-	if not OS.has_feature("mobile"):
+	if not OS.has_feature("mobile") and (not _projector_driving_view_active() or projector_hint_alpha > 0.01):
 		var map_control = "   M  MAP" if OS.has_feature("pc_max") or OS.has_feature("projector_max") else ""
-		draw_string(font, Vector2(viewport_size.x * 0.5 - 300, viewport_size.y - 22), "WASD  DRIVE   SPACE  BRAKE   R  RECOVER%s   F8  FRAME   F11  FULLSCREEN" % map_control, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.85, 0.87, 0.87, 0.8))
+		var hint_alpha := projector_hint_alpha if _projector_driving_view_active() else 1.0
+		draw_string(font, Vector2(viewport_size.x * 0.5 - 300, viewport_size.y - 22), "WASD  DRIVE   SPACE  BRAKE   R  RECOVER%s   F8  FRAME   F11  FULLSCREEN" % map_control, HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.85, 0.87, 0.87, 0.8 * hint_alpha))
 	if performance_visible and frame_sample_count > 0:
 		var panel_position := Vector2(viewport_size.x - 270.0, viewport_size.y - 112.0)
 		var status := "60 FPS RANGE"

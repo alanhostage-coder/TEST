@@ -154,6 +154,11 @@ func run() -> void:
 		push_error("PUA_PROJECTOR_RENDER_FAIL opening credit did not retire")
 		quit(2)
 		return
+	hud._update_projector_hint(hud.PROJECTOR_HINT_HOLD_SECONDS + hud.PROJECTOR_HINT_FADE_SECONDS)
+	if not is_zero_approx(hud.projector_hint_alpha):
+		push_error("PUA_PROJECTOR_RENDER_FAIL idle control hint remained visible")
+		quit(2)
+		return
 	for _frame in range(8):
 		await process_frame
 	var panel_render_sizes: Array = []
@@ -245,6 +250,7 @@ func run() -> void:
 		"driver_focus_x": driver_focus_rect.get_center().x,
 		"driver_focus_expected_x": expected_driver_focus_x,
 		"opening_credit_retired": true,
+		"idle_control_hint_hidden": true,
 		"hud_z_index": hud.z_index,
 		"cockpit_z_index": bay.steering_ring.z_index,
 		"control_z_index": bay.button.z_index,

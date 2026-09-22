@@ -22,6 +22,8 @@ First slice: Godot Mobile renderer, real 3D collision space, reversible free dri
 - Projector Max starts in five-surface mode: three bay shutters and two separate
   wall windows. `LAYOUT` switches to the optional three-bay-only mode. Driving
   controls fade after six idle seconds and return immediately on mouse movement.
+- The bottom control legend retires after eight idle seconds in projector driving
+  view and wakes immediately on keyboard, mouse, touch or controller input.
 - Projector instruments, sight marker and opening credit follow the calibrated
   forward shutter instead of the geometric centre of the complete 16:9 canvas.
   Instruments render above the cockpit but below controls; calibration hides the
