@@ -13,6 +13,10 @@ func _initialize() -> void:
 
 func run() -> void:
 	var world = load("res://world.tscn").instantiate()
+	# The proof must exercise the same XPS facade/detail path as the exported exe.
+	# Set this before the node enters the tree so World._ready() builds the map with
+	# the XPS feature policy rather than the editor's feature set.
+	world.set_meta("force_xps_proof", true)
 	root.add_child(world)
 	current_scene = world
 	var map_ready := false

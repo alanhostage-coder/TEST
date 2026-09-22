@@ -76,9 +76,10 @@ var road_patch_mat
 var weed_mat
 
 func _ready():
-	projector_max_mode = OS.has_feature("projector_max")
-	pc_max_mode = OS.has_feature("pc_max")
-	xps_9530_mode = OS.has_feature("xps_9530")
+	var force_xps_proof := bool(get_meta("force_xps_proof", false))
+	projector_max_mode = OS.has_feature("projector_max") or force_xps_proof
+	pc_max_mode = OS.has_feature("pc_max") or force_xps_proof
+	xps_9530_mode = OS.has_feature("xps_9530") or force_xps_proof
 	low_spec_mode = OS.has_feature("thinkpad_low") or (projector_max_mode and not xps_9530_mode)
 	if xps_9530_mode:
 		# Five cameras multiply shadow cost. Preserve full mapped geometry and nearby
