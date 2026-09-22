@@ -830,7 +830,7 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 					var shop_w = min(2.65, max(1.75, length / float(slots) * 0.78))
 					var shop_h = 2.22
 					var shop_frame = tenement_shop_frame_mats[abs(seed + edge_index + slot) % tenement_shop_frame_mats.size()]
-					var recessed_shop_p := p + inward * 0.16
+					var recessed_shop_p: Vector2 = p + inward * 0.16
 					_visual_box(body, Vector3(recessed_shop_p.x, 1.16, recessed_shop_p.y), Vector3(0.075, shop_h, shop_w), tenement_sash_glass_mat)
 					var shop_glass = body.get_child(body.get_child_count() - 1)
 					if shop_glass is MeshInstance3D:
@@ -859,7 +859,7 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 					var door_w = min(1.28, max(0.94, length / float(slots) * 0.56))
 					var door_h = 2.18
 					var door_mat = tenement_door_mats[abs(seed + edge_index) % tenement_door_mats.size()]
-					var recessed_door_p := p + inward * 0.11
+					var recessed_door_p: Vector2 = p + inward * 0.11
 					_visual_box(body, Vector3(recessed_door_p.x, 1.09, recessed_door_p.y), Vector3(0.085, door_h, door_w), door_mat)
 					var door = body.get_child(body.get_child_count() - 1)
 					if door is MeshInstance3D:
@@ -876,7 +876,7 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 					var lintel = body.get_child(body.get_child_count() - 1)
 					if lintel is MeshInstance3D:
 						lintel.rotation.y = angle
-					var recessed_fanlight_p := p + inward * 0.10
+					var recessed_fanlight_p: Vector2 = p + inward * 0.10
 					_visual_box(body, Vector3(recessed_fanlight_p.x, 2.16, recessed_fanlight_p.y), Vector3(0.085, 0.22, door_w * 0.78), tenement_sash_glass_mat)
 					var fanlight = body.get_child(body.get_child_count() - 1)
 					if fanlight is MeshInstance3D:
@@ -886,7 +886,7 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 					continue
 
 				var panel_mat = tenement_sash_glass_mat if generic_tenement else glass_mat
-				var panel_p := p + inward * (0.075 if generic_tenement else 0.0)
+				var panel_p: Vector2 = p + inward * (0.075 if generic_tenement else 0.0)
 				_visual_box(body, Vector3(panel_p.x, y, panel_p.y), Vector3(0.070 if generic_tenement else 0.085, panel_h, panel_w), panel_mat)
 				var panel = body.get_child(body.get_child_count() - 1)
 				if panel is MeshInstance3D:
@@ -933,7 +933,7 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 		var chimney_total = 1 + (abs(seed) % 2)
 		for chimney_index in range(chimney_total):
 			var offset = (float(chimney_index) - float(chimney_total - 1) * 0.5) * 2.1
-			var chimney_p := centroid + roof_axis * offset
+			var chimney_p: Vector2 = centroid + roof_axis * offset
 			_visual_box(body, Vector3(chimney_p.x, height + 0.72, chimney_p.y), Vector3(0.58, 1.44, 0.58), soot_stone_mat)
 			var chimney = body.get_child(body.get_child_count() - 1)
 			if chimney is MeshInstance3D:
@@ -953,7 +953,7 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 		var rdelta := rp1 - rp0
 		var rlength = rdelta.length()
 		if rlength >= 5.5:
-			var rtangent := rdelta / rlength
+			var rtangent: Vector2 = rdelta / rlength
 			var rmid := (rp0 + rp1) * 0.5
 			var rinward := (centroid - rmid).normalized()
 			if rinward.length() < 0.5:
@@ -974,7 +974,7 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 				top_rail.visibility_range_end = 125.0
 			for post_index in range(5):
 				var t = float(post_index) / 4.0 - 0.5
-				var post_p := rail_mid + rtangent * t * run
+				var post_p: Vector2 = rail_mid + rtangent * t * run
 				_visual_box(body, Vector3(post_p.x, 0.40, post_p.y), Vector3(0.065, 0.80, 0.065), metal_mat)
 				var post = body.get_child(body.get_child_count() - 1)
 				if post is MeshInstance3D:
