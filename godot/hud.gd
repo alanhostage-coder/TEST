@@ -19,8 +19,8 @@ func _ready():
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_reset_frame_stats()
 
-func _process(delta):
-	var unscaled_delta := delta / maxf(Engine.time_scale, 0.001)
+func _process(delta: float):
+	var unscaled_delta: float = delta / maxf(Engine.time_scale, 0.001)
 	_record_frame_time_ms(unscaled_delta * 1000.0)
 	frame_stats_clock += unscaled_delta
 	if frame_stats_clock >= 0.5:
