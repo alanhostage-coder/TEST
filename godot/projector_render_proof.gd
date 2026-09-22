@@ -2,6 +2,7 @@ extends SceneTree
 
 const OUTPUT_PATH := "/tmp/pua-projector-proof.png"
 const CONTINUITY_PATH := "/tmp/pua-projector-continuity.png"
+const LAPTOP_MAX_HD_PATH := "/tmp/pua-xps-laptop-max-hd.png"
 const MANIFEST_PATH := "/tmp/pua-projector-proof.json"
 const MAP_READY_FRAME_BUDGET := 240
 const EXPECTED_PACKAGED_PATCH_TIMESTAMP := "2026-09-20T22:47:11Z"
@@ -198,6 +199,22 @@ func run() -> void:
 		quit(2)
 		return
 
+	# Capture the ordinary single-camera 1920x1080 laptop view from the same
+	# source-backed world. This is evidence for the Max-HD laptop presentation,
+	# not a crop of the five-surface composite.
+	bay._set_mode(0)
+	hud.visible = true
+	for _frame in range(4):
+		await process_frame
+	var laptop_max_hd := root.get_texture().get_image()
+	if laptop_max_hd == null or laptop_max_hd.is_empty() or laptop_max_hd.save_png(LAPTOP_MAX_HD_PATH) != OK:
+		push_error("PUA_PROJECTOR_RENDER_FAIL laptop max-hd frame save error")
+		quit(2)
+		return
+	bay._set_mode(1)
+	bay._update_driver_chrome(bay.DRIVER_CHROME_HOLD_SECONDS + bay.DRIVER_CHROME_FADE_SECONDS)
+	await process_frame
+
 	# Keep the normal gameplay frame above, then remove interface chrome for a
 	# second image whose sole job is exposing cross-surface geometry and seams.
 	hud.visible = false
@@ -235,6 +252,7 @@ func run() -> void:
 		"surface_count": bay.layout_surface_count,
 		"camera_count": bay.cameras.size(),
 		"composite_size": [composite.get_width(), composite.get_height()],
+		"laptop_max_hd_size": [laptop_max_hd.get_width(), laptop_max_hd.get_height()],
 		"packaged_patch_timestamp": str(packaged.get("source_timestamp_utc", "")),
 		"packaged_roads": packaged.get("roads", []).size(),
 		"packaged_overlay_roads": osm_overlay._packaged_overlay_road_count,
