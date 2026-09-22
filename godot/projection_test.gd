@@ -13,6 +13,20 @@ func run():
 	bay._set_mode(1)
 	await process_frame
 	assert(bay.black_mask.visible)
+	# Projector controls should retire from the driver's view after a short idle,
+	# then return immediately when the operator moves the mouse.
+	bay._update_driver_chrome(bay.DRIVER_CHROME_HOLD_SECONDS + bay.DRIVER_CHROME_FADE_SECONDS)
+	assert(not bay.button.visible)
+	assert(not bay.title.visible)
+	bay._wake_driver_chrome()
+	assert(bay.button.visible)
+	assert(bay.title.visible)
+	assert(is_equal_approx(bay.driver_chrome_alpha, 1.0))
+	bay._set_mode(2)
+	assert(bay.button.visible)
+	assert(bay.save_button.visible)
+	assert(bay.restore_button.visible)
+	bay._set_mode(1)
 	for camera in bay.cameras:
 		assert(camera.global_position.is_finite())
 	var calibration_base := PackedVector2Array([

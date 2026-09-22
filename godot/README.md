@@ -20,7 +20,8 @@ First slice: Godot Mobile renderer, real 3D collision space, reversible free dri
   in the packaged EH15 patch. Their in-world street and place labels are capped and
   distance-limited to protect the low-spec frame budget.
 - Projector Max starts in five-surface mode: three bay shutters and two separate
-  wall windows. `LAYOUT` switches to the optional three-bay-only mode.
+  wall windows. `LAYOUT` switches to the optional three-bay-only mode. Driving
+  controls fade after six idle seconds and return immediately on mouse movement.
 - `CAL` supports mouse/touch corner warping, surface selection and whole-panorama
   yaw. Black gaps mask walls and frames. `SAVE` persists both layouts; `RESTORE`
   recovers the calibration that existed before the last save or reset.

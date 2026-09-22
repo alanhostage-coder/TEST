@@ -127,6 +127,15 @@ func run() -> void:
 		quit(2)
 		return
 	bay._set_mode(1)
+	# The normal proof represents the settled driving view, not the brief operator
+	# controls shown on entry. Fail the release if the projector chrome cannot
+	# retire cleanly after its documented idle envelope.
+	bay._update_driver_chrome(bay.DRIVER_CHROME_HOLD_SECONDS + bay.DRIVER_CHROME_FADE_SECONDS)
+	if bay.button.visible or bay.cal_button.visible or bay.layout_button.visible \
+	or bay.drive_button.visible or bay.centre_button.visible or bay.title.visible:
+		push_error("PUA_PROJECTOR_RENDER_FAIL idle driver chrome remained visible")
+		quit(2)
+		return
 	for _frame in range(8):
 		await process_frame
 	var panel_render_sizes: Array = []
@@ -214,6 +223,7 @@ func run() -> void:
 		"max_panel_aspect_error": max_panel_aspect_error,
 		"projector_1024_aspect_error": projector_1024_aspect_error,
 		"legacy_yaw_normalised": true,
+		"idle_driver_chrome_hidden": true,
 		"xps_profile_exercised": true,
 		"xps_panel_render_scales": xps_scales,
 		"xps_panel_render_sizes": xps_panel_sizes,

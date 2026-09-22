@@ -38,6 +38,9 @@ const MIN_VIEWPORT_WIDTH := 64.0
 const MIN_VIEWPORT_HEIGHT := 180.0
 const MIN_CALIBRATION_AREA_RATIO := 0.22
 const MIN_CALIBRATION_EDGE_RATIO := 0.15
+const DRIVER_CHROME_HOLD_SECONDS := 6.0
+const DRIVER_CHROME_FADE_SECONDS := 1.25
+const DRIVER_CHROME_MOUSE_WAKE_DISTANCE := 3.0
 
 var mode := 0 # 0 normal, 1 cab, 2 calibration
 var car: Node3D
@@ -78,6 +81,8 @@ var pc_max_mode := false
 var xps_9530_mode := false
 var black_mask: ColorRect
 var shared_cab_transform := Transform3D.IDENTITY
+var driver_chrome_idle := 0.0
+var driver_chrome_alpha := 1.0
 
 func _ready():
 	projector_max_mode = OS.has_feature("projector_max")
@@ -471,7 +476,41 @@ func _set_mode(value: int):
 		cal_button.text = "DONE"
 		title.text = "UNMEASURED START · DRAG CORNERS TO CLOSED SHUTTER EDGES"
 	_update_calibration_controls()
+	_wake_driver_chrome()
 	queue_redraw()
+
+func _wake_driver_chrome():
+	driver_chrome_idle = 0.0
+	driver_chrome_alpha = 1.0
+	_apply_driver_chrome_alpha()
+
+func _update_driver_chrome(delta: float):
+	if mode != 1:
+		return
+	driver_chrome_idle += delta / maxf(Engine.time_scale, 0.001)
+	if driver_chrome_idle <= DRIVER_CHROME_HOLD_SECONDS:
+		return
+	var previous_alpha := driver_chrome_alpha
+	driver_chrome_alpha = move_toward(driver_chrome_alpha, 0.0, delta / DRIVER_CHROME_FADE_SECONDS)
+	if not is_equal_approx(previous_alpha, driver_chrome_alpha):
+		_apply_driver_chrome_alpha()
+
+func _apply_driver_chrome_alpha():
+	var driving := mode == 1
+	var chrome_visible := not driving or driver_chrome_alpha > 0.01
+	button.visible = chrome_visible
+	cal_button.visible = chrome_visible
+	layout_button.visible = chrome_visible
+	title.visible = chrome_visible
+	drive_button.visible = driving and chrome_visible
+	centre_button.visible = driving and chrome_visible
+	var alpha := driver_chrome_alpha if driving else 1.0
+	button.modulate.a = 0.80 * alpha
+	cal_button.modulate.a = 0.58 * alpha
+	layout_button.modulate.a = 0.68 * alpha
+	drive_button.modulate.a = 0.82 * alpha
+	centre_button.modulate.a = 0.72 * alpha
+	title.modulate.a = 0.62 * alpha
 
 func _unhandled_input(event):
 	if event is InputEventKey and event.pressed and not event.echo:
@@ -486,6 +525,8 @@ func _unhandled_input(event):
 			get_viewport().set_input_as_handled()
 
 func _input(event):
+	if mode == 1 and event is InputEventMouseMotion and event.relative.length() >= DRIVER_CHROME_MOUSE_WAKE_DISTANCE:
+		_wake_driver_chrome()
 	if mode != 2:
 		return
 	if event is InputEventScreenTouch:
@@ -586,7 +627,8 @@ func _pick_corner(pos: Vector2):
 				active_corner = corner
 	queue_redraw()
 
-func _process(_delta):
+func _process(delta: float):
+	_update_driver_chrome(delta)
 	if mode == 0 or not car:
 		return
 	if mode == 1 and steering_ring:
