@@ -21,9 +21,11 @@ First slice: Godot Mobile renderer, real 3D collision space, reversible free dri
   distance-limited to protect the low-spec frame budget.
 - Projector Max starts in five-surface mode: three bay shutters and two separate
   wall windows. `LAYOUT` switches to the optional three-bay-only mode.
-- `CAL` supports mouse/touch corner warping, surface selection and per-surface
-  yaw. Black gaps mask walls and frames. `SAVE` persists both layouts.
+- `CAL` supports mouse/touch corner warping, surface selection and whole-panorama
+  yaw. Black gaps mask walls and frames. `SAVE` persists both layouts; `RESTORE`
+  recovers the calibration that existed before the last save or reset.
 - The layout is deliberately marked unmeasured until calibrated to the closed
   shutters. The supplied open-shutter photographs are references, not survey data.
 - `F6` cycles live, clear, rain and fog; the HUD always names the active source.
-  `F5` toggles projector driving view and `F7` switches the saved 3/5 layout.
+  `F5` toggles projector driving view, `F7` switches the saved 3/5 layout and
+  `F8` shows rolling average, P95 and hitch-count frame-pacing evidence.

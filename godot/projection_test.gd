@@ -42,6 +42,25 @@ func run():
 	assert(bay.layout_surface_count == 5)
 	assert(bay.cal_offsets_five[0][0].is_equal_approx(calibrated_corner))
 	bay._reset_offsets(false)
+	# The physical XPS test needs real frame-pacing evidence rather than a visual
+	# impression. Exercise the rolling average, percentile and hitch counter with
+	# deterministic samples so the F8 panel cannot report decorative figures.
+	var hud = world.get_node("HUD")
+	hud._reset_frame_stats()
+	for _i in range(90):
+		hud._record_frame_time_ms(16.0)
+	for _i in range(10):
+		hud._record_frame_time_ms(40.0)
+	hud._refresh_frame_stats()
+	assert(is_equal_approx(hud.average_frame_ms, 18.4))
+	assert(is_equal_approx(hud.p95_frame_ms, 40.0))
+	assert(is_equal_approx(hud.worst_frame_ms, 40.0))
+	assert(hud.frame_hitch_count == 10)
+	hud._toggle_performance_overlay()
+	assert(hud.performance_visible)
+	hud._toggle_performance_overlay()
+	assert(not hud.performance_visible)
+	hud._reset_frame_stats()
 	var osm_overlay = world.get_node("OSMGroundTiles")
 	osm_overlay._build_live_map_overlay()
 	osm_overlay._bind_map_stream()
