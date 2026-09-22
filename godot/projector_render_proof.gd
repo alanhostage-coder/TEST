@@ -392,25 +392,25 @@ func _capture_driveabout(world: Node, bay: Node, hud: Node) -> Array:
 
 
 func _road_pose_for_target(car: Node, target: Vector2) -> Dictionary:
-	var best_distance := INF
-	var best_projection := Vector2.ZERO
-	var best_direction := Vector2.ZERO
-	var best_t := 0.0
-	var best_length := 0.0
+	var best_distance: float = INF
+	var best_projection: Vector2 = Vector2.ZERO
+	var best_direction: Vector2 = Vector2.ZERO
+	var best_t: float = 0.0
+	var best_length: float = 0.0
 	for segment in car.get_meta("map_road_segments", []):
 		if not segment is Array or segment.size() < 2:
 			continue
 		if not segment[0] is Array or not segment[1] is Array:
 			continue
-		var a := Vector2(float(segment[0][0]), float(segment[0][1]))
-		var b := Vector2(float(segment[1][0]), float(segment[1][1]))
-		var delta := b - a
-		var length := delta.length()
+		var a: Vector2 = Vector2(float(segment[0][0]), float(segment[0][1]))
+		var b: Vector2 = Vector2(float(segment[1][0]), float(segment[1][1]))
+		var delta: Vector2 = b - a
+		var length: float = delta.length()
 		if length < 2.0:
 			continue
-		var t := clamp((target - a).dot(delta) / delta.length_squared(), 0.0, 1.0)
-		var projection := a + delta * t
-		var distance := projection.distance_squared_to(target)
+		var t: float = clampf((target - a).dot(delta) / delta.length_squared(), 0.0, 1.0)
+		var projection: Vector2 = a + delta * t
+		var distance: float = projection.distance_squared_to(target)
 		if distance < best_distance:
 			best_distance = distance
 			best_projection = projection
@@ -419,17 +419,17 @@ func _road_pose_for_target(car: Node, target: Vector2) -> Dictionary:
 			best_length = length
 	if best_length <= 0.0:
 		return {}
-	var room_to_a := best_t * best_length
-	var room_to_b := (1.0 - best_t) * best_length
-	var direction := best_direction
-	var road_position := best_projection
+	var room_to_a: float = best_t * best_length
+	var room_to_b: float = (1.0 - best_t) * best_length
+	var direction: Vector2 = best_direction
+	var road_position: Vector2 = best_projection
 	if room_to_a >= room_to_b:
-		var back := min(16.0, max(4.0, room_to_a * 0.72))
-		road_position = best_projection - best_direction * back
+		var back_a: float = minf(16.0, maxf(4.0, room_to_a * 0.72))
+		road_position = best_projection - best_direction * back_a
 		direction = best_direction
 	else:
-		var back := min(16.0, max(4.0, room_to_b * 0.72))
-		road_position = best_projection + best_direction * back
+		var back_b: float = minf(16.0, maxf(4.0, room_to_b * 0.72))
+		road_position = best_projection + best_direction * back_b
 		direction = -best_direction
 	return {
 		"position": road_position,
