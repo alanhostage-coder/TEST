@@ -65,6 +65,9 @@ var generic_tenement_window_count := 0
 var generic_tenement_door_count := 0
 var generic_tenement_shopfront_count := 0
 var generic_tenement_downpipe_count := 0
+var generic_tenement_recess_count := 0
+var generic_tenement_chimney_count := 0
+var generic_tenement_railing_count := 0
 var tenement_shop_frame_mats: Array = []
 var brick_mat
 var render_mat
@@ -777,6 +780,9 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 		var tangent = delta / length
 		var angle = atan2(tangent.x, tangent.y)
 		var edge_mid = (p0 + p1) * 0.5
+		var inward := (centroid - edge_mid).normalized()
+		if inward.length() < 0.5:
+			inward = Vector2(-tangent.y, tangent.x)
 		var slots = clamp(int(floor(length / (5.8 if industrial else 3.55))), 1, 7 if xps_9530_mode else 4)
 		var shop_slots := {}
 		if generic_tenement and not mapped_commercial_pois.is_empty():
@@ -824,7 +830,8 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 					var shop_w = min(2.65, max(1.75, length / float(slots) * 0.78))
 					var shop_h = 2.22
 					var shop_frame = tenement_shop_frame_mats[abs(seed + edge_index + slot) % tenement_shop_frame_mats.size()]
-					_visual_box(body, Vector3(p.x, 1.16, p.y), Vector3(0.11, shop_h, shop_w), tenement_sash_glass_mat)
+					var recessed_shop_p := p + inward * 0.16
+					_visual_box(body, Vector3(recessed_shop_p.x, 1.16, recessed_shop_p.y), Vector3(0.075, shop_h, shop_w), tenement_sash_glass_mat)
 					var shop_glass = body.get_child(body.get_child_count() - 1)
 					if shop_glass is MeshInstance3D:
 						shop_glass.rotation.y = angle
@@ -845,13 +852,15 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 					if stallriser is MeshInstance3D:
 						stallriser.rotation.y = angle
 					generic_tenement_shopfront_count += 1
+					generic_tenement_recess_count += 1
 					continue
 				var is_door = edge_index == door_edge and floor_index == 0 and slot == abs(seed / 7) % slots and generic_tenement
 				if is_door:
 					var door_w = min(1.28, max(0.94, length / float(slots) * 0.56))
 					var door_h = 2.18
 					var door_mat = tenement_door_mats[abs(seed + edge_index) % tenement_door_mats.size()]
-					_visual_box(body, Vector3(p.x, 1.09, p.y), Vector3(0.105, door_h, door_w), door_mat)
+					var recessed_door_p := p + inward * 0.11
+					_visual_box(body, Vector3(recessed_door_p.x, 1.09, recessed_door_p.y), Vector3(0.085, door_h, door_w), door_mat)
 					var door = body.get_child(body.get_child_count() - 1)
 					if door is MeshInstance3D:
 						door.rotation.y = angle
@@ -867,15 +876,18 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 					var lintel = body.get_child(body.get_child_count() - 1)
 					if lintel is MeshInstance3D:
 						lintel.rotation.y = angle
-					_visual_box(body, Vector3(p.x, 2.16, p.y), Vector3(0.115, 0.22, door_w * 0.78), tenement_sash_glass_mat)
+					var recessed_fanlight_p := p + inward * 0.10
+					_visual_box(body, Vector3(recessed_fanlight_p.x, 2.16, recessed_fanlight_p.y), Vector3(0.085, 0.22, door_w * 0.78), tenement_sash_glass_mat)
 					var fanlight = body.get_child(body.get_child_count() - 1)
 					if fanlight is MeshInstance3D:
 						fanlight.rotation.y = angle
 					generic_tenement_door_count += 1
+					generic_tenement_recess_count += 1
 					continue
 
 				var panel_mat = tenement_sash_glass_mat if generic_tenement else glass_mat
-				_visual_box(body, Vector3(p.x, y, p.y), Vector3(0.085, panel_h, panel_w), panel_mat)
+				var panel_p := p + inward * (0.075 if generic_tenement else 0.0)
+				_visual_box(body, Vector3(panel_p.x, y, panel_p.y), Vector3(0.070 if generic_tenement else 0.085, panel_h, panel_w), panel_mat)
 				var panel = body.get_child(body.get_child_count() - 1)
 				if panel is MeshInstance3D:
 					panel.rotation.y = angle
@@ -890,8 +902,14 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 						var jamb = body.get_child(body.get_child_count() - 1)
 						if jamb is MeshInstance3D:
 							jamb.rotation.y = angle
-					for rail_y in [y - panel_h * 0.5 - 0.035, y, y + panel_h * 0.5 + 0.035]:
-						_visual_box(body, Vector3(p.x, rail_y, p.y), Vector3(0.105, 0.075, panel_w + 0.10), tenement_sash_frame_mat)
+					# Stone sill/lintel give the window architectural depth; the central sash
+					# meeting rail remains painted timber.
+					for rail_index in range(3):
+						var rail_y = [y - panel_h * 0.5 - 0.055, y, y + panel_h * 0.5 + 0.055][rail_index]
+						var rail_mat = tenement_sash_frame_mat if rail_index == 1 else sandstone_mat
+						var rail_h = 0.075 if rail_index == 1 else 0.13
+						var rail_depth = 0.105 if rail_index == 1 else 0.16
+						_visual_box(body, Vector3(p.x, rail_y, p.y), Vector3(rail_depth, rail_h, panel_w + 0.18), rail_mat)
 						var rail = body.get_child(body.get_child_count() - 1)
 						if rail is MeshInstance3D:
 							rail.rotation.y = angle
@@ -903,6 +921,65 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 						sill.rotation.y = angle
 						sill.visibility_range_end = 190.0
 		edge_budget += 1
+
+	# Roofline silhouettes are generic visual dressing for unnamed tenements only.
+	# They do not claim exact chimney count or placement.
+	if generic_tenement and height > 5.5:
+		var roof_axis := Vector2(1.0, 0.0)
+		if poly.size() >= 2:
+			var roof_delta: Vector2 = poly[1] - poly[0]
+			if roof_delta.length() > 0.5:
+				roof_axis = roof_delta.normalized()
+		var chimney_total = 1 + (abs(seed) % 2)
+		for chimney_index in range(chimney_total):
+			var offset = (float(chimney_index) - float(chimney_total - 1) * 0.5) * 2.1
+			var chimney_p := centroid + roof_axis * offset
+			_visual_box(body, Vector3(chimney_p.x, height + 0.72, chimney_p.y), Vector3(0.58, 1.44, 0.58), soot_stone_mat)
+			var chimney = body.get_child(body.get_child_count() - 1)
+			if chimney is MeshInstance3D:
+				chimney.visibility_range_end = 220.0
+			_visual_box(body, Vector3(chimney_p.x, height + 1.46, chimney_p.y), Vector3(0.72, 0.10, 0.72), roof_mat)
+			var cap = body.get_child(body.get_child_count() - 1)
+			if cap is MeshInstance3D:
+				cap.visibility_range_end = 220.0
+			generic_tenement_chimney_count += 1
+
+	# A restrained basement/railing cue on a subset of generic tenements adds
+	# street-level depth without pretending the exact railing layout is mapped.
+	if generic_tenement and abs(seed) % 4 == 0 and poly.size() >= 2:
+		var rail_edge = (door_edge + 1) % poly.size()
+		var rp0: Vector2 = poly[rail_edge]
+		var rp1: Vector2 = poly[(rail_edge + 1) % poly.size()]
+		var rdelta := rp1 - rp0
+		var rlength = rdelta.length()
+		if rlength >= 5.5:
+			var rtangent := rdelta / rlength
+			var rmid := (rp0 + rp1) * 0.5
+			var rinward := (centroid - rmid).normalized()
+			if rinward.length() < 0.5:
+				rinward = Vector2(-rtangent.y, rtangent.x)
+			var outward := -rinward
+			var run = min(4.8, rlength * 0.58)
+			var basement_p := rmid + rinward * 0.06
+			_visual_box(body, Vector3(basement_p.x, 0.43, basement_p.y), Vector3(0.07, 0.72, run * 0.78), tenement_sash_glass_mat)
+			var basement = body.get_child(body.get_child_count() - 1)
+			if basement is MeshInstance3D:
+				basement.rotation.y = atan2(rtangent.x, rtangent.y)
+				basement.visibility_range_end = 125.0
+			var rail_mid := rmid + outward * 0.22
+			_visual_box(body, Vector3(rail_mid.x, 0.72, rail_mid.y), Vector3(0.07, 0.08, run), metal_mat)
+			var top_rail = body.get_child(body.get_child_count() - 1)
+			if top_rail is MeshInstance3D:
+				top_rail.rotation.y = atan2(rtangent.x, rtangent.y)
+				top_rail.visibility_range_end = 125.0
+			for post_index in range(5):
+				var t = float(post_index) / 4.0 - 0.5
+				var post_p := rail_mid + rtangent * t * run
+				_visual_box(body, Vector3(post_p.x, 0.40, post_p.y), Vector3(0.065, 0.80, 0.065), metal_mat)
+				var post = body.get_child(body.get_child_count() - 1)
+				if post is MeshInstance3D:
+					post.visibility_range_end = 120.0
+			generic_tenement_railing_count += 1
 
 func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float, seed: int) -> bool:
 	var footprint = building.get("footprint", [])
@@ -1440,6 +1517,9 @@ func _on_map_ready(map_data: Dictionary):
 	generic_tenement_door_count = 0
 	generic_tenement_shopfront_count = 0
 	generic_tenement_downpipe_count = 0
+	generic_tenement_recess_count = 0
+	generic_tenement_chimney_count = 0
+	generic_tenement_railing_count = 0
 	for building in buildings:
 		if not building is Dictionary:
 			continue
@@ -1494,6 +1574,9 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("generic_tenement_door_count", generic_tenement_door_count)
 		car.set_meta("generic_tenement_shopfront_count", generic_tenement_shopfront_count)
 		car.set_meta("generic_tenement_downpipe_count", generic_tenement_downpipe_count)
+		car.set_meta("generic_tenement_recess_count", generic_tenement_recess_count)
+		car.set_meta("generic_tenement_chimney_count", generic_tenement_chimney_count)
+		car.set_meta("generic_tenement_railing_count", generic_tenement_railing_count)
 		car.set_meta("map_fallback_building_count", fallback_building_count)
 		car.set_meta("map_linear_feature_count", linear_features.size())
 		car.set_meta("map_point_feature_count", point_features.size())
