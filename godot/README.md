@@ -23,7 +23,8 @@ First slice: Godot Mobile renderer, real 3D collision space, reversible free dri
   wall windows. `LAYOUT` switches to the optional three-bay-only mode. Driving
   controls fade after six idle seconds and return immediately on mouse movement.
 - The bottom control legend retires after eight idle seconds in projector driving
-  view and wakes immediately on keyboard, mouse, touch or controller input.
+  view. Normal steering never revives it; `F1`, mouse/touch movement or controller
+  Start wakes it immediately when the operator needs the reminder.
 - Projector instruments, sight marker and opening credit follow the calibrated
   forward shutter instead of the geometric centre of the complete 16:9 canvas.
   Instruments render above the cockpit but below controls; calibration hides the

@@ -133,9 +133,9 @@ func _update_parkview_credit(delta: float):
 
 func _unhandled_input(event):
 	if _projector_driving_view_active():
-		if event is InputEventKey and event.pressed and not event.echo:
+		if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F1:
 			_wake_projector_hint()
-		elif event is InputEventJoypadButton and event.pressed:
+		elif event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_START:
 			_wake_projector_hint()
 		elif event is InputEventMouseMotion and event.relative.length_squared() >= 9.0:
 			_wake_projector_hint()

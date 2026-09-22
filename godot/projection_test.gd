@@ -76,10 +76,15 @@ func run():
 	# five physical surfaces. It must retire once learned and wake on input.
 	hud._update_projector_hint(hud.PROJECTOR_HINT_HOLD_SECONDS + hud.PROJECTOR_HINT_FADE_SECONDS)
 	assert(is_zero_approx(hud.projector_hint_alpha))
-	var wake_event := InputEventKey.new()
-	wake_event.keycode = KEY_W
-	wake_event.pressed = true
-	hud._unhandled_input(wake_event)
+	var drive_event := InputEventKey.new()
+	drive_event.keycode = KEY_W
+	drive_event.pressed = true
+	hud._unhandled_input(drive_event)
+	assert(is_zero_approx(hud.projector_hint_alpha))
+	var help_event := InputEventKey.new()
+	help_event.keycode = KEY_F1
+	help_event.pressed = true
+	hud._unhandled_input(help_event)
 	assert(is_equal_approx(hud.projector_hint_alpha, 1.0))
 	bay._set_mode(2)
 	hud._process(0.0)
