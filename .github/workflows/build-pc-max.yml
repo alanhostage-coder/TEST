@@ -135,6 +135,7 @@ jobs:
           assert proof['weather'] == 'manual clear', proof
           assert proof['roads'] > 0 and proof['buildings'] > 0, proof
           assert proof['exact_buildings'] == proof['buildings'], proof
+          assert proof['generic_tenement_facades'] > 0, proof
           assert proof['packaged_overlay_roads'] == proof['packaged_roads'], proof
           assert abs(proof['packaged_overlay_position'][0] - proof['packaged_overlay_expected_x']) <= 1, proof
           assert proof['packaged_overlay_marker_visible'] is True, proof

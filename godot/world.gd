@@ -54,6 +54,9 @@ var pavement_mat
 var kerb_mat
 var sandstone_warm_mat
 var soot_stone_cool_mat
+var tenement_weathered_mat
+var tenement_warm_mat
+var generic_tenement_facade_count := 0
 var brick_mat
 var render_mat
 var hedge_mat
@@ -141,6 +144,17 @@ func _make_materials():
 	# Shared materials keep close-range texture cheap on old integrated GPUs.
 	road_patch_mat = _mat(Color(0.035, 0.038, 0.041), 0.46, 0.03)
 	weed_mat = _mat(Color(0.15, 0.21, 0.08), 0.98, 0.0)
+	tenement_weathered_mat = _tenement_texture_mat("res://assets/edinburgh_tenement/walls/edin_ten_wall_weathered_a_alb.png", Color(0.98, 0.98, 0.97), 0.93)
+	tenement_warm_mat = _tenement_texture_mat("res://assets/edinburgh_tenement/walls/edin_ten_wall_warm_a_alb.png", Color(0.98, 0.97, 0.94), 0.92)
+
+func _tenement_texture_mat(path: String, tint: Color, roughness: float):
+	var material = _mat(tint, roughness, 0.0)
+	var texture = load(path)
+	if texture:
+		material.albedo_texture = texture
+		material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
+		material.texture_repeat = true
+	return material
 
 func _mat(color: Color, roughness: float, metallic: float):
 	var m = StandardMaterial3D.new()
@@ -613,8 +627,24 @@ func _road_micro_detail(parent: Node3D, a: Vector2, b: Vector2, width: float, se
 			parent.add_child(seam)
 	return count
 
+func _uses_generic_edinburgh_tenement_texture(building: Dictionary) -> bool:
+	if map_center_lat < 52.5:
+		return false
+	if str(building.get("name", "")).strip_edges() != "":
+		return false
+	var kind = str(building.get("kind", "yes")).to_lower()
+	if kind in ["church", "cathedral", "school", "hospital", "civic", "public", "castle", "monument", "industrial", "warehouse"]:
+		return false
+	var tagged = str(building.get("material", "")).to_lower()
+	return tagged == "" or "stone" in tagged
+
+
 func _osm_building_material(building: Dictionary, seed: int):
 	var tagged = str(building.get("material", "")).to_lower()
+	if _uses_generic_edinburgh_tenement_texture(building):
+		# Generic visual approximation only. The OSM footprint stays authoritative;
+		# these shared textures do not claim surveyed facade accuracy.
+		return tenement_warm_mat if abs(seed) % 5 == 0 else tenement_weathered_mat
 	if "brick" in tagged:
 		return brick_mat
 	if "concrete" in tagged:
@@ -733,17 +763,28 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 		var p0 = poly[int(tris[t])]
 		var p1 = poly[int(tris[t + 1])]
 		var p2 = poly[int(tris[t + 2])]
+		st.set_uv(Vector2(p0.x / 5.0, p0.y / 5.0))
 		st.add_vertex(Vector3(p0.x, height, p0.y))
+		st.set_uv(Vector2(p1.x / 5.0, p1.y / 5.0))
 		st.add_vertex(Vector3(p1.x, height, p1.y))
+		st.set_uv(Vector2(p2.x / 5.0, p2.y / 5.0))
 		st.add_vertex(Vector3(p2.x, height, p2.y))
 	for i in range(poly.size()):
 		var p0 = poly[i]
 		var p1 = poly[(i + 1) % poly.size()]
+		var wall_u = maxf(0.2, p0.distance_to(p1) / 5.0)
+		var wall_v = maxf(1.0, height / 3.0)
+		st.set_uv(Vector2(0.0, wall_v))
 		st.add_vertex(Vector3(p0.x, 0.0, p0.y))
+		st.set_uv(Vector2(wall_u, wall_v))
 		st.add_vertex(Vector3(p1.x, 0.0, p1.y))
+		st.set_uv(Vector2(wall_u, 0.0))
 		st.add_vertex(Vector3(p1.x, height, p1.y))
+		st.set_uv(Vector2(0.0, wall_v))
 		st.add_vertex(Vector3(p0.x, 0.0, p0.y))
+		st.set_uv(Vector2(wall_u, 0.0))
 		st.add_vertex(Vector3(p1.x, height, p1.y))
+		st.set_uv(Vector2(0.0, 0.0))
 		st.add_vertex(Vector3(p0.x, height, p0.y))
 	st.generate_normals()
 	var mesh = st.commit()
@@ -754,6 +795,10 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 	var visual = MeshInstance3D.new()
 	visual.mesh = mesh
 	visual.material_override = _osm_building_material(building, seed)
+	if _uses_generic_edinburgh_tenement_texture(building):
+		generic_tenement_facade_count += 1
+		visual.set_meta("facade_visual_source", "generic_edinburgh_tenement_kit_v1")
+		body.set_meta("facade_visual_source", "generic_edinburgh_tenement_kit_v1")
 	visual.visibility_range_end = 520.0 if xps_9530_mode else (360.0 if not low_spec_mode else 220.0)
 	body.add_child(visual)
 	var collision = CollisionShape3D.new()
@@ -1229,6 +1274,7 @@ func _on_map_ready(map_data: Dictionary):
 
 	var exact_building_count := 0
 	var fallback_building_count := 0
+	generic_tenement_facade_count = 0
 	for building in buildings:
 		if not building is Dictionary:
 			continue
@@ -1272,6 +1318,7 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_road_count", roads.size())
 		car.set_meta("map_building_count", buildings.size())
 		car.set_meta("map_exact_building_count", exact_building_count)
+		car.set_meta("generic_tenement_facade_count", generic_tenement_facade_count)
 		car.set_meta("map_fallback_building_count", fallback_building_count)
 		car.set_meta("map_linear_feature_count", linear_features.size())
 		car.set_meta("map_point_feature_count", point_features.size())
