@@ -270,6 +270,8 @@ func run() -> void:
 		"generic_tenement_facades": int(car.get_meta("generic_tenement_facade_count", 0)),
 		"generic_tenement_windows": int(car.get_meta("generic_tenement_window_count", 0)),
 		"generic_tenement_doors": int(car.get_meta("generic_tenement_door_count", 0)),
+		"generic_tenement_shopfronts": int(car.get_meta("generic_tenement_shopfront_count", 0)),
+		"generic_tenement_downpipes": int(car.get_meta("generic_tenement_downpipe_count", 0)),
 		"opening_policy": str(car.get_meta("map_opening_policy", "")),
 		"opening_anchor": str(car.get_meta("map_opening_verified_anchor", "")),
 		"opening_anchor_annotation": str(opening_anchor_label.text),

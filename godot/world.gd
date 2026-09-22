@@ -63,6 +63,9 @@ var tenement_door_mats: Array = []
 var generic_tenement_facade_count := 0
 var generic_tenement_window_count := 0
 var generic_tenement_door_count := 0
+var generic_tenement_shopfront_count := 0
+var generic_tenement_downpipe_count := 0
+var tenement_shop_frame_mats: Array = []
 var brick_mat
 var render_mat
 var hedge_mat
@@ -160,6 +163,12 @@ func _make_materials():
 		_mat(Color(0.075, 0.16, 0.12), 0.72, 0.0),
 		_mat(Color(0.17, 0.055, 0.05), 0.74, 0.0),
 		_mat(Color(0.055, 0.10, 0.17), 0.70, 0.0)
+	]
+	tenement_shop_frame_mats = [
+		_mat(Color(0.055, 0.11, 0.10), 0.68, 0.0),
+		_mat(Color(0.13, 0.055, 0.05), 0.72, 0.0),
+		_mat(Color(0.10, 0.105, 0.11), 0.70, 0.0),
+		_mat(Color(0.19, 0.14, 0.055), 0.74, 0.0)
 	]
 
 func _tenement_texture_mat(path: String, tint: Color, roughness: float):
@@ -642,6 +651,57 @@ func _road_micro_detail(parent: Node3D, a: Vector2, b: Vector2, width: float, se
 			parent.add_child(seam)
 	return count
 
+const COMMERCIAL_GROUND_FLOOR_POI_KINDS := [
+	"hairdresser", "pharmacy", "cafe", "beauty", "funeral_directors", "dentist",
+	"antiques", "bakery", "art", "fireplace", "books", "restaurant", "clothes",
+	"tattoo", "window_blind", "bar", "gift", "fast_food", "copyshop",
+	"convenience", "carpet", "pet", "charity", "bookmaker", "bicycle", "tailor",
+	"fitness_centre", "clinic"
+]
+
+
+func _mapped_commercial_pois_inside_building(building: Dictionary, poi_features: Array) -> Array:
+	var footprint = building.get("footprint", [])
+	if not footprint is Array or footprint.size() < 3:
+		return []
+	var poly := PackedVector2Array()
+	for raw_point in footprint:
+		if raw_point is Array and raw_point.size() >= 2:
+			poly.append(Vector2(float(raw_point[0]), float(raw_point[1])))
+	if poly.size() < 3:
+		return []
+	var matches: Array = []
+	for poi in poi_features:
+		if not poi is Dictionary:
+			continue
+		var poi_kind = str(poi.get("kind", "")).to_lower()
+		if poi_kind not in COMMERCIAL_GROUND_FLOOR_POI_KINDS:
+			continue
+		var raw_p = poi.get("point", [])
+		if not raw_p is Array or raw_p.size() < 2:
+			continue
+		var p := Vector2(float(raw_p[0]), float(raw_p[1]))
+		if Geometry2D.is_point_in_polygon(p, poly):
+			# Presence is source-backed by the mapped POI. We intentionally do not copy
+			# its business name onto the facade: the shopfront itself remains generic.
+			matches.append({"point": [p.x, p.y], "kind": poi_kind, "source": "osm_poi"})
+	return matches
+
+
+func _nearest_poly_edge(poly: PackedVector2Array, point: Vector2) -> int:
+	var best_index := -1
+	var best_distance := INF
+	for edge_index in range(poly.size()):
+		var p0 := poly[edge_index]
+		var p1 := poly[(edge_index + 1) % poly.size()]
+		var closest := Geometry2D.get_closest_point_to_segment(point, p0, p1)
+		var distance := point.distance_squared_to(closest)
+		if distance < best_distance:
+			best_distance = distance
+			best_index = edge_index
+	return best_index
+
+
 func _uses_generic_edinburgh_tenement_texture(building: Dictionary) -> bool:
 	if map_center_lat < 52.5:
 		return false
@@ -699,8 +759,10 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 	var kind = str(building.get("kind", "yes")).to_lower()
 	var industrial = kind in ["industrial", "warehouse", "commercial", "retail"]
 	var generic_tenement = _uses_generic_edinburgh_tenement_texture(building) and not industrial
+	var mapped_commercial_pois: Array = building.get("_mapped_commercial_pois", [])
 	var floors = clamp(int(floor(height / 3.0)), 1, 5 if xps_9530_mode else 3)
 	var door_edge = abs(seed) % poly.size()
+	var downpipe_edge = abs(seed / 11) % poly.size()
 	var edge_budget := 0
 	var max_edges := 8 if xps_9530_mode else 6
 	for edge_index in range(poly.size()):
@@ -716,12 +778,31 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 		var angle = atan2(tangent.x, tangent.y)
 		var edge_mid = (p0 + p1) * 0.5
 		var slots = clamp(int(floor(length / (5.8 if industrial else 3.55))), 1, 7 if xps_9530_mode else 4)
+		var shop_slots := {}
+		if generic_tenement and not mapped_commercial_pois.is_empty():
+			for poi in mapped_commercial_pois:
+				var raw_p = poi.get("point", [])
+				if not raw_p is Array or raw_p.size() < 2:
+					continue
+				var poi_point := Vector2(float(raw_p[0]), float(raw_p[1]))
+				if _nearest_poly_edge(poly, poi_point) != edge_index:
+					continue
+				var along = clamp((poi_point - p0).dot(delta) / maxf(length * length, 0.001), 0.0, 0.999)
+				shop_slots[int(floor(along * float(slots)))] = true
 
 		_visual_box(body, Vector3(edge_mid.x, min(0.42, height * 0.08), edge_mid.y), Vector3(0.10, min(0.84, height * 0.16), length * 0.96), roof_mat)
 		var plinth = body.get_child(body.get_child_count() - 1)
 		if plinth is MeshInstance3D:
 			plinth.rotation.y = angle
 			plinth.visibility_range_end = 155.0
+		if generic_tenement and edge_index == downpipe_edge:
+			var pipe_t = 0.08 if seed % 2 == 0 else 0.92
+			var pipe_p = p0.lerp(p1, pipe_t)
+			_visual_box(body, Vector3(pipe_p.x, height * 0.46, pipe_p.y), Vector3(0.11, height * 0.88, 0.11), metal_mat)
+			var downpipe = body.get_child(body.get_child_count() - 1)
+			if downpipe is MeshInstance3D:
+				downpipe.visibility_range_end = 190.0
+			generic_tenement_downpipe_count += 1
 		if height > 5.8:
 			_visual_box(body, Vector3(edge_mid.x, height - 0.18, edge_mid.y), Vector3(0.12, 0.26, length * 0.97), roof_mat)
 			var cornice = body.get_child(body.get_child_count() - 1)
@@ -738,6 +819,33 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 				var p = p0.lerp(p1, t)
 				var panel_w = min(1.45 if industrial else 1.08, max(0.74, length / float(slots) * 0.46))
 				var panel_h = 1.25 if industrial else 1.40
+				var is_shopfront = generic_tenement and floor_index == 0 and shop_slots.has(slot)
+				if is_shopfront:
+					var shop_w = min(2.65, max(1.75, length / float(slots) * 0.78))
+					var shop_h = 2.22
+					var shop_frame = tenement_shop_frame_mats[abs(seed + edge_index + slot) % tenement_shop_frame_mats.size()]
+					_visual_box(body, Vector3(p.x, 1.16, p.y), Vector3(0.11, shop_h, shop_w), tenement_sash_glass_mat)
+					var shop_glass = body.get_child(body.get_child_count() - 1)
+					if shop_glass is MeshInstance3D:
+						shop_glass.rotation.y = angle
+						shop_glass.visibility_range_end = 235.0
+					# Generic fascia/pilasters only: source proves commercial presence, not exact design or text.
+					for side in [-1.0, 1.0]:
+						var fp = p + tangent * side * (shop_w * 0.5 + 0.07)
+						_visual_box(body, Vector3(fp.x, 1.18, fp.y), Vector3(0.12, shop_h + 0.24, 0.13), shop_frame)
+						var pilaster = body.get_child(body.get_child_count() - 1)
+						if pilaster is MeshInstance3D:
+							pilaster.rotation.y = angle
+					_visual_box(body, Vector3(p.x, 2.40, p.y), Vector3(0.12, 0.34, shop_w + 0.28), shop_frame)
+					var fascia = body.get_child(body.get_child_count() - 1)
+					if fascia is MeshInstance3D:
+						fascia.rotation.y = angle
+					_visual_box(body, Vector3(p.x, 0.24, p.y), Vector3(0.12, 0.40, shop_w + 0.08), shop_frame)
+					var stallriser = body.get_child(body.get_child_count() - 1)
+					if stallriser is MeshInstance3D:
+						stallriser.rotation.y = angle
+					generic_tenement_shopfront_count += 1
+					continue
 				var is_door = edge_index == door_edge and floor_index == 0 and slot == abs(seed / 7) % slots and generic_tenement
 				if is_door:
 					var door_w = min(1.28, max(0.94, length / float(slots) * 0.56))
@@ -1330,6 +1438,8 @@ func _on_map_ready(map_data: Dictionary):
 	generic_tenement_facade_count = 0
 	generic_tenement_window_count = 0
 	generic_tenement_door_count = 0
+	generic_tenement_shopfront_count = 0
+	generic_tenement_downpipe_count = 0
 	for building in buildings:
 		if not building is Dictionary:
 			continue
@@ -1344,8 +1454,14 @@ func _on_map_ready(map_data: Dictionary):
 		var cz = float(center[1])
 		var seed = int(abs(cx * 17.0 + cz * 31.0 + sx * 11.0 + sz * 7.0))
 		var kind = str(building.get("kind", "yes"))
+		var visual_building: Dictionary = building
+		if pc_max_mode and not low_spec_mode:
+			var commercial_pois := _mapped_commercial_pois_inside_building(building, poi_features)
+			if not commercial_pois.is_empty():
+				visual_building = building.duplicate(true)
+				visual_building["_mapped_commercial_pois"] = commercial_pois
 		var exact_radius = LOW_SPEC_EXACT_FOOTPRINT_RADIUS if low_spec_mode else (620.0 if pc_max_mode else 260.0)
-		var exact = Vector2(cx, cz).length() <= exact_radius and _add_exact_osm_building(map_root, building, h, seed)
+		var exact = Vector2(cx, cz).length() <= exact_radius and _add_exact_osm_building(map_root, visual_building, h, seed)
 		if not exact:
 			_add_edinburgh_building(map_root, Vector3(cx, 0.0, cz), Vector3(sx, h, sz), seed, kind)
 			fallback_building_count += 1
@@ -1376,6 +1492,8 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("generic_tenement_facade_count", generic_tenement_facade_count)
 		car.set_meta("generic_tenement_window_count", generic_tenement_window_count)
 		car.set_meta("generic_tenement_door_count", generic_tenement_door_count)
+		car.set_meta("generic_tenement_shopfront_count", generic_tenement_shopfront_count)
+		car.set_meta("generic_tenement_downpipe_count", generic_tenement_downpipe_count)
 		car.set_meta("map_fallback_building_count", fallback_building_count)
 		car.set_meta("map_linear_feature_count", linear_features.size())
 		car.set_meta("map_point_feature_count", point_features.size())

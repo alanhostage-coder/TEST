@@ -138,6 +138,8 @@ jobs:
           assert proof['generic_tenement_facades'] > 0, proof
           assert proof['generic_tenement_windows'] >= 24, proof
           assert proof['generic_tenement_doors'] >= 1, proof
+          assert proof['generic_tenement_shopfronts'] >= 6, proof
+          assert proof['generic_tenement_downpipes'] >= 20, proof
           assert proof['packaged_overlay_roads'] == proof['packaged_roads'], proof
           assert abs(proof['packaged_overlay_position'][0] - proof['packaged_overlay_expected_x']) <= 1, proof
           assert proof['packaged_overlay_marker_visible'] is True, proof
