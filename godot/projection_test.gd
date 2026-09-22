@@ -30,6 +30,18 @@ func run():
 	assert(bay._is_safe_calibration_quad(calibration_keystone, calibration_base))
 	assert(not bay._is_safe_calibration_quad(calibration_foldover, calibration_base))
 	assert(not bay._is_safe_calibration_quad(calibration_sliver, calibration_base))
+	# A mistaken RESET must be recoverable after a physical shutter alignment.
+	# RESET saves defaults, and that save must first preserve the prior file.
+	bay.layout_surface_count = 5
+	var calibrated_corner := Vector2(0.03, 0.04)
+	bay.cal_offsets_five[0][0] = calibrated_corner
+	bay._save_calibration()
+	bay._reset_calibration()
+	assert(bay.cal_offsets_five[0][0] == Vector2.ZERO)
+	bay._restore_calibration_backup()
+	assert(bay.layout_surface_count == 5)
+	assert(bay.cal_offsets_five[0][0].is_equal_approx(calibrated_corner))
+	bay._reset_offsets(false)
 	var osm_overlay = world.get_node("OSMGroundTiles")
 	osm_overlay._build_live_map_overlay()
 	osm_overlay._bind_map_stream()

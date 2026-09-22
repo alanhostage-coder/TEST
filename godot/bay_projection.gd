@@ -5,6 +5,7 @@ extends Control
 # plus two separate wall windows. The defaults are explicitly an unmeasured
 # starting layout; calibration supplies the real closed-shutter extents.
 const CAL_PATH := "user://parkview_bay_calibration.cfg"
+const CAL_BACKUP_PATH := "user://parkview_bay_calibration.previous.cfg"
 const MAX_SURFACES := 5
 const SURFACE_NAMES := ["BAY LEFT", "BAY CENTRE", "BAY RIGHT", "WALL NEAR", "WALL FAR"]
 # Normalised screen-space starter rectangles. These preserve unequal panels and
@@ -60,6 +61,7 @@ const BAY_VIEW_YAW_SIGN := -1.0
 var button: Button
 var save_button: Button
 var reset_button: Button
+var restore_button: Button
 var drive_button: Button
 var centre_button: Button
 var cal_button: Button
@@ -140,6 +142,15 @@ func _build_buttons():
 	reset_button.pressed.connect(_reset_calibration)
 	add_child(reset_button)
 
+	restore_button = Button.new()
+	restore_button.text = "RESTORE"
+	restore_button.position = Vector2(136, 138)
+	restore_button.size = Vector2(138, 38)
+	restore_button.modulate = Color(1, 1, 1, 0.70)
+	restore_button.tooltip_text = "Restore the calibration that existed before the last save or reset"
+	restore_button.pressed.connect(_restore_calibration_backup)
+	add_child(restore_button)
+
 	drive_button = Button.new()
 	drive_button.text = "DRIVE"
 	drive_button.position = Vector2(18, 94)
@@ -182,7 +193,7 @@ func _build_buttons():
 	title.modulate = Color(1, 1, 1, 0.62)
 	add_child(title)
 
-	for control in [button, cal_button, layout_button, save_button, reset_button, drive_button, centre_button, surface_button, yaw_left_button, yaw_right_button, title]:
+	for control in [button, cal_button, layout_button, save_button, reset_button, restore_button, drive_button, centre_button, surface_button, yaw_left_button, yaw_right_button, title]:
 		control.z_index = 40
 
 func _build_views():
@@ -438,6 +449,7 @@ func _set_mode(value: int):
 			car.set_motion_drive_enabled(false)
 	save_button.visible = mode == 2
 	reset_button.visible = mode == 2
+	restore_button.visible = mode == 2
 	surface_button.visible = mode == 2
 	yaw_left_button.visible = mode == 2
 	yaw_right_button.visible = mode == 2
@@ -645,6 +657,12 @@ func _reset_calibration():
 	_reset_offsets(true)
 
 func _save_calibration():
+	# Preserve the last known file before replacing it. RESET deliberately saves
+	# its defaults, so this backup is the escape hatch for an accidental reset in
+	# a dark projection room after a careful physical alignment.
+	var previous = ConfigFile.new()
+	if previous.load(CAL_PATH) == OK:
+		previous.save(CAL_BACKUP_PATH)
 	var cfg = ConfigFile.new()
 	cfg.set_value("layout", "surface_count", layout_surface_count)
 	cfg.set_value("layout", "measurement_status", "unmeasured_until_user_calibrates_closed_shutters")
@@ -660,6 +678,20 @@ func _save_calibration():
 	cfg.set_value("layout", "yaw_policy", "panorama_contiguous_v1")
 	cfg.save(CAL_PATH)
 	title.text = "%d-SURFACE CALIBRATION SAVED" % layout_surface_count
+
+func _restore_calibration_backup():
+	var backup = ConfigFile.new()
+	if backup.load(CAL_BACKUP_PATH) != OK:
+		title.text = "NO PREVIOUS CALIBRATION TO RESTORE"
+		return
+	if backup.save(CAL_PATH) != OK:
+		title.text = "CALIBRATION RESTORE FAILED"
+		return
+	_reset_all_offsets()
+	_load_calibration()
+	_rescale_surfaces()
+	_update_calibration_controls()
+	title.text = "%d-SURFACE PREVIOUS CALIBRATION RESTORED" % layout_surface_count
 
 func _load_calibration():
 	var cfg = ConfigFile.new()
