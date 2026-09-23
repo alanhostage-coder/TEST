@@ -80,17 +80,26 @@ jobs:
           cat /tmp/mobile-road-clearance.log
           test "$status" -eq 0
           grep -q 'MOBILE_ROAD_CLEARANCE_OK' /tmp/mobile-road-clearance.log
+      - name: Forced mobile startup regression
+        run: |
+          set +e
+          timeout 45s godot --headless --path godot --script res://mobile_startup_test.gd > /tmp/mobile-startup.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/mobile-startup.log
+          test "$status" -eq 0
+          grep -q 'MOBILE_STARTUP_OK' /tmp/mobile-startup.log
       - name: Export Android debug APK
         run: |
           mkdir -p build/android
           EXPORT_DIR="$(readlink -f build/android)"
-          godot --headless --verbose --path godot --export-debug "Android" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_83.apk"
-          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_83.apk"
-          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_83.apk"
+          godot --headless --verbose --path godot --export-debug "Android" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_84.apk"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_84.apk"
+          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_84.apk"
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.83-ANDROID
-          path: build/android/PROCEED_UNTIL_APPREHENDED_0_83.apk
+          name: PUA-0.84-ANDROID
+          path: build/android/PROCEED_UNTIL_APPREHENDED_0_84.apk
           if-no-files-found: error
           retention-days: 30
