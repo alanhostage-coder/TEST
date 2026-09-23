@@ -26,6 +26,13 @@ func run():
 		return
 	stream._load_district_destinations()
 	var manifest: Dictionary = stream.full_manifest
+	if str(manifest.get("dedupe_policy", "")) != "osm_id+kind per tile":
+		_fail("EH15 bundle is not deduped")
+		return
+	var totals_check = manifest.get("raw_tile_totals", {})
+	if totals_check is Dictionary and int(totals_check.get("buildings", 999999)) >= 45000:
+		_fail("EH15 building inventory still looks duplicated")
+		return
 	var tiles = manifest.get("tiles", [])
 	if not tiles is Array or tiles.size() < 25:
 		_fail("tile coverage too small")
