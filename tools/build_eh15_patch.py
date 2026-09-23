@@ -12,8 +12,9 @@ LAT_STEP = 0.0110
 LON_STEP = 0.0195
 OUT = Path(os.environ.get("PUA_EH15_OUT", "eh15_full"))
 ENDPOINTS = [
+    "https://overpass.private.coffee/api/interpreter",
+    "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
     "https://overpass-api.de/api/interpreter",
-    "https://overpass.kumi.systems/api/interpreter",
 ]
 HIGHWAYS = "motorway|trunk|primary|secondary|tertiary|residential|unclassified|living_street|service|track"
 ATTENTION = "traffic_signals|crossing|bus_stop|stop|give_way"
@@ -22,11 +23,29 @@ def local(lat, lon):
     mplon = 111320.0 * math.cos(math.radians(CENTER_LAT))
     return [(lon - CENTER_LON) * mplon, -(lat - CENTER_LAT) * 111320.0]
 
+def _overpass_query(query):
+    body = urllib.parse.urlencode({"data": query}).encode()
+    last = None
+    for attempt in range(6):
+        endpoint = ENDPOINTS[attempt % len(ENDPOINTS)]
+        try:
+            req = urllib.request.Request(endpoint, data=body, headers={"User-Agent":"PUA-EH15-builder/0.78","Accept":"application/json"})
+            with urllib.request.urlopen(req, timeout=95) as resp:
+                return json.load(resp)
+        except Exception as exc:
+            last = exc
+            time.sleep(1.5 + attempt * 1.5)
+    raise RuntimeError(f"Overpass failed: {last}")
+
 def request_overpass(s, w, n, e):
-    q = f'''[out:json][timeout:45];
+    heavy = f'''[out:json][timeout:75][maxsize:536870912];
 (
  way[highway~"^({HIGHWAYS})$"]({s},{w},{n},{e});
  way[building]({s},{w},{n},{e});
+);
+out tags geom qt;'''
+    detail = f'''[out:json][timeout:60][maxsize:268435456];
+(
  way[barrier~"^(hedge|fence|wall)$"]({s},{w},{n},{e});
  way[highway~"^(footway|path|cycleway)$"]({s},{w},{n},{e});
  node[natural=tree]({s},{w},{n},{e});
@@ -40,18 +59,10 @@ def request_overpass(s, w, n, e):
  node[place][name]({s},{w},{n},{e});
 );
 out tags geom qt;'''
-    body = urllib.parse.urlencode({"data": q}).encode()
-    last = None
-    for attempt in range(6):
-        endpoint = ENDPOINTS[attempt % len(ENDPOINTS)]
-        try:
-            req = urllib.request.Request(endpoint, data=body, headers={"User-Agent":"PUA-EH15-builder/0.78"})
-            with urllib.request.urlopen(req, timeout=70) as resp:
-                return json.load(resp)
-        except Exception as exc:
-            last = exc
-            time.sleep(2.0 + attempt * 2.0)
-    raise RuntimeError(f"Overpass failed: {last}")
+    a = _overpass_query(heavy)
+    b = _overpass_query(detail)
+    timestamp = max(str((a.get("osm3s") or {}).get("timestamp_osm_base","")), str((b.get("osm3s") or {}).get("timestamp_osm_base","")))
+    return {"version":0.6,"osm3s":{"timestamp_osm_base":timestamp},"elements":a.get("elements",[])+b.get("elements",[])}
 
 def geom_points(geom, min_gap=0.75):
     out=[]; last=None
@@ -177,7 +188,7 @@ def main():
             sw=local(s,w); ne=local(n,e)
             tiles.append({"id":tid,"file":fn,"bbox":[s,w,n,e],
                 "local_bounds":[min(sw[0],ne[0]),min(sw[1],ne[1]),max(sw[0],ne[0]),max(sw[1],ne[1])],"counts":counts})
-            time.sleep(0.8)
+            time.sleep(0.25)
     manifest={"patch_format":2,"patch_id":"uk-edinburgh-eh15-full","display_name":"EH15 · Edinburgh",
         "source":"packaged_osm_tiles","source_name":"OpenStreetMap","source_url":"https://www.openstreetmap.org/copyright",
         "source_timestamp_utc":newest,"generated_utc":datetime.now(timezone.utc).isoformat(),
