@@ -1,0 +1,35 @@
+name: Generate EH15 Full Offline Patch
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'tools/build_eh15_patch.py'
+      - '.github/workflows/generate-eh15-patch.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  harvest:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Harvest source-backed EH15 OSM tiles
+        run: python3 tools/build_eh15_patch.py
+      - name: Inventory
+        run: |
+          du -sh eh15_full
+          find eh15_full -type f | wc -l
+          python3 - <<'PY'
+          import json
+          m=json.load(open('eh15_full/manifest.json'))
+          print(json.dumps({'tiles':len(m['tiles']),'totals':m['raw_tile_totals'],'source_timestamp_utc':m['source_timestamp_utc']},indent=2))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EH15-FULL-OFFLINE-PATCH
+          path: eh15_full
+          if-no-files-found: error
+          retention-days: 7
