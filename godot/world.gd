@@ -25,6 +25,7 @@ const ROAD_MICRO_STEP := 6.5
 # while remaining a bounded low-spec draw/collision radius for future patches.
 const LOW_SPEC_EXACT_FOOTPRINT_RADIUS := 220.0
 const DRIVER_DETAIL_RADIUS := 38.0
+const MOBILE_BUILDING_VISUAL_RADIUS := 720.0
 const XPS_LIGHT_GRADE := "edinburgh-side-light-v1"
 var low_spec_mode := false
 var projector_max_mode := false
@@ -446,6 +447,8 @@ func _add_mapped_road_name_signs(parent: Node3D, roads: Array) -> int:
 	# by _add_mapped_point_features at their sourced coordinates.
 	var cap = 26 if xps_9530_mode else (8 if projector_max_mode else (10 if low_spec_mode else (34 if pc_max_mode else 18)))
 	var distance_limit = 125.0 if low_spec_mode else 260.0
+	var driver = get_node_or_null("Car")
+	var reference := Vector2(driver.global_position.x, driver.global_position.z) if mobile_mode and driver else Vector2.ZERO
 	var label_range = 115.0 if low_spec_mode else 180.0
 	var label_size = 24 if low_spec_mode else 31
 	var candidates: Array = []
@@ -460,6 +463,7 @@ func _add_mapped_road_name_signs(parent: Node3D, roads: Array) -> int:
 		if not points is Array or points.size() < 2:
 			continue
 		var chosen := Vector2(INF, INF)
+		var chosen_distance_sq := INF
 		for i in range(points.size() - 1):
 			if not points[i] is Array or not points[i + 1] is Array:
 				continue
@@ -468,12 +472,14 @@ func _add_mapped_road_name_signs(parent: Node3D, roads: Array) -> int:
 			if a.distance_to(b) < 8.0:
 				continue
 			var mid = (a + b) * 0.5
-			if mid.length() < chosen.length():
+			var mid_distance_sq := mid.distance_squared_to(reference)
+			if mid_distance_sq < chosen_distance_sq:
 				chosen = mid
-		if chosen.x == INF or chosen.length() > distance_limit:
+				chosen_distance_sq = mid_distance_sq
+		if chosen.x == INF or sqrt(chosen_distance_sq) > distance_limit:
 			continue
 		seen[road_name] = true
-		candidates.append({"name": road_name, "point": chosen, "distance_sq": chosen.length_squared()})
+		candidates.append({"name": road_name, "point": chosen, "distance_sq": chosen_distance_sq})
 	candidates.sort_custom(func(a, b): return float(a["distance_sq"]) < float(b["distance_sq"]))
 	var made := 0
 	for candidate in candidates:
@@ -503,6 +509,8 @@ func _add_named_poi_markers(parent: Node3D, pois: Array):
 	var label_range = 110.0 if low_spec_mode else 200.0
 	var label_size = 25 if low_spec_mode else 32
 	var made := 0
+	var driver = get_node_or_null("Car")
+	var reference := Vector2(driver.global_position.x, driver.global_position.z) if mobile_mode and driver else Vector2.ZERO
 	for poi in pois:
 		if made >= cap or not poi is Dictionary:
 			break
@@ -511,7 +519,7 @@ func _add_named_poi_markers(parent: Node3D, pois: Array):
 		if poi_name == "" or not point is Array or point.size() < 2:
 			continue
 		var p = Vector2(float(point[0]), float(point[1]))
-		if p.length() > distance_limit:
+		if p.distance_to(reference) > distance_limit:
 			continue
 		_visual_box(parent, Vector3(p.x, 1.35, p.y), Vector3(0.08, 2.70, 0.08), metal_mat)
 		_visual_box(parent, Vector3(p.x, 2.55, p.y), Vector3(0.92, 0.40, 0.08), sign_blue_mat)
@@ -525,7 +533,9 @@ func _add_named_building_marker(parent: Node3D, building: Dictionary):
 		return
 	var p = Vector2(float(center[0]), float(center[1]))
 	var distance_limit = 100.0 if low_spec_mode else (230.0 if pc_max_mode else 150.0)
-	if p.length() > distance_limit:
+	var driver = get_node_or_null("Car")
+	var reference := Vector2(driver.global_position.x, driver.global_position.z) if mobile_mode and driver else Vector2.ZERO
+	if p.distance_to(reference) > distance_limit:
 		return
 	_add_world_label(parent, Vector3(p.x, 3.2, p.y), name, Color(0.95, 0.93, 0.86), 25 if low_spec_mode else 34, 105.0 if low_spec_mode else 170.0)
 
@@ -1550,6 +1560,8 @@ func _on_map_ready(map_data: Dictionary):
 		var sz = max(2.0, float(size[1]))
 		var cx = float(center[0])
 		var cz = float(center[1])
+		if mobile_mode and Vector2(cx, cz).distance_to(detail_origin) > MOBILE_BUILDING_VISUAL_RADIUS:
+			continue
 		var seed = int(abs(cx * 17.0 + cz * 31.0 + sx * 11.0 + sz * 7.0))
 		var kind = str(building.get("kind", "yes"))
 		var visual_building: Dictionary = building
