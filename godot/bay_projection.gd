@@ -93,7 +93,7 @@ var driver_chrome_idle := 0.0
 var driver_chrome_alpha := 1.0
 
 func _ready():
-	if OS.has_feature("mobile"):
+	if OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1":
 		# Projector calibration/render surfaces are desktop-only. Building five
 		# hidden SubViewports on Android wastes GPU and exposes irrelevant controls.
 		visible = false
