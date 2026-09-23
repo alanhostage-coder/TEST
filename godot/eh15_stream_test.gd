@@ -82,6 +82,24 @@ func run():
 		if str(stream.data.get("source", "")) != "packaged_osm_tiles":
 			_fail("stream source provenance missing")
 			return
+		var checked_source_ids := 0
+		for feature in roads:
+			if feature is Dictionary:
+				checked_source_ids += 1
+				if int(feature.get("osm_id", 0)) <= 0:
+					_fail("streamed road lost OSM object id")
+					return
+				if checked_source_ids >= 24:
+					break
+		checked_source_ids = 0
+		for feature in buildings:
+			if feature is Dictionary:
+				checked_source_ids += 1
+				if int(feature.get("osm_id", 0)) <= 0:
+					_fail("streamed building lost OSM object id")
+					return
+				if checked_source_ids >= 24:
+					break
 		checked += 1
 	var totals = manifest.get("raw_tile_totals", {})
 	print("EH15_STREAM_OK tiles=%d destinations=%d samples=%d roads=%s buildings=%s" % [
