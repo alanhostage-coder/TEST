@@ -509,6 +509,107 @@ func nearest_named_road(local_position: Vector2) -> Dictionary:
 			}
 	return best
 
+
+func _nearest_other_named_road(local_position: Vector2, excluded_name: String) -> Dictionary:
+	var best_distance := INF
+	var best: Dictionary = {}
+	var seen := {}
+	for segment in _named_road_segments:
+		var name := str(segment.get("name", "")).strip_edges()
+		if name == "" or name == excluded_name or seen.has(name):
+			continue
+		seen[name] = true
+		var a: Vector2 = segment["a"]
+		var b: Vector2 = segment["b"]
+		var ab := b - a
+		var denominator := ab.length_squared()
+		if denominator < 0.001:
+			continue
+		var t := clampf((local_position - a).dot(ab) / denominator, 0.0, 1.0)
+		var nearest := a + ab * t
+		var distance := local_position.distance_to(nearest)
+		if distance < best_distance:
+			best_distance = distance
+			best = {
+				"name": name,
+				"ref": str(segment.get("ref", "")),
+				"osm_id": int(segment.get("osm_id", 0)),
+				"distance_m": distance
+			}
+	return best
+
+func _identity_feature_priority(kind: String, source_type: String) -> float:
+	var k := kind.to_lower()
+	if k.begins_with("historic:") or k.begins_with("tourism:attraction") or k.begins_with("tourism:artwork"):
+		return 0.0
+	if k.begins_with("amenity:library") or k.begins_with("amenity:school") or k.begins_with("amenity:social_centre") or k.begins_with("amenity:post_office"):
+		return 35.0
+	if k.begins_with("leisure:") or k.begins_with("tourism:information"):
+		return 70.0
+	if source_type == "building":
+		return 115.0
+	# Hotels, guest houses, takeaways and shops can still orient the player when
+	# they are genuinely the closest named thing, but they should not beat a public
+	# or historic landmark at a similar distance.
+	return 180.0
+
+func mobile_location_identity(local_position: Vector2) -> Dictionary:
+	var current_road := nearest_named_road(local_position)
+	var current_name := str(current_road.get("name", "")).strip_edges()
+	var nearby_road := _nearest_other_named_road(local_position, current_name)
+	var nearest_place: Dictionary = {}
+	var nearest_place_distance := INF
+	var nearest_landmark: Dictionary = {}
+	var best_landmark_score := INF
+
+	for poi in data.get("poi_features", []):
+		if not poi is Dictionary:
+			continue
+		var name := str(poi.get("name", "")).strip_edges()
+		var point = poi.get("point", [])
+		if name == "" or not point is Array or point.size() < 2:
+			continue
+		var p := Vector2(float(point[0]), float(point[1]))
+		var distance := local_position.distance_to(p)
+		var kind := str(poi.get("kind", ""))
+		var lower_kind := kind.to_lower()
+		if lower_kind.begins_with("place:") or lower_kind in ["suburb", "neighbourhood", "town", "village", "locality"]:
+			if distance < nearest_place_distance:
+				nearest_place_distance = distance
+				nearest_place = {"name": name, "kind": kind, "distance_m": distance, "osm_id": int(poi.get("osm_id", 0))}
+			continue
+		if distance > 900.0:
+			continue
+		var score := distance + _identity_feature_priority(kind, "poi")
+		if score < best_landmark_score:
+			best_landmark_score = score
+			nearest_landmark = {"name": name, "kind": kind, "distance_m": distance, "osm_id": int(poi.get("osm_id", 0)), "source_type": "poi"}
+
+	for building in data.get("buildings", []):
+		if not building is Dictionary:
+			continue
+		var name := str(building.get("name", "")).strip_edges()
+		var center = building.get("center", [])
+		if name == "" or not center is Array or center.size() < 2:
+			continue
+		var p := Vector2(float(center[0]), float(center[1]))
+		var distance := local_position.distance_to(p)
+		if distance > 700.0:
+			continue
+		var kind := str(building.get("kind", "building"))
+		var score := distance + _identity_feature_priority(kind, "building")
+		if score < best_landmark_score:
+			best_landmark_score = score
+			nearest_landmark = {"name": name, "kind": kind, "distance_m": distance, "osm_id": int(building.get("osm_id", 0)), "source_type": "building"}
+
+	return {
+		"road": current_road,
+		"near_road": nearby_road,
+		"place": nearest_place,
+		"landmark": nearest_landmark,
+		"source": "OpenStreetMap"
+	}
+
 func local_to_lat_lon(local_position: Vector2) -> Vector2:
 	var meters_per_lon = 111320.0 * cos(deg_to_rad(center_lat))
 	var latitude = center_lat - local_position.y / 111320.0
