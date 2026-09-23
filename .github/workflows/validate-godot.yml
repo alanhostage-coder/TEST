@@ -63,6 +63,13 @@ jobs:
           grep -q 'MOBILE_ROAD_CLEARANCE_OK' /tmp/mobile-road-clearance.log
           ! grep -E 'SCRIPT ERROR|Parse Error|MOBILE_ROAD_CLEARANCE_FAIL' /tmp/mobile-road-clearance.log
 
+      - name: Forced mobile startup regression
+        run: |
+          set -o pipefail
+          timeout 45s godot --headless --path godot --script res://mobile_startup_test.gd 2>&1 | tee /tmp/mobile-startup.log
+          grep -q 'MOBILE_STARTUP_OK' /tmp/mobile-startup.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|MOBILE_STARTUP_FAIL' /tmp/mobile-startup.log
+
       - name: Greybeard invariants
         run: |
           grep -q 'renderer/rendering_method="mobile"' godot/project.godot
