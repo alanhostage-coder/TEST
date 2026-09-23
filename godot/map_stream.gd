@@ -8,6 +8,11 @@ signal location_ready(latitude, longitude, postcode)
 const OVERPASS_URL := "https://overpass-api.de/api/interpreter"
 const START_POSTCODE := "EH15 2BZ"
 const PATCH_PATH := "res://patches/eh15_2bz.json"
+const EH15_FULL_MANIFEST_PATH := "res://patches/eh15_full/manifest.json"
+const EH15_FULL_TILE_DIR := "res://patches/eh15_full"
+const EH15_DESTINATIONS_PATH := "res://patches/eh15_full/destinations.json"
+const MOBILE_STREAM_RADIUS_METERS := 650.0
+const MOBILE_MAX_ACTIVE_TILES := 4
 var CACHE_PATH := "user://pua_map_stream_eh15_2bz_v7_pc_max.json" if OS.has_feature("pc_max") else "user://pua_map_stream_eh15_2bz_v7.json"
 const CACHE_MAX_AGE_SECONDS := 604800
 # Quality-1 postcodes.io centroid verified 2026-09-20. This is an origin for
@@ -42,8 +47,20 @@ var data := {
 
 var _request: HTTPRequest
 var _named_road_segments: Array = []
+var full_manifest: Dictionary = {}
+var full_tiles: Array = []
+var full_stream_enabled := false
+var active_tile_signature := ""
+var district_destinations: Array = []
 
 func _ready():
+	if OS.has_feature("mobile") and _load_full_eh15_manifest():
+		_load_district_destinations()
+		_load_full_eh15_window(Vector2.ZERO, false)
+		_rebuild_named_road_index()
+		location_ready.emit(center_lat, center_lon, resolved_postcode)
+		map_ready.emit(data)
+		return
 	var cache_fresh = _load_cache()
 	if not cache_fresh:
 		_load_packaged_patch()
@@ -58,6 +75,164 @@ func _ready():
 	# deterministically. Playable builds still refresh from Overpass when online.
 	if not cache_fresh and DisplayServer.get_name() != "headless":
 		_fetch_osm()
+
+func _load_full_eh15_manifest() -> bool:
+	if not FileAccess.file_exists(EH15_FULL_MANIFEST_PATH):
+		return false
+	var file = FileAccess.open(EH15_FULL_MANIFEST_PATH, FileAccess.READ)
+	if not file:
+		return false
+	var parsed = JSON.parse_string(file.get_as_text())
+	if not parsed is Dictionary or int(parsed.get("patch_format", 0)) < 2:
+		return false
+	var tiles = parsed.get("tiles", [])
+	if not tiles is Array or tiles.is_empty():
+		return false
+	full_manifest = parsed
+	full_tiles = tiles
+	full_stream_enabled = true
+	center_lat = float(parsed.get("center_lat", FALLBACK_LAT))
+	center_lon = float(parsed.get("center_lon", FALLBACK_LON))
+	resolved_postcode = "EH15"
+	return true
+
+func _load_district_destinations():
+	district_destinations.clear()
+	if not FileAccess.file_exists(EH15_DESTINATIONS_PATH):
+		return
+	var file = FileAccess.open(EH15_DESTINATIONS_PATH, FileAccess.READ)
+	if not file:
+		return
+	var parsed = JSON.parse_string(file.get_as_text())
+	if parsed is Dictionary:
+		var items = parsed.get("destinations", [])
+		if items is Array:
+			district_destinations = items
+
+func get_district_destinations() -> Array:
+	return district_destinations
+
+func full_district_coverage() -> Dictionary:
+	if not full_stream_enabled:
+		return {}
+	return {
+		"postcode": "EH15",
+		"coverage_bbox": full_manifest.get("coverage_bbox", []),
+		"tile_count": full_tiles.size(),
+		"raw_tile_totals": full_manifest.get("raw_tile_totals", {})
+	}
+
+func update_stream_position(local_position: Vector2):
+	if full_stream_enabled:
+		_load_full_eh15_window(local_position, true)
+
+func _distance_sq_to_tile(tile: Dictionary, p: Vector2) -> float:
+	var bounds = tile.get("local_bounds", [])
+	if not bounds is Array or bounds.size() < 4:
+		return INF
+	var min_x = float(bounds[0])
+	var min_z = float(bounds[1])
+	var max_x = float(bounds[2])
+	var max_z = float(bounds[3])
+	var dx = maxf(maxf(min_x - p.x, 0.0), p.x - max_x)
+	var dz = maxf(maxf(min_z - p.y, 0.0), p.y - max_z)
+	return dx * dx + dz * dz
+
+func _load_full_eh15_window(local_position: Vector2, emit_change: bool) -> bool:
+	if not full_stream_enabled:
+		return false
+	var ranked: Array = []
+	for raw_tile in full_tiles:
+		if raw_tile is Dictionary:
+			ranked.append({"tile": raw_tile, "d2": _distance_sq_to_tile(raw_tile, local_position)})
+	ranked.sort_custom(func(a, b): return float(a["d2"]) < float(b["d2"]))
+	var chosen: Array = []
+	var radius_sq := MOBILE_STREAM_RADIUS_METERS * MOBILE_STREAM_RADIUS_METERS
+	for item in ranked:
+		if chosen.size() >= MOBILE_MAX_ACTIVE_TILES:
+			break
+		if float(item["d2"]) <= radius_sq or chosen.is_empty():
+			chosen.append(item["tile"])
+	var ids: Array = []
+	for tile in chosen:
+		ids.append(str(tile.get("id", "")))
+	ids.sort()
+	var signature := ",".join(ids)
+	if signature == active_tile_signature and not data.get("roads", []).is_empty():
+		return false
+
+	var merged := {
+		"roads": [],
+		"buildings": [],
+		"linear_features": [],
+		"point_features": [],
+		"poi_features": []
+	}
+	var seen := {
+		"roads": {},
+		"buildings": {},
+		"linear_features": {},
+		"point_features": {},
+		"poi_features": {}
+	}
+	for tile in chosen:
+		var filename := str(tile.get("file", ""))
+		if filename == "":
+			continue
+		var path := "%s/%s" % [EH15_FULL_TILE_DIR, filename]
+		if not FileAccess.file_exists(path):
+			continue
+		var tile_file = FileAccess.open(path, FileAccess.READ)
+		if not tile_file:
+			continue
+		var tile_data = JSON.parse_string(tile_file.get_as_text())
+		if not tile_data is Dictionary:
+			continue
+		for feature_key in merged.keys():
+			var features = tile_data.get(feature_key, [])
+			if not features is Array:
+				continue
+			var bucket: Array = merged[feature_key]
+			var feature_seen: Dictionary = seen[feature_key]
+			for feature in features:
+				if not feature is Dictionary:
+					continue
+				var osm_id = int(feature.get("osm_id", 0))
+				var unique_key = str(osm_id)
+				if osm_id == 0:
+					unique_key = "%s:%s:%s" % [str(feature.get("kind", "")), str(feature.get("name", "")), str(feature.get("point", feature.get("center", [])))]
+				if feature_seen.has(unique_key):
+					continue
+				feature_seen[unique_key] = true
+				bucket.append(feature)
+			merged[feature_key] = bucket
+			seen[feature_key] = feature_seen
+
+	active_tile_signature = signature
+	data = {
+		"source": "packaged_osm_tiles",
+		"source_name": "OpenStreetMap",
+		"source_url": "https://www.openstreetmap.org/copyright",
+		"license": "ODbL 1.0; © OpenStreetMap contributors",
+		"source_timestamp_utc": str(full_manifest.get("source_timestamp_utc", "")),
+		"start_postcode": "EH15",
+		"center_lat": center_lat,
+		"center_lon": center_lon,
+		"roads": merged["roads"],
+		"buildings": merged["buildings"],
+		"linear_features": merged["linear_features"],
+		"point_features": merged["point_features"],
+		"poi_features": merged["poi_features"],
+		"active_tile_ids": ids,
+		"full_tile_count": full_tiles.size(),
+		"full_coverage_bbox": full_manifest.get("coverage_bbox", []),
+		"full_raw_tile_totals": full_manifest.get("raw_tile_totals", {}),
+		"updated_unix": int(Time.get_unix_time_from_system())
+	}
+	_rebuild_named_road_index()
+	if emit_change:
+		map_ready.emit(data)
+	return true
 
 func _load_packaged_patch() -> bool:
 	if not FileAccess.file_exists(PATCH_PATH):
