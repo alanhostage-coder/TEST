@@ -28,7 +28,7 @@ jobs:
       - name: Clip EH15 coverage envelope
         run: |
           osmium extract -s complete_ways -b -3.1625,55.9268,-3.0660,55.9845 /tmp/scotland.osm.pbf -o /tmp/eh15.osm.pbf --overwrite
-          osmium export /tmp/eh15.osm.pbf -f geojson -o /tmp/eh15.geojson --overwrite
+          osmium export /tmp/eh15.osm.pbf -f geojson -a type,id -o /tmp/eh15.geojson --overwrite
           test -s /tmp/eh15.geojson
           du -h /tmp/eh15.osm.pbf /tmp/eh15.geojson
       - name: Build tiled offline district
