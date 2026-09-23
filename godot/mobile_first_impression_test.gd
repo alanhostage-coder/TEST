@@ -15,8 +15,8 @@ func run():
 		"size": [10.0, 10.0],
 		"footprint": [[-5.0,-5.0],[5.0,-5.0],[5.0,5.0],[-5.0,5.0]]
 	}
-	var inside := world._building_footprint_clearance(Vector2.ZERO, building)
-	var outside := world._building_footprint_clearance(Vector2(12.0, 0.0), building)
+	var inside: float = world._building_footprint_clearance(Vector2.ZERO, building)
+	var outside: float = world._building_footprint_clearance(Vector2(12.0, 0.0), building)
 	if inside > 0.01:
 		push_error("MOBILE_FIRST_IMPRESSION_FAIL inside clearance " + str(inside))
 		quit(2)
