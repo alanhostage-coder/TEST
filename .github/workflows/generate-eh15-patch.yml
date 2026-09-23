@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   harvest:
@@ -27,6 +27,25 @@ jobs:
           m=json.load(open('eh15_full/manifest.json'))
           print(json.dumps({'tiles':len(m['tiles']),'totals':m['raw_tile_totals'],'source_timestamp_utc':m['source_timestamp_utc']},indent=2))
           PY
+      - name: Commit bundled EH15 patch
+        shell: bash
+        run: |
+          cp -a eh15_full "$RUNNER_TEMP/eh15_full"
+          git fetch origin main
+          git checkout main
+          git reset --hard origin/main
+          rm -rf godot/patches/eh15_full
+          mkdir -p godot/patches
+          cp -a "$RUNNER_TEMP/eh15_full" godot/patches/eh15_full
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add godot/patches/eh15_full
+          if git diff --cached --quiet; then
+            echo "EH15 patch unchanged"
+            exit 0
+          fi
+          git commit -m "Bundle full EH15 Android map"
+          git push origin HEAD:main
       - uses: actions/upload-artifact@v4
         with:
           name: EH15-FULL-OFFLINE-PATCH
