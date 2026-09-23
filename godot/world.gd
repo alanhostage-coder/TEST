@@ -1559,7 +1559,8 @@ func _on_map_ready(map_data: Dictionary):
 				visual_building = building.duplicate(true)
 				visual_building["_mapped_commercial_pois"] = commercial_pois
 		var exact_radius = LOW_SPEC_EXACT_FOOTPRINT_RADIUS if low_spec_mode else (620.0 if pc_max_mode else 260.0)
-		var exact = Vector2(cx, cz).distance_to(detail_origin) <= exact_radius and _add_exact_osm_building(map_root, visual_building, h, seed)
+		var exact_detail_origin := detail_origin if mobile_mode else Vector2.ZERO
+		var exact = Vector2(cx, cz).distance_to(exact_detail_origin) <= exact_radius and _add_exact_osm_building(map_root, visual_building, h, seed)
 		if not exact:
 			_add_edinburgh_building(map_root, Vector3(cx, 0.0, cz), Vector3(sx, h, sz), seed, kind)
 			fallback_building_count += 1
