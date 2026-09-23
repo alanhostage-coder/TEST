@@ -88,6 +88,12 @@ var sign_red_mat
 var sign_blue_mat
 var road_patch_mat
 var weed_mat
+var sea_mat
+var beach_mat
+var open_space_mat
+var retail_zone_mat
+var industrial_zone_mat
+var commercial_zone_mat
 
 func _ready():
 	var force_xps_proof := bool(get_meta("force_xps_proof", false))
@@ -173,6 +179,12 @@ func _make_materials():
 	# Shared materials keep close-range texture cheap on old integrated GPUs.
 	road_patch_mat = _mat(Color(0.035, 0.038, 0.041), 0.46, 0.03)
 	weed_mat = _mat(Color(0.15, 0.21, 0.08), 0.98, 0.0)
+	sea_mat = _mat(Color(0.045, 0.145, 0.205), 0.28, 0.06)
+	beach_mat = _mat(Color(0.47, 0.42, 0.31), 0.96, 0.0)
+	open_space_mat = _mat(Color(0.105, 0.205, 0.09), 0.98, 0.0)
+	retail_zone_mat = _mat(Color(0.22, 0.225, 0.22), 0.94, 0.0)
+	industrial_zone_mat = _mat(Color(0.175, 0.18, 0.18), 0.96, 0.0)
+	commercial_zone_mat = _mat(Color(0.245, 0.24, 0.225), 0.94, 0.0)
 	tenement_weathered_mat = _tenement_texture_mat("res://assets/edinburgh_tenement/walls/edin_ten_wall_weathered_a_alb.png", Color(1.0, 0.975, 0.93), 0.93)
 	tenement_warm_mat = _tenement_texture_mat("res://assets/edinburgh_tenement/walls/edin_ten_wall_warm_a_alb.png", Color(1.0, 0.95, 0.86), 0.92)
 	tenement_soot_mat = _tenement_texture_mat("res://assets/edinburgh_tenement/walls/edin_ten_wall_weathered_a_alb.png", Color(0.68, 0.675, 0.63), 0.95)
@@ -323,6 +335,148 @@ func _road_rotated_material(parent: Node3D, pos: Vector3, length: float, width: 
 	mesh.position = pos
 	mesh.rotation.y = angle
 	parent.add_child(mesh)
+
+
+func _identity_area_material(kind: String):
+	match kind:
+		"beach":
+			return beach_mat
+		"water":
+			return sea_mat
+		"open_space":
+			return open_space_mat
+		"retail_zone":
+			return retail_zone_mat
+		"industrial_zone":
+			return industrial_zone_mat
+		"commercial_zone":
+			return commercial_zone_mat
+		_:
+			return null
+
+func _add_identity_area(parent: Node3D, feature: Dictionary):
+	var kind := str(feature.get("kind", ""))
+	var material = _identity_area_material(kind)
+	if material == null:
+		return
+	var raw_points = feature.get("points", [])
+	if not raw_points is Array or raw_points.size() < 3:
+		return
+	var poly := PackedVector2Array()
+	for raw_point in raw_points:
+		if raw_point is Array and raw_point.size() >= 2:
+			poly.append(Vector2(float(raw_point[0]), float(raw_point[1])))
+	if poly.size() > 2 and poly[0].distance_squared_to(poly[poly.size() - 1]) < 0.01:
+		poly.resize(poly.size() - 1)
+	if poly.size() < 3:
+		return
+	var tris := Geometry2D.triangulate_polygon(poly)
+	if tris.size() < 3:
+		return
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var y := -0.018 if kind == "water" else 0.009
+	for t in range(0, tris.size(), 3):
+		for j in range(3):
+			var p: Vector2 = poly[int(tris[t + j])]
+			surface.add_vertex(Vector3(p.x, y, p.y))
+	var mesh := surface.commit()
+	if mesh == null:
+		return
+	var visual := MeshInstance3D.new()
+	visual.mesh = mesh
+	visual.material_override = material
+	visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	visual.visibility_range_end = 1300.0 if mobile_mode else 700.0
+	visual.set_meta("source_backed_identity", true)
+	visual.set_meta("source_tag", str(feature.get("source_tag", "")))
+	parent.add_child(visual)
+
+func _add_coastline_sea(parent: Node3D, features: Array) -> int:
+	# OSM natural=coastline is directed with water on the right. The local map
+	# transform flips latitude into Z, so the transformed water-side normal is
+	# (-dz, +dx). Extruding only on that side gives the driver a sea horizon
+	# without inventing an inland water boundary.
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var segment_count := 0
+	for feature in features:
+		if not feature is Dictionary or str(feature.get("kind", "")) != "coastline":
+			continue
+		var raw_points = feature.get("points", [])
+		if not raw_points is Array or raw_points.size() < 2:
+			continue
+		for i in range(raw_points.size() - 1):
+			var pa = raw_points[i]
+			var pb = raw_points[i + 1]
+			if not pa is Array or not pb is Array or pa.size() < 2 or pb.size() < 2:
+				continue
+			var a := Vector2(float(pa[0]), float(pa[1]))
+			var b := Vector2(float(pb[0]), float(pb[1]))
+			var delta := b - a
+			if delta.length() < 1.0:
+				continue
+			var tangent := delta.normalized()
+			var water_normal := Vector2(-tangent.y, tangent.x)
+			var near_a := a + water_normal * 1.0
+			var near_b := b + water_normal * 1.0
+			var far_a := a + water_normal * 1650.0
+			var far_b := b + water_normal * 1650.0
+			for p in [near_a, far_a, far_b, near_a, far_b, near_b]:
+				surface.add_vertex(Vector3(p.x, -0.055, p.y))
+			segment_count += 1
+	if segment_count <= 0:
+		return 0
+	var mesh := surface.commit()
+	if mesh == null:
+		return 0
+	var water := MeshInstance3D.new()
+	water.name = "OSMCoastalWater"
+	water.mesh = mesh
+	water.material_override = sea_mat
+	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	water.visibility_range_end = 2200.0
+	water.set_meta("source_backed_identity", true)
+	water.set_meta("source_field", "osm:natural=coastline")
+	parent.add_child(water)
+	return segment_count
+
+func _add_identity_features(parent: Node3D, features: Array) -> Dictionary:
+	var counts := {"coast_segments": 0, "areas": 0, "rail_segments": 0}
+	counts["coast_segments"] = _add_coastline_sea(parent, features)
+	var area_budget := 90 if mobile_mode else 140
+	var rail_budget := 90 if mobile_mode else 160
+	for feature in features:
+		if not feature is Dictionary:
+			continue
+		var kind := str(feature.get("kind", ""))
+		if kind in ["beach", "water", "open_space", "retail_zone", "industrial_zone", "commercial_zone"]:
+			if int(counts["areas"]) >= area_budget:
+				continue
+			_add_identity_area(parent, feature)
+			counts["areas"] = int(counts["areas"]) + 1
+		elif kind == "railway":
+			var points = feature.get("points", [])
+			if not points is Array:
+				continue
+			for i in range(points.size() - 1):
+				if int(counts["rail_segments"]) >= rail_budget:
+					break
+				var pa = points[i]
+				var pb = points[i + 1]
+				if not pa is Array or not pb is Array or pa.size() < 2 or pb.size() < 2:
+					continue
+				var a := Vector2(float(pa[0]), float(pa[1]))
+				var b := Vector2(float(pb[0]), float(pb[1]))
+				var delta := b - a
+				var length := delta.length()
+				if length < 2.0:
+					continue
+				var mid := (a + b) * 0.5
+				var angle := atan2(delta.x, delta.y)
+				_road_rotated_material(parent, Vector3(mid.x, 0.016, mid.y), length + 0.4, 3.4, angle, gravel_mat)
+				counts["rail_segments"] = int(counts["rail_segments"]) + 1
+	return counts
 
 func _add_mapped_linear_features(parent: Node3D, features: Array):
 	var cap = 260 if xps_9530_mode else (80 if projector_max_mode else (110 if low_spec_mode else (320 if pc_max_mode else 240)))
@@ -1480,6 +1634,7 @@ func _on_map_ready(map_data: Dictionary):
 	var linear_features = map_data.get("linear_features", [])
 	var point_features = map_data.get("point_features", [])
 	var poi_features = map_data.get("poi_features", [])
+	var identity_features = map_data.get("identity_features", [])
 	if roads.is_empty() and buildings.is_empty():
 		return
 	map_mode_active = true
@@ -1525,6 +1680,7 @@ func _on_map_ready(map_data: Dictionary):
 			if p is Array and p.size() >= 2: bd = min(bd, Vector2(float(p[0]), float(p[1])).distance_squared_to(detail_origin))
 		return ad < bd
 	)
+	var identity_counts := _add_identity_features(map_root, identity_features)
 	var street_edge_budget := 0
 	var marking_budget := 0
 	var street_edge_limit := 420 if xps_9530_mode else (70 if projector_max_mode else (90 if low_spec_mode else (620 if pc_max_mode else 240)))
@@ -1640,6 +1796,10 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_linear_feature_count", linear_features.size())
 		car.set_meta("map_point_feature_count", point_features.size())
 		car.set_meta("map_poi_feature_count", poi_features.size())
+		car.set_meta("map_identity_feature_count", identity_features.size())
+		car.set_meta("map_coast_segment_count", int(identity_counts.get("coast_segments", 0)))
+		car.set_meta("map_identity_area_count", int(identity_counts.get("areas", 0)))
+		car.set_meta("map_rail_segment_count", int(identity_counts.get("rail_segments", 0)))
 		car.set_meta("map_road_annotation_count", mapped_road_annotation_count)
 		car.set_meta("map_road_segments", map_segments)
 		if not map_opening_placed:

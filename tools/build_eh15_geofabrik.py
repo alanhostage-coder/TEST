@@ -118,7 +118,7 @@ def main():
       for ix in range(cols):
         tid=f"{ix}_{iy}";s=SOUTH+iy*LAT_STEP;n=min(NORTH,s+LAT_STEP);w=WEST+ix*LON_STEP;e=min(EAST,w+LON_STEP)
         sw=local(s,w);ne=local(n,e)
-        bytile[tid]={"patch_format":2,"patch_id":"uk-edinburgh-eh15-full","tile_id":tid,"source":"OpenStreetMap","source_url":"https://www.openstreetmap.org/copyright","license":"ODbL 1.0; © OpenStreetMap contributors","bbox":[s,w,n,e],"roads":[],"buildings":[],"linear_features":[],"point_features":[],"poi_features":[],"local_bounds":[min(sw[0],ne[0]),min(sw[1],ne[1]),max(sw[0],ne[0]),max(sw[1],ne[1])]}
+        bytile[tid]={"patch_format":2,"patch_id":"uk-edinburgh-eh15-full","tile_id":tid,"source":"OpenStreetMap","source_url":"https://www.openstreetmap.org/copyright","license":"ODbL 1.0; © OpenStreetMap contributors","bbox":[s,w,n,e],"roads":[],"buildings":[],"linear_features":[],"point_features":[],"poi_features":[],"identity_features":[],"local_bounds":[min(sw[0],ne[0]),min(sw[1],ne[1]),max(sw[0],ne[0]),max(sw[1],ne[1])]}
     for f in fc.get("features",[]):
         props=props_clean(f.get("properties") or {});geom=f.get("geometry") or {};typ=geom.get("type","");coords=geom.get("coordinates") or [];oid=osm_id(f.get("properties") or {})
         item=None;key=None
@@ -138,7 +138,38 @@ def main():
         if typ=="Polygon":linecoords=coords[0] if coords else []
         if typ=="MultiPolygon":linecoords=coords[0][0] if coords and coords[0] else []
         highway=str(props.get("highway",""))
-        if highway in HIGHWAYS and linecoords:
+        natural=str(props.get("natural",""))
+        leisure=str(props.get("leisure",""))
+        landuse=str(props.get("landuse",""))
+        railway=str(props.get("railway",""))
+        identity_kind=""
+        identity_closed=typ in ("Polygon","MultiPolygon")
+        if natural=="coastline":
+            identity_kind="coastline"; identity_closed=False
+        elif natural=="beach":
+            identity_kind="beach"
+        elif natural=="water":
+            identity_kind="water"
+        elif leisure in ("park","nature_reserve","recreation_ground"):
+            identity_kind="open_space"
+        elif landuse in ("grass","meadow","recreation_ground","cemetery"):
+            identity_kind="open_space"
+        elif landuse=="retail":
+            identity_kind="retail_zone"
+        elif landuse=="industrial":
+            identity_kind="industrial_zone"
+        elif landuse=="commercial":
+            identity_kind="commercial_zone"
+        elif railway in ("rail","light_rail"):
+            identity_kind="railway"; identity_closed=False
+        if identity_kind and linecoords:
+            pts=points(linecoords,0.5 if identity_kind=="coastline" else 1.25)
+            if len(pts)>=2:
+                item={"osm_id":oid,"kind":identity_kind,"name":str(props.get("name","")),
+                    "points":pts,"closed":bool(identity_closed),
+                    "source_tag":"natural="+natural if natural else ("leisure="+leisure if leisure else ("landuse="+landuse if landuse else "railway="+railway))}
+                key="identity_features"
+        elif highway in HIGHWAYS and linecoords:
             pts=points(linecoords)
             if len(pts)>=2:
                 width,ws=road_width(props)
@@ -154,14 +185,18 @@ def main():
             x,z=feature_point(item);bytile[tile_for_point(x,z,rows,cols)][key].append(item)
     OUT.mkdir(parents=True,exist_ok=True)
     source_timestamp=os.environ.get("OSM_SOURCE_TIMESTAMP","")
-    tiles=[];records=[];totals={k:0 for k in ("roads","buildings","linear_features","point_features","poi_features")}
+    tiles=[];records=[];totals={k:0 for k in ("roads","buildings","linear_features","point_features","poi_features","identity_features")}
+    identity_kind_totals={}
     for tid,tile in bytile.items():
         fn=f"tile_{tid}.json";(OUT/fn).write_text(json.dumps({k:v for k,v in tile.items() if k!="local_bounds"},separators=(",",":")))
         counts={k:len(tile[k]) for k in totals}
         for k,v in counts.items():totals[k]+=v
+        for feature in tile["identity_features"]:
+            kind=str(feature.get("kind",""))
+            identity_kind_totals[kind]=identity_kind_totals.get(kind,0)+1
         records.append(tile);tiles.append({"id":tid,"file":fn,"bbox":tile["bbox"],"local_bounds":tile["local_bounds"],"counts":counts})
     dest=build_destinations(OUT,records,source_timestamp)
-    manifest={"patch_format":2,"patch_id":"uk-edinburgh-eh15-full","display_name":"EH15 · Edinburgh","source":"packaged_osm_tiles","source_name":"OpenStreetMap via Geofabrik Scotland extract","source_url":"https://download.geofabrik.de/europe/united-kingdom/scotland.html","source_timestamp_utc":source_timestamp,"generated_utc":datetime.now(timezone.utc).isoformat(),"license":"ODbL 1.0; © OpenStreetMap contributors","start_postcode":"EH15","center_lat":CENTER_LAT,"center_lon":CENTER_LON,"coverage_bbox":[SOUTH,WEST,NORTH,EAST],"coverage_note":"Conservative envelope covers EH15 plus a small fringe; not asserted as an official postal boundary.","tile_rows":rows,"tile_cols":cols,"tiles":tiles,"raw_tile_totals":totals,"destination_count":dest}
+    manifest={"patch_format":2,"patch_id":"uk-edinburgh-eh15-full","display_name":"EH15 · Edinburgh","source":"packaged_osm_tiles","source_name":"OpenStreetMap via Geofabrik Scotland extract","source_url":"https://download.geofabrik.de/europe/united-kingdom/scotland.html","source_timestamp_utc":source_timestamp,"generated_utc":datetime.now(timezone.utc).isoformat(),"license":"ODbL 1.0; © OpenStreetMap contributors","start_postcode":"EH15","center_lat":CENTER_LAT,"center_lon":CENTER_LON,"coverage_bbox":[SOUTH,WEST,NORTH,EAST],"coverage_note":"Conservative envelope covers EH15 plus a small fringe; not asserted as an official postal boundary.","tile_rows":rows,"tile_cols":cols,"tiles":tiles,"raw_tile_totals":totals,"identity_kind_totals":identity_kind_totals,"destination_count":dest}
     (OUT/"manifest.json").write_text(json.dumps(manifest,separators=(",",":")))
-    print(json.dumps({"tiles":len(tiles),"totals":totals,"destinations":dest,"source_timestamp":source_timestamp},indent=2))
+    print(json.dumps({"tiles":len(tiles),"totals":totals,"identity_kinds":identity_kind_totals,"destinations":dest,"source_timestamp":source_timestamp},indent=2))
 if __name__=="__main__":main()

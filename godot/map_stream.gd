@@ -42,6 +42,7 @@ var data := {
 	"linear_features": [],
 	"point_features": [],
 	"poi_features": [],
+	"identity_features": [],
 	"updated_unix": 0
 }
 
@@ -166,14 +167,16 @@ func _load_full_eh15_window(local_position: Vector2, emit_change: bool) -> bool:
 		"buildings": [],
 		"linear_features": [],
 		"point_features": [],
-		"poi_features": []
+		"poi_features": [],
+		"identity_features": []
 	}
 	var seen := {
 		"roads": {},
 		"buildings": {},
 		"linear_features": {},
 		"point_features": {},
-		"poi_features": {}
+		"poi_features": {},
+		"identity_features": {}
 	}
 	for tile in chosen:
 		var filename := str(tile.get("file", ""))
@@ -223,6 +226,7 @@ func _load_full_eh15_window(local_position: Vector2, emit_change: bool) -> bool:
 		"linear_features": merged["linear_features"],
 		"point_features": merged["point_features"],
 		"poi_features": merged["poi_features"],
+		"identity_features": merged["identity_features"],
 		"active_tile_ids": ids,
 		"full_tile_count": full_tiles.size(),
 		"full_coverage_bbox": full_manifest.get("coverage_bbox", []),

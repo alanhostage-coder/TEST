@@ -44,6 +44,8 @@ jobs:
           assert len(m['tiles']) >= 25
           assert t['roads'] >= 300
           assert t['buildings'] >= 1500
+          assert t.get('identity_features',0) >= 1
+          assert m.get('identity_kind_totals',{}).get('coastline',0) >= 1
           assert m['destination_count'] >= 20
           assert len(glob.glob('eh15_full/tile_*.json')) == len(m['tiles'])
           print(json.dumps({'tiles':len(m['tiles']),'totals':t,'destinations':m['destination_count'],'source_timestamp':m['source_timestamp_utc']},indent=2))

@@ -37,6 +37,10 @@ func run():
 	if float(bbox[2]) - float(bbox[0]) < 0.055 or float(bbox[3]) - float(bbox[1]) < 0.090:
 		_fail("coverage envelope does not span EH15")
 		return
+	var identity_totals = manifest.get("identity_kind_totals", {})
+	if not identity_totals is Dictionary or int(identity_totals.get("coastline", 0)) < 1:
+		_fail("source-backed coastline missing from EH15 manifest")
+		return
 	var destinations = stream.get_district_destinations()
 	if not destinations is Array or destinations.size() < 20:
 		_fail("source-backed destination set too small")
@@ -80,6 +84,41 @@ func run():
 	if best.size() < 4:
 		_fail("EH15 coverage lacks four populated quadrants")
 		return
+	var coastal_point := Vector2(INF, INF)
+	for raw_tile in tiles:
+		if not raw_tile is Dictionary:
+			continue
+		var filename := str(raw_tile.get("file", ""))
+		if filename == "":
+			continue
+		var tile_file = FileAccess.open("res://patches/eh15_full/" + filename, FileAccess.READ)
+		if not tile_file:
+			continue
+		var tile_data = JSON.parse_string(tile_file.get_as_text())
+		if not tile_data is Dictionary:
+			continue
+		for feature in tile_data.get("identity_features", []):
+			if feature is Dictionary and str(feature.get("kind", "")) == "coastline":
+				var coast_points = feature.get("points", [])
+				if coast_points is Array and not coast_points.is_empty() and coast_points[0] is Array and coast_points[0].size() >= 2:
+					coastal_point = Vector2(float(coast_points[0][0]), float(coast_points[0][1]))
+					break
+		if coastal_point.x != INF:
+			break
+	if coastal_point.x == INF:
+		_fail("no runtime coastline coordinate found")
+		return
+	stream.active_tile_signature = ""
+	stream._load_full_eh15_window(coastal_point, false)
+	var streamed_coast := false
+	for feature in stream.data.get("identity_features", []):
+		if feature is Dictionary and str(feature.get("kind", "")) == "coastline":
+			streamed_coast = true
+			break
+	if not streamed_coast:
+		_fail("coastline does not survive mobile tile streaming")
+		return
+
 	var checked := 0
 	for sample in best.values():
 		var point: Vector2 = sample.get("point", Vector2.ZERO)
