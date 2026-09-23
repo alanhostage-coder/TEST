@@ -101,7 +101,7 @@ func _ready():
 	projector_max_mode = OS.has_feature("projector_max") or force_xps_proof
 	pc_max_mode = OS.has_feature("pc_max") or force_xps_proof
 	xps_9530_mode = OS.has_feature("xps_9530") or force_xps_proof
-	mobile_mode = OS.has_feature("mobile")
+	mobile_mode = OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1"
 	low_spec_mode = OS.has_feature("thinkpad_low") or (projector_max_mode and not xps_9530_mode) or mobile_mode
 	if xps_9530_mode:
 		# Final reference-machine grade: slightly lower, more lateral light makes the
@@ -1193,37 +1193,6 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 
 
 
-func _mobile_building_intrudes_drivable_road(building: Dictionary) -> bool:
-	if not mobile_mode:
-		return false
-	var footprint = building.get("footprint", [])
-	if not footprint is Array or footprint.size() < 3:
-		return false
-	var samples: Array[Vector2] = []
-	for i in range(footprint.size()):
-		var raw = footprint[i]
-		var next_raw = footprint[(i + 1) % footprint.size()]
-		if not raw is Array or raw.size() < 2:
-			continue
-		var p := Vector2(float(raw[0]), float(raw[1]))
-		samples.append(p)
-		if next_raw is Array and next_raw.size() >= 2:
-			var q := Vector2(float(next_raw[0]), float(next_raw[1]))
-			samples.append((p + q) * 0.5)
-	for segment in map_segments:
-		if not segment is Array or segment.size() < 4:
-			continue
-		var kind := str(segment[3]).to_lower()
-		if kind in ["service", "track", "path", "footway", "cycleway"]:
-			continue
-		var a := Vector2(float(segment[0][0]), float(segment[0][1]))
-		var b := Vector2(float(segment[1][0]), float(segment[1][1]))
-		var corridor := float(segment[2]) * 0.5 + 0.9
-		for sample in samples:
-			if _point_segment_distance_2d(sample, a, b) < corridor:
-				return true
-	return false
-
 func _add_mobile_osm_footprint_visual(parent: Node3D, building: Dictionary, height: float, seed: int) -> bool:
 	# Far mobile buildings must preserve the mapped OSM polygon. The old low-spec
 	# fallback used the footprint bounding box, which could rotate/expand an angled
@@ -1819,7 +1788,6 @@ func _on_map_ready(map_data: Dictionary):
 
 	var exact_building_count := 0
 	var mobile_visual_only_building_count := 0
-	var mobile_road_conflict_cull_count := 0
 	var fallback_building_count := 0
 	generic_tenement_facade_count = 0
 	generic_tenement_window_count = 0
@@ -1844,9 +1812,6 @@ func _on_map_ready(map_data: Dictionary):
 		if mobile_mode and Vector2(cx, cz).distance_to(detail_origin) > MOBILE_BUILDING_VISUAL_RADIUS:
 			continue
 		var seed = int(abs(cx * 17.0 + cz * 31.0 + sx * 11.0 + sz * 7.0))
-		if mobile_mode and _mobile_building_intrudes_drivable_road(building):
-			mobile_road_conflict_cull_count += 1
-			continue
 		var kind = str(building.get("kind", "yes"))
 		var visual_building: Dictionary = building
 		if pc_max_mode and not low_spec_mode:
@@ -1891,7 +1856,6 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_building_count", buildings.size())
 		car.set_meta("map_exact_building_count", exact_building_count)
 		car.set_meta("map_mobile_visual_only_building_count", mobile_visual_only_building_count)
-		car.set_meta("map_mobile_road_conflict_cull_count", mobile_road_conflict_cull_count)
 		car.set_meta("generic_tenement_facade_count", generic_tenement_facade_count)
 		car.set_meta("generic_tenement_window_count", generic_tenement_window_count)
 		car.set_meta("generic_tenement_door_count", generic_tenement_door_count)
