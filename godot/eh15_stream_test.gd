@@ -1,3 +1,4 @@
+# Android 0.79 recognisability gate: source-backed road identity + full EH15 streaming.
 extends SceneTree
 
 func _initialize():
