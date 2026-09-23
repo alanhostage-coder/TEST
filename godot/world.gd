@@ -2485,8 +2485,8 @@ func _mobile_footprint_regression() -> Dictionary:
 		var min_y := INF
 		var max_y := -INF
 		for i in range(poly.size()):
-			var a := poly[i]
-			var b := poly[(i + 1) % poly.size()]
+			var a: Vector2 = poly[i]
+			var b: Vector2 = poly[(i + 1) % poly.size()]
 			polygon_area += a.x * b.y - b.x * a.y
 			min_x = minf(min_x, a.x)
 			max_x = maxf(max_x, a.x)
