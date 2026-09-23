@@ -30,6 +30,11 @@ var low_spec_mode := false
 var projector_max_mode := false
 var pc_max_mode := false
 var xps_9530_mode := false
+var mobile_mode := false
+var mobile_destination_index := -1
+var mobile_destination_point := Vector2.ZERO
+var mobile_destination_name := ""
+var mobile_destination_clock := 0.0
 var map_center_lat := 55.95
 var atmosphere_initialized := false
 var atmosphere_wetness := 0.0
@@ -87,7 +92,8 @@ func _ready():
 	projector_max_mode = OS.has_feature("projector_max") or force_xps_proof
 	pc_max_mode = OS.has_feature("pc_max") or force_xps_proof
 	xps_9530_mode = OS.has_feature("xps_9530") or force_xps_proof
-	low_spec_mode = OS.has_feature("thinkpad_low") or (projector_max_mode and not xps_9530_mode)
+	mobile_mode = OS.has_feature("mobile")
+	low_spec_mode = OS.has_feature("thinkpad_low") or (projector_max_mode and not xps_9530_mode) or mobile_mode
 	if xps_9530_mode:
 		# Final reference-machine grade: slightly lower, more lateral light makes the
 		# sandstone relief and recessed sash/close geometry readable from the driver seat.
@@ -119,7 +125,11 @@ func _ready():
 func _process(delta):
 	var car = $Car
 	if map_mode_active:
+		var stream = get_node_or_null("MapStream")
+		if stream and stream.has_method("update_stream_position"):
+			stream.update_stream_position(Vector2(car.global_position.x, car.global_position.z))
 		_update_map_agents(delta)
+		_update_mobile_destination(delta, car)
 		car.set_meta("patrol_interest", 0.0)
 	else:
 		_update_traffic(delta)
@@ -1549,7 +1559,7 @@ func _on_map_ready(map_data: Dictionary):
 				visual_building = building.duplicate(true)
 				visual_building["_mapped_commercial_pois"] = commercial_pois
 		var exact_radius = LOW_SPEC_EXACT_FOOTPRINT_RADIUS if low_spec_mode else (620.0 if pc_max_mode else 260.0)
-		var exact = Vector2(cx, cz).length() <= exact_radius and _add_exact_osm_building(map_root, visual_building, h, seed)
+		var exact = Vector2(cx, cz).distance_to(detail_origin) <= exact_radius and _add_exact_osm_building(map_root, visual_building, h, seed)
 		if not exact:
 			_add_edinburgh_building(map_root, Vector3(cx, 0.0, cz), Vector3(sx, h, sz), seed, kind)
 			fallback_building_count += 1
@@ -1829,6 +1839,60 @@ func _place_car_for_first_impression(car, roads: Array, buildings: Array, poi_fe
 	car.set_meta("map_opening_verified_anchor_source", best_anchor_source)
 	car.set_meta("map_opening_verified_anchor_distance_m", best_anchor_distance)
 	car.set_meta("map_opening_visible_anchor_count", best_visible_anchor_count)
+
+
+
+func _update_mobile_destination(delta: float, car):
+	if not mobile_mode or car == null:
+		return
+	mobile_destination_clock += delta
+	if mobile_destination_clock < 0.25:
+		return
+	mobile_destination_clock = 0.0
+	var stream = get_node_or_null("MapStream")
+	if stream == null or not stream.has_method("get_district_destinations"):
+		return
+	var destinations = stream.get_district_destinations()
+	if not destinations is Array or destinations.is_empty():
+		return
+	var car2 := Vector2(car.global_position.x, car.global_position.z)
+	if mobile_destination_index < 0 or mobile_destination_index >= destinations.size():
+		var best_index := -1
+		var best_distance := INF
+		for i in range(destinations.size()):
+			var candidate = destinations[i]
+			if not candidate is Dictionary:
+				continue
+			var point = candidate.get("point", [])
+			if not point is Array or point.size() < 2:
+				continue
+			var distance = car2.distance_to(Vector2(float(point[0]), float(point[1])))
+			if distance > 90.0 and distance < best_distance:
+				best_distance = distance
+				best_index = i
+		mobile_destination_index = best_index if best_index >= 0 else 0
+	var item = destinations[mobile_destination_index]
+	if not item is Dictionary:
+		return
+	var point = item.get("point", [])
+	if not point is Array or point.size() < 2:
+		return
+	mobile_destination_point = Vector2(float(point[0]), float(point[1]))
+	mobile_destination_name = str(item.get("name", "EH15")).strip_edges()
+	var remaining := car2.distance_to(mobile_destination_point)
+	if remaining < 32.0 and destinations.size() > 1:
+		mobile_destination_index = (mobile_destination_index + 1) % destinations.size()
+		item = destinations[mobile_destination_index]
+		point = item.get("point", [])
+		if point is Array and point.size() >= 2:
+			mobile_destination_point = Vector2(float(point[0]), float(point[1]))
+			mobile_destination_name = str(item.get("name", "EH15")).strip_edges()
+			remaining = car2.distance_to(mobile_destination_point)
+	car.set_meta("eh15_destination_name", mobile_destination_name)
+	car.set_meta("eh15_destination_point", [mobile_destination_point.x, mobile_destination_point.y])
+	car.set_meta("eh15_destination_distance_m", remaining)
+	car.set_meta("eh15_destination_index", mobile_destination_index)
+	car.set_meta("eh15_destination_count", destinations.size())
 
 
 
