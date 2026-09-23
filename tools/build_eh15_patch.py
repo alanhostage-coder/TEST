@@ -163,10 +163,69 @@ def dedupe(items):
         seen.add(key); out.append(x)
     return out
 
+def build_destinations(outdir, tile_records, source_timestamp):
+    candidates = {}
+    for tile in tile_records:
+        for poi in tile.get("poi_features", []):
+            name = str(poi.get("name","")).strip()
+            point = poi.get("point", [])
+            if not name or not isinstance(point,list) or len(point)<2:
+                continue
+            oid = int(poi.get("osm_id",0))
+            kind = str(poi.get("kind","poi"))
+            priority = 10 if kind.startswith("historic:") else 9 if kind.startswith("tourism:") else 8 if kind.startswith("leisure:") else 7 if kind.startswith("amenity:") else 4
+            candidates[("poi",oid if oid else name)] = {"osm_id":oid,"name":name,"kind":kind,"point":point,"source_type":"poi","priority":priority}
+        for b in tile.get("buildings", []):
+            name = str(b.get("name","")).strip()
+            point = b.get("center", [])
+            if not name or not isinstance(point,list) or len(point)<2:
+                continue
+            oid = int(b.get("osm_id",0))
+            candidates[("building",oid if oid else name)] = {"osm_id":oid,"name":name,"kind":str(b.get("kind","building")),"point":point,"source_type":"building","priority":6}
+
+    # One strong named anchor per ~300 m cell prevents the mobile destination loop
+    # becoming a dense list of adjacent shops while preserving coverage across EH15.
+    cells = {}
+    for item in candidates.values():
+        x,z=float(item["point"][0]),float(item["point"][1])
+        cell=(math.floor(x/300.0),math.floor(z/300.0))
+        old=cells.get(cell)
+        if old is None or (item["priority"],len(item["name"])) > (old["priority"],len(old["name"])):
+            cells[cell]=item
+    selected=list(cells.values())
+    selected.sort(key=lambda x:(-x["priority"], math.hypot(float(x["point"][0]),float(x["point"][1]))))
+    selected=selected[:72]
+
+    # Order as a drive-about rather than by source order. Hops around 450–800 m
+    # keep the next destination visible without turning the whole district into one giant jump.
+    ordered=[]
+    remaining=selected[:]
+    current=[0.0,0.0]
+    while remaining:
+        def hop_score(item):
+            d=math.hypot(float(item["point"][0])-current[0],float(item["point"][1])-current[1])
+            penalty=2000.0 if d < 120.0 and len(remaining)>1 else 0.0
+            return abs(d-600.0)+0.10*d+penalty-25.0*item["priority"]
+        nxt=min(remaining,key=hop_score)
+        remaining.remove(nxt)
+        clean={k:v for k,v in nxt.items() if k!="priority"}
+        ordered.append(clean)
+        current=[float(clean["point"][0]),float(clean["point"][1])]
+    payload={
+        "source":"OpenStreetMap",
+        "source_url":"https://www.openstreetmap.org/copyright",
+        "license":"ODbL 1.0; © OpenStreetMap contributors",
+        "source_timestamp_utc":source_timestamp,
+        "selection_note":"All destination names and coordinates come from bundled OSM named POIs/buildings; ordering is a gameplay traversal only.",
+        "destinations":ordered
+    }
+    (outdir/"destinations.json").write_text(json.dumps(payload,separators=(",",":")))
+    return len(ordered)
+
 def main():
     OUT.mkdir(parents=True,exist_ok=True)
     rows=math.ceil((NORTH-SOUTH)/LAT_STEP); cols=math.ceil((EAST-WEST)/LON_STEP)
-    tiles=[]; totals={"roads":0,"buildings":0,"linear_features":0,"point_features":0,"poi_features":0}
+    tiles=[]; tile_records=[]; totals={"roads":0,"buildings":0,"linear_features":0,"point_features":0,"poi_features":0}
     newest=""
     for iy in range(rows):
         s=SOUTH+iy*LAT_STEP; n=min(NORTH,s+LAT_STEP)
@@ -183,12 +242,14 @@ def main():
                 "license":"ODbL 1.0; © OpenStreetMap contributors","source_timestamp_utc":newest,
                 "bbox":[s,w,n,e],"roads":roads,"buildings":buildings,"linear_features":linear,"point_features":points,"poi_features":pois}
             fn=f"tile_{tid}.json"; (OUT/fn).write_text(json.dumps(tile,separators=(",",":")))
+            tile_records.append(tile)
             counts={k:len(tile[k]) for k in totals}
             for k,v in counts.items(): totals[k]+=v
             sw=local(s,w); ne=local(n,e)
             tiles.append({"id":tid,"file":fn,"bbox":[s,w,n,e],
                 "local_bounds":[min(sw[0],ne[0]),min(sw[1],ne[1]),max(sw[0],ne[0]),max(sw[1],ne[1])],"counts":counts})
             time.sleep(0.25)
+    destination_count=build_destinations(OUT,tile_records,newest)
     manifest={"patch_format":2,"patch_id":"uk-edinburgh-eh15-full","display_name":"EH15 · Edinburgh",
         "source":"packaged_osm_tiles","source_name":"OpenStreetMap","source_url":"https://www.openstreetmap.org/copyright",
         "source_timestamp_utc":newest,"generated_utc":datetime.now(timezone.utc).isoformat(),
@@ -197,8 +258,8 @@ def main():
         "coverage_bbox":[SOUTH,WEST,NORTH,EAST],
         "coverage_note":"Envelope deliberately extends beyond the EH15 district edges so the complete district is covered; it is not rendered as an asserted postal boundary.",
         "postcode_reference":"EH15 polygon reference cross-checked against National Records of Scotland postcode-district dataset metadata; runtime geometry is OSM only.",
-        "tile_rows":rows,"tile_cols":cols,"tiles":tiles,"raw_tile_totals":totals}
+        "tile_rows":rows,"tile_cols":cols,"tiles":tiles,"raw_tile_totals":totals,"destination_count":destination_count}
     (OUT/"manifest.json").write_text(json.dumps(manifest,separators=(",",":")))
-    print(json.dumps({"tiles":len(tiles),"totals":totals,"osm_timestamp":newest},indent=2))
+    print(json.dumps({"tiles":len(tiles),"totals":totals,"destinations":destination_count,"osm_timestamp":newest},indent=2))
 
 if __name__=="__main__": main()
