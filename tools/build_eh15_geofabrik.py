@@ -88,6 +88,67 @@ def feature_point(item):
     return 0.0,0.0
 
 
+
+def point_segment_distance(p,a,b):
+    vx=b[0]-a[0]; vy=b[1]-a[1]
+    wx=p[0]-a[0]; wy=p[1]-a[1]
+    denom=vx*vx+vy*vy
+    t=max(0.0,min(1.0,(wx*vx+wy*vy)/denom)) if denom>1e-9 else 0.0
+    qx=a[0]+t*vx; qy=a[1]+t*vy
+    return math.hypot(p[0]-qx,p[1]-qy)
+
+def cull_buildings_in_drivable_corridors(bytile):
+    excluded={"service","track","path","footway","cycleway"}
+    cell=40.0
+    road_grid={}
+    for tile in bytile.values():
+        for road in tile["roads"]:
+            if str(road.get("kind","")).lower() in excluded:
+                continue
+            width=float(road.get("width",5.0) or 5.0)
+            pts=road.get("points",[])
+            for i in range(len(pts)-1):
+                a=pts[i]; b=pts[i+1]
+                if len(a)<2 or len(b)<2: continue
+                corridor=width*0.5+0.9
+                minx=min(a[0],b[0])-corridor; maxx=max(a[0],b[0])+corridor
+                minz=min(a[1],b[1])-corridor; maxz=max(a[1],b[1])+corridor
+                seg=(a,b,corridor)
+                for gx in range(math.floor(minx/cell),math.floor(maxx/cell)+1):
+                    for gz in range(math.floor(minz/cell),math.floor(maxz/cell)+1):
+                        road_grid.setdefault((gx,gz),[]).append(seg)
+    culled=0
+    for tile in bytile.values():
+        kept=[]
+        for bld in tile["buildings"]:
+            fp=bld.get("footprint",[])
+            if not isinstance(fp,list) or len(fp)<3:
+                kept.append(bld); continue
+            samples=[]
+            for i,p in enumerate(fp):
+                if not isinstance(p,list) or len(p)<2: continue
+                q=fp[(i+1)%len(fp)]
+                samples.append((float(p[0]),float(p[1])))
+                if isinstance(q,list) and len(q)>=2:
+                    samples.append(((float(p[0])+float(q[0]))*0.5,(float(p[1])+float(q[1]))*0.5))
+            conflict=False
+            checked=set()
+            for p in samples:
+                key=(math.floor(p[0]/cell),math.floor(p[1]/cell))
+                for seg in road_grid.get(key,[]):
+                    sid=id(seg)
+                    if sid in checked: continue
+                    checked.add(sid)
+                    if point_segment_distance(p,seg[0],seg[1]) < seg[2]:
+                        conflict=True; break
+                if conflict: break
+            if conflict:
+                culled+=1
+            else:
+                kept.append(bld)
+        tile["buildings"]=kept
+    return culled
+
 def dedupe_features(items):
     out=[]
     seen=set()
@@ -198,6 +259,7 @@ def main():
                 if len(pts)>=2:item={"osm_id":oid,"kind":barrier if barrier else highway,"surface":str(props.get("surface","")),"points":pts};key="linear_features"
         if item and key:
             x,z=feature_point(item);bytile[tile_for_point(x,z,rows,cols)][key].append(item)
+    road_conflict_culled=cull_buildings_in_drivable_corridors(bytile)
     OUT.mkdir(parents=True,exist_ok=True)
     source_timestamp=os.environ.get("OSM_SOURCE_TIMESTAMP","")
     tiles=[];records=[];totals={k:0 for k in ("roads","buildings","linear_features","point_features","poi_features","identity_features")}
@@ -213,7 +275,7 @@ def main():
             identity_kind_totals[kind]=identity_kind_totals.get(kind,0)+1
         records.append(tile);tiles.append({"id":tid,"file":fn,"bbox":tile["bbox"],"local_bounds":tile["local_bounds"],"counts":counts})
     dest=build_destinations(OUT,records,source_timestamp)
-    manifest={"patch_format":2,"patch_id":"uk-edinburgh-eh15-full","display_name":"EH15 · Edinburgh","source":"packaged_osm_tiles","source_name":"OpenStreetMap via Geofabrik Scotland extract","source_url":"https://download.geofabrik.de/europe/united-kingdom/scotland.html","source_timestamp_utc":source_timestamp,"generated_utc":datetime.now(timezone.utc).isoformat(),"license":"ODbL 1.0; © OpenStreetMap contributors","start_postcode":"EH15","center_lat":CENTER_LAT,"center_lon":CENTER_LON,"coverage_bbox":[SOUTH,WEST,NORTH,EAST],"coverage_note":"Conservative envelope covers EH15 plus a small fringe; not asserted as an official postal boundary.","tile_rows":rows,"tile_cols":cols,"tiles":tiles,"raw_tile_totals":totals,"identity_kind_totals":identity_kind_totals,"dedupe_policy":"osm_id+kind per tile","destination_count":dest}
+    manifest={"patch_format":2,"patch_id":"uk-edinburgh-eh15-full","display_name":"EH15 · Edinburgh","source":"packaged_osm_tiles","source_name":"OpenStreetMap via Geofabrik Scotland extract","source_url":"https://download.geofabrik.de/europe/united-kingdom/scotland.html","source_timestamp_utc":source_timestamp,"generated_utc":datetime.now(timezone.utc).isoformat(),"license":"ODbL 1.0; © OpenStreetMap contributors","start_postcode":"EH15","center_lat":CENTER_LAT,"center_lon":CENTER_LON,"coverage_bbox":[SOUTH,WEST,NORTH,EAST],"coverage_note":"Conservative envelope covers EH15 plus a small fringe; not asserted as an official postal boundary.","tile_rows":rows,"tile_cols":cols,"tiles":tiles,"raw_tile_totals":totals,"identity_kind_totals":identity_kind_totals,"dedupe_policy":"osm_id+kind per tile","road_conflict_policy":"offline_nonservice_corridor_cull_v1","road_conflict_culled":road_conflict_culled,"destination_count":dest}
     (OUT/"manifest.json").write_text(json.dumps(manifest,separators=(",",":")))
-    print(json.dumps({"tiles":len(tiles),"totals":totals,"identity_kinds":identity_kind_totals,"destinations":dest,"source_timestamp":source_timestamp},indent=2))
+    print(json.dumps({"tiles":len(tiles),"totals":totals,"identity_kinds":identity_kind_totals,"road_conflict_culled":road_conflict_culled,"destinations":dest,"source_timestamp":source_timestamp},indent=2))
 if __name__=="__main__":main()
