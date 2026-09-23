@@ -40,6 +40,20 @@ func run():
 	if not destinations is Array or destinations.size() < 20:
 		_fail("source-backed destination set too small")
 		return
+	var identity = stream.mobile_location_identity(Vector2.ZERO)
+	if not identity is Dictionary:
+		_fail("mobile location identity missing")
+		return
+	var identity_road = identity.get("road", {})
+	if not identity_road is Dictionary or str(identity_road.get("name", "")).strip_edges() == "":
+		_fail("mobile location identity has no named road")
+		return
+	if int(identity_road.get("osm_id", 0)) <= 0:
+		_fail("mobile location identity road lost OSM id")
+		return
+	if str(identity.get("source", "")) != "OpenStreetMap":
+		_fail("mobile location identity provenance missing")
+		return
 	var best := {}
 	for raw_tile in tiles:
 		if not raw_tile is Dictionary:
