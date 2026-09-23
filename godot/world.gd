@@ -36,6 +36,7 @@ var mobile_destination_index := -1
 var mobile_destination_point := Vector2.ZERO
 var mobile_destination_name := ""
 var mobile_destination_clock := 0.0
+var mobile_identity_clock := 0.0
 var map_center_lat := 55.95
 var atmosphere_initialized := false
 var atmosphere_wetness := 0.0
@@ -131,6 +132,7 @@ func _process(delta):
 			stream.update_stream_position(Vector2(car.global_position.x, car.global_position.z))
 		_update_map_agents(delta)
 		_update_mobile_destination(delta, car)
+		_update_mobile_location_identity(delta, car)
 		car.set_meta("patrol_interest", 0.0)
 	else:
 		_update_traffic(delta)
@@ -445,12 +447,12 @@ func _add_mapped_road_name_signs(parent: Node3D, roads: Array) -> int:
 	# street-name board exists at an arbitrary segment midpoint. Keep generic names
 	# as unobtrusive world annotations; actual mapped traffic signs are created only
 	# by _add_mapped_point_features at their sourced coordinates.
-	var cap = 26 if xps_9530_mode else (8 if projector_max_mode else (10 if low_spec_mode else (34 if pc_max_mode else 18)))
-	var distance_limit = 125.0 if low_spec_mode else 260.0
+	var cap = 18 if mobile_mode else (26 if xps_9530_mode else (8 if projector_max_mode else (10 if low_spec_mode else (34 if pc_max_mode else 18))))
+	var distance_limit = 210.0 if mobile_mode else (125.0 if low_spec_mode else 260.0)
 	var driver = get_node_or_null("Car")
 	var reference := Vector2(driver.global_position.x, driver.global_position.z) if mobile_mode and driver else Vector2.ZERO
-	var label_range = 115.0 if low_spec_mode else 180.0
-	var label_size = 24 if low_spec_mode else 31
+	var label_range = 190.0 if mobile_mode else (115.0 if low_spec_mode else 180.0)
+	var label_size = 31 if mobile_mode else (24 if low_spec_mode else 31)
 	var candidates: Array = []
 	var seen := {}
 	for road in roads:
@@ -489,13 +491,14 @@ func _add_mapped_road_name_signs(parent: Node3D, roads: Array) -> int:
 		var label = Label3D.new()
 		label.name = "MappedRoadName_%d" % made
 		label.text = str(candidate["name"]).to_upper()
-		label.position = Vector3(chosen.x, 1.05, chosen.y)
+		label.position = Vector3(chosen.x, 1.55 if mobile_mode else 1.05, chosen.y)
 		label.font_size = label_size
-		label.pixel_size = 0.0042
+		label.pixel_size = 0.0062 if mobile_mode else 0.0042
 		label.modulate = Color(0.94, 0.95, 0.92, 0.88)
 		label.outline_size = 7
 		label.outline_modulate = Color(0.02, 0.025, 0.03, 0.92)
 		label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+		label.no_depth_test = mobile_mode
 		label.visibility_range_end = label_range
 		label.set_meta("annotation_only", true)
 		label.set_meta("source_field", "osm:name")
@@ -503,11 +506,29 @@ func _add_mapped_road_name_signs(parent: Node3D, roads: Array) -> int:
 		made += 1
 	return made
 
+func _add_mobile_identity_annotation(parent: Node3D, pos: Vector3, text_value: String, colour: Color, range_end: float):
+	if text_value.strip_edges() == "":
+		return
+	var label = Label3D.new()
+	label.text = text_value
+	label.position = pos
+	label.font_size = 29
+	label.pixel_size = 0.0064
+	label.modulate = colour
+	label.outline_size = 9
+	label.outline_modulate = Color(0.015, 0.02, 0.025, 0.98)
+	label.billboard = BaseMaterial3D.BILLBOARD_ENABLED
+	label.no_depth_test = true
+	label.visibility_range_end = range_end
+	label.set_meta("annotation_only", true)
+	label.set_meta("source_field", "osm:name")
+	parent.add_child(label)
+
 func _add_named_poi_markers(parent: Node3D, pois: Array):
-	var cap = 22 if xps_9530_mode else (5 if projector_max_mode else (7 if low_spec_mode else (32 if pc_max_mode else 14)))
-	var distance_limit = 120.0 if low_spec_mode else 300.0
-	var label_range = 110.0 if low_spec_mode else 200.0
-	var label_size = 25 if low_spec_mode else 32
+	var cap = 10 if mobile_mode else (22 if xps_9530_mode else (5 if projector_max_mode else (7 if low_spec_mode else (32 if pc_max_mode else 14))))
+	var distance_limit = 190.0 if mobile_mode else (120.0 if low_spec_mode else 300.0)
+	var label_range = 175.0 if mobile_mode else (110.0 if low_spec_mode else 200.0)
+	var label_size = 29 if mobile_mode else (25 if low_spec_mode else 32)
 	var made := 0
 	var driver = get_node_or_null("Car")
 	var reference := Vector2(driver.global_position.x, driver.global_position.z) if mobile_mode and driver else Vector2.ZERO
@@ -521,9 +542,12 @@ func _add_named_poi_markers(parent: Node3D, pois: Array):
 		var p = Vector2(float(point[0]), float(point[1]))
 		if p.distance_to(reference) > distance_limit:
 			continue
-		_visual_box(parent, Vector3(p.x, 1.35, p.y), Vector3(0.08, 2.70, 0.08), metal_mat)
-		_visual_box(parent, Vector3(p.x, 2.55, p.y), Vector3(0.92, 0.40, 0.08), sign_blue_mat)
-		_add_world_label(parent, Vector3(p.x, 2.58, p.y), poi_name, Color(0.98, 0.98, 0.96), label_size, label_range)
+		if mobile_mode:
+			_add_mobile_identity_annotation(parent, Vector3(p.x, 3.0, p.y), poi_name, Color(0.72, 0.90, 1.0, 0.96), label_range)
+		else:
+			_visual_box(parent, Vector3(p.x, 1.35, p.y), Vector3(0.08, 2.70, 0.08), metal_mat)
+			_visual_box(parent, Vector3(p.x, 2.55, p.y), Vector3(0.92, 0.40, 0.08), sign_blue_mat)
+			_add_world_label(parent, Vector3(p.x, 2.58, p.y), poi_name, Color(0.98, 0.98, 0.96), label_size, label_range)
 		made += 1
 
 func _add_named_building_marker(parent: Node3D, building: Dictionary):
@@ -532,12 +556,15 @@ func _add_named_building_marker(parent: Node3D, building: Dictionary):
 	if name == "" or not center is Array or center.size() < 2:
 		return
 	var p = Vector2(float(center[0]), float(center[1]))
-	var distance_limit = 100.0 if low_spec_mode else (230.0 if pc_max_mode else 150.0)
+	var distance_limit = 165.0 if mobile_mode else (100.0 if low_spec_mode else (230.0 if pc_max_mode else 150.0))
 	var driver = get_node_or_null("Car")
 	var reference := Vector2(driver.global_position.x, driver.global_position.z) if mobile_mode and driver else Vector2.ZERO
 	if p.distance_to(reference) > distance_limit:
 		return
-	_add_world_label(parent, Vector3(p.x, 3.2, p.y), name, Color(0.95, 0.93, 0.86), 25 if low_spec_mode else 34, 105.0 if low_spec_mode else 170.0)
+	if mobile_mode:
+		_add_mobile_identity_annotation(parent, Vector3(p.x, 3.4, p.y), name, Color(1.0, 0.86, 0.58, 0.96), 155.0)
+	else:
+		_add_world_label(parent, Vector3(p.x, 3.2, p.y), name, Color(0.95, 0.93, 0.86), 25 if low_spec_mode else 34, 105.0 if low_spec_mode else 170.0)
 
 
 func _add_opening_anchor_annotation(parent: Node3D, car: Node, pois: Array, buildings: Array, points: Array) -> bool:
@@ -1907,6 +1934,43 @@ func _update_mobile_destination(delta: float, car):
 	car.set_meta("eh15_destination_index", mobile_destination_index)
 	car.set_meta("eh15_destination_count", destinations.size())
 
+
+
+func _update_mobile_location_identity(delta: float, car):
+	if not mobile_mode or car == null:
+		return
+	mobile_identity_clock += delta
+	if mobile_identity_clock < 0.22:
+		return
+	mobile_identity_clock = 0.0
+	var stream = get_node_or_null("MapStream")
+	if stream == null or not stream.has_method("mobile_location_identity"):
+		return
+	var identity = stream.mobile_location_identity(Vector2(car.global_position.x, car.global_position.z))
+	if not identity is Dictionary:
+		return
+	var road = identity.get("road", {})
+	var near_road = identity.get("near_road", {})
+	var place = identity.get("place", {})
+	var landmark = identity.get("landmark", {})
+	if road is Dictionary:
+		var road_name := str(road.get("name", "")).strip_edges()
+		var road_ref := str(road.get("ref", "")).strip_edges()
+		car.set_meta("mobile_road_name", road_name if road_name != "" else road_ref)
+		car.set_meta("mobile_road_distance_m", float(road.get("distance_m", INF)))
+	if near_road is Dictionary:
+		var near_name := str(near_road.get("name", "")).strip_edges()
+		var near_ref := str(near_road.get("ref", "")).strip_edges()
+		car.set_meta("mobile_near_road_name", near_name if near_name != "" else near_ref)
+		car.set_meta("mobile_near_road_distance_m", float(near_road.get("distance_m", INF)))
+	if place is Dictionary:
+		car.set_meta("mobile_place_name", str(place.get("name", "")).strip_edges())
+		car.set_meta("mobile_place_distance_m", float(place.get("distance_m", INF)))
+	if landmark is Dictionary:
+		car.set_meta("mobile_landmark_name", str(landmark.get("name", "")).strip_edges())
+		car.set_meta("mobile_landmark_distance_m", float(landmark.get("distance_m", INF)))
+		car.set_meta("mobile_landmark_kind", str(landmark.get("kind", "")))
+	car.set_meta("mobile_location_source", "OpenStreetMap")
 
 
 func _spawn_map_agents():
