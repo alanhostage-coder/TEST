@@ -237,6 +237,39 @@ func _draw():
 			var wing2 := arrow_dir.rotated(-2.45)
 			draw_line(arrow_centre + arrow_dir * 10.0, arrow_centre + arrow_dir * 10.0 + wing * 7.0, Color(1.0, 0.78, 0.42, 0.96), 2.0)
 			draw_line(arrow_centre + arrow_dir * 10.0, arrow_centre + arrow_dir * 10.0 + wing2 * 7.0, Color(1.0, 0.78, 0.42, 0.96), 2.0)
+
+		var road_name := str(car.get_meta("mobile_road_name", "")).strip_edges()
+		var road_distance := float(car.get_meta("mobile_road_distance_m", INF))
+		var near_road_name := str(car.get_meta("mobile_near_road_name", "")).strip_edges()
+		var near_road_distance := float(car.get_meta("mobile_near_road_distance_m", INF))
+		var place_name := str(car.get_meta("mobile_place_name", "")).strip_edges()
+		var landmark_name := str(car.get_meta("mobile_landmark_name", "")).strip_edges()
+		var landmark_distance := float(car.get_meta("mobile_landmark_distance_m", INF))
+		if road_name != "" or place_name != "" or landmark_name != "":
+			var identity_width := minf(viewport_size.x - 24.0, 430.0)
+			var identity_x: float = (float(viewport_size.x) - identity_width) * 0.5
+			draw_rect(Rect2(identity_x, 78.0, identity_width, 68.0), Color(0.010, 0.014, 0.018, 0.82), true)
+			draw_line(Vector2(identity_x, 78.0), Vector2(identity_x + identity_width, 78.0), Color(0.28, 0.78, 0.92, 0.92), 2.0)
+			var area_label := place_name.to_upper() if place_name != "" else "EH15"
+			if area_label.length() > 30:
+				area_label = area_label.substr(0, 27) + "..."
+			draw_string(font, Vector2(identity_x + 12.0, 97.0), area_label, HORIZONTAL_ALIGNMENT_LEFT, identity_width - 24.0, 10, Color(0.40, 0.84, 0.96, 0.96))
+			var road_label := road_name
+			if road_label.length() > 34:
+				road_label = road_label.substr(0, 31) + "..."
+			if road_label != "":
+				var road_prefix := "" if road_distance <= 22.0 else "NEAR "
+				draw_string(font, Vector2(identity_x + 12.0, 120.0), road_prefix + road_label.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, identity_width - 24.0, 17, Color(0.97, 0.96, 0.90, 0.98))
+			var context := ""
+			if near_road_name != "" and near_road_distance <= 180.0:
+				context = "NEAR " + near_road_name
+			if landmark_name != "" and landmark_distance <= 550.0:
+				var landmark_piece := "%s  %dm" % [landmark_name, int(round(landmark_distance))]
+				context = landmark_piece if context == "" else context + "  ·  " + landmark_piece
+			if context.length() > 52:
+				context = context.substr(0, 49) + "..."
+			if context != "":
+				draw_string(font, Vector2(identity_x + 12.0, 139.0), context, HORIZONTAL_ALIGNMENT_LEFT, identity_width - 24.0, 10, Color(0.72, 0.78, 0.78, 0.90))
 	if not OS.has_feature("mobile") and (not _projector_driving_view_active() or projector_hint_alpha > 0.01):
 		var map_control = "   M  MAP" if OS.has_feature("pc_max") or OS.has_feature("projector_max") else ""
 		var hint_alpha := projector_hint_alpha if _projector_driving_view_active() else 1.0
