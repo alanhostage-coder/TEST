@@ -46,6 +46,8 @@ jobs:
           assert t['buildings'] >= 1500
           assert t['buildings'] < 45000
           assert m.get('dedupe_policy','') == 'osm_id+kind per tile'
+          assert m.get('road_conflict_policy','') == 'offline_nonservice_corridor_cull_v1'
+          assert m.get('road_conflict_culled',-1) >= 0
           assert t.get('identity_features',0) >= 1
           assert m.get('identity_kind_totals',{}).get('coastline',0) >= 1
           assert m['destination_count'] >= 20
