@@ -251,7 +251,8 @@ func _is_near_road() -> bool:
 			var a = Vector2(float(segment[0][0]), float(segment[0][1]))
 			var b = Vector2(float(segment[1][0]), float(segment[1][1]))
 			var width = float(segment[2])
-			if _point_segment_distance(p, a, b) < width * 0.5 + 2.4:
+			var road_margin := 0.65 if OS.has_feature("mobile") else 2.4
+			if _point_segment_distance(p, a, b) < width * 0.5 + road_margin:
 				return true
 		return false
 	var local_x = abs(fposmod(global_position.x + 45.0, 90.0) - 45.0)

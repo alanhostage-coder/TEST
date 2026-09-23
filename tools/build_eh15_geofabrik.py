@@ -87,6 +87,21 @@ def feature_point(item):
         return sum(float(p[0]) for p in fp)/len(fp),sum(float(p[1]) for p in fp)/len(fp)
     return 0.0,0.0
 
+
+def dedupe_features(items):
+    out=[]
+    seen=set()
+    for item in items:
+        oid=int(item.get("osm_id",0))
+        kind=str(item.get("kind",""))
+        name=str(item.get("name",""))
+        key=(oid,kind) if oid else (0,kind,name,json.dumps(item.get("point",item.get("center",item.get("points",[]))),separators=(",",":")))
+        if key in seen:
+            continue
+        seen.add(key)
+        out.append(item)
+    return out
+
 def build_destinations(outdir,tiles,source_timestamp):
     c={}
     for tile in tiles:
@@ -188,6 +203,8 @@ def main():
     tiles=[];records=[];totals={k:0 for k in ("roads","buildings","linear_features","point_features","poi_features","identity_features")}
     identity_kind_totals={}
     for tid,tile in bytile.items():
+        for feature_key in ("roads","buildings","linear_features","point_features","poi_features","identity_features"):
+            tile[feature_key]=dedupe_features(tile[feature_key])
         fn=f"tile_{tid}.json";(OUT/fn).write_text(json.dumps({k:v for k,v in tile.items() if k!="local_bounds"},separators=(",",":")))
         counts={k:len(tile[k]) for k in totals}
         for k,v in counts.items():totals[k]+=v
@@ -196,7 +213,7 @@ def main():
             identity_kind_totals[kind]=identity_kind_totals.get(kind,0)+1
         records.append(tile);tiles.append({"id":tid,"file":fn,"bbox":tile["bbox"],"local_bounds":tile["local_bounds"],"counts":counts})
     dest=build_destinations(OUT,records,source_timestamp)
-    manifest={"patch_format":2,"patch_id":"uk-edinburgh-eh15-full","display_name":"EH15 · Edinburgh","source":"packaged_osm_tiles","source_name":"OpenStreetMap via Geofabrik Scotland extract","source_url":"https://download.geofabrik.de/europe/united-kingdom/scotland.html","source_timestamp_utc":source_timestamp,"generated_utc":datetime.now(timezone.utc).isoformat(),"license":"ODbL 1.0; © OpenStreetMap contributors","start_postcode":"EH15","center_lat":CENTER_LAT,"center_lon":CENTER_LON,"coverage_bbox":[SOUTH,WEST,NORTH,EAST],"coverage_note":"Conservative envelope covers EH15 plus a small fringe; not asserted as an official postal boundary.","tile_rows":rows,"tile_cols":cols,"tiles":tiles,"raw_tile_totals":totals,"identity_kind_totals":identity_kind_totals,"destination_count":dest}
+    manifest={"patch_format":2,"patch_id":"uk-edinburgh-eh15-full","display_name":"EH15 · Edinburgh","source":"packaged_osm_tiles","source_name":"OpenStreetMap via Geofabrik Scotland extract","source_url":"https://download.geofabrik.de/europe/united-kingdom/scotland.html","source_timestamp_utc":source_timestamp,"generated_utc":datetime.now(timezone.utc).isoformat(),"license":"ODbL 1.0; © OpenStreetMap contributors","start_postcode":"EH15","center_lat":CENTER_LAT,"center_lon":CENTER_LON,"coverage_bbox":[SOUTH,WEST,NORTH,EAST],"coverage_note":"Conservative envelope covers EH15 plus a small fringe; not asserted as an official postal boundary.","tile_rows":rows,"tile_cols":cols,"tiles":tiles,"raw_tile_totals":totals,"identity_kind_totals":identity_kind_totals,"dedupe_policy":"osm_id+kind per tile","destination_count":dest}
     (OUT/"manifest.json").write_text(json.dumps(manifest,separators=(",",":")))
     print(json.dumps({"tiles":len(tiles),"totals":totals,"identity_kinds":identity_kind_totals,"destinations":dest,"source_timestamp":source_timestamp},indent=2))
 if __name__=="__main__":main()
