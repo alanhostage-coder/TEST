@@ -219,7 +219,7 @@ func _draw():
 		var destination_distance := float(car.get_meta("eh15_destination_distance_m", 0.0))
 		if destination_name != "" and destination_point is Array and destination_point.size() >= 2:
 			var panel_width := minf(viewport_size.x - 24.0, 430.0)
-			var panel_x := (viewport_size.x - panel_width) * 0.5
+			var panel_x: float = (float(viewport_size.x) - panel_width) * 0.5
 			draw_rect(Rect2(panel_x, 14.0, panel_width, 58.0), Color(0.012, 0.016, 0.020, 0.78), true)
 			draw_line(Vector2(panel_x, 14.0), Vector2(panel_x + panel_width, 14.0), Color(0.88, 0.49, 0.20, 0.88), 2.0)
 			var label := destination_name
