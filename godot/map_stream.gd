@@ -55,7 +55,7 @@ var active_tile_signature := ""
 var district_destinations: Array = []
 
 func _ready():
-	if OS.has_feature("mobile") and _load_full_eh15_manifest():
+	if (OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1") and _load_full_eh15_manifest():
 		_load_district_destinations()
 		_load_full_eh15_window(Vector2.ZERO, false)
 		_rebuild_named_road_index()
