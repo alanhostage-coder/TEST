@@ -1,3 +1,4 @@
+# 0.84 exact-data startup gate: boots forced mobile world against offline-cleaned EH15 tiles.
 extends SceneTree
 
 func _initialize():
