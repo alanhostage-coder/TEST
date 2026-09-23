@@ -31,6 +31,17 @@ jobs:
           grep -q 'PUA_PROJECTION_WEATHER_OK' /tmp/pua-projection.log
           ! grep -E 'SCRIPT ERROR|Parse Error|Assertion failed' /tmp/pua-projection.log
 
+      - name: Full EH15 mobile stream regression
+        run: |
+          if [ -f godot/patches/eh15_full/manifest.json ]; then
+            set -o pipefail
+            timeout 40s godot --headless --path godot --script res://eh15_stream_test.gd 2>&1 | tee /tmp/eh15-stream.log
+            grep -q 'EH15_STREAM_OK' /tmp/eh15-stream.log
+            ! grep -E 'SCRIPT ERROR|Parse Error|EH15_STREAM_FAIL' /tmp/eh15-stream.log
+          else
+            echo "EH15_STREAM_SKIP pre-harvest commit"
+          fi
+
       - name: Greybeard invariants
         run: |
           grep -q 'renderer/rendering_method="mobile"' godot/project.godot
