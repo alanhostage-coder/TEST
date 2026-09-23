@@ -42,6 +42,13 @@ jobs:
             echo "EH15_STREAM_SKIP pre-harvest commit"
           fi
 
+      - name: Mobile OSM footprint road-safety regression
+        run: |
+          set -o pipefail
+          timeout 30s godot --headless --path godot --script res://mobile_footprint_test.gd 2>&1 | tee /tmp/mobile-footprint.log
+          grep -q 'MOBILE_FOOTPRINT_OK' /tmp/mobile-footprint.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|MOBILE_FOOTPRINT_FAIL' /tmp/mobile-footprint.log
+
       - name: Greybeard invariants
         run: |
           grep -q 'renderer/rendering_method="mobile"' godot/project.godot

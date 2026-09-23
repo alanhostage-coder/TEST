@@ -25,7 +25,8 @@ const ROAD_MICRO_STEP := 6.5
 # while remaining a bounded low-spec draw/collision radius for future patches.
 const LOW_SPEC_EXACT_FOOTPRINT_RADIUS := 220.0
 const DRIVER_DETAIL_RADIUS := 38.0
-const MOBILE_BUILDING_VISUAL_RADIUS := 720.0
+const MOBILE_BUILDING_VISUAL_RADIUS := 620.0
+const MOBILE_COLLIDING_BUILDING_RADIUS := 220.0
 const XPS_LIGHT_GRADE := "edinburgh-side-light-v1"
 var low_spec_mode := false
 var projector_max_mode := false
@@ -1185,6 +1186,58 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 					post.visibility_range_end = 120.0
 			generic_tenement_railing_count += 1
 
+
+func _add_mobile_osm_footprint_visual(parent: Node3D, building: Dictionary, height: float, seed: int) -> bool:
+	# Far mobile buildings must preserve the mapped OSM polygon. The old low-spec
+	# fallback used the footprint bounding box, which could rotate/expand an angled
+	# building across a real road and also created a false box collision. This path
+	# is visual-only: exact footprint silhouette, no collision, no facade trim.
+	var footprint = building.get("footprint", [])
+	if not footprint is Array or footprint.size() < 3:
+		return false
+	var poly := PackedVector2Array()
+	for point in footprint:
+		if point is Array and point.size() >= 2:
+			poly.append(Vector2(float(point[0]), float(point[1])))
+	if poly.size() > 2 and poly[0].distance_squared_to(poly[poly.size() - 1]) < 0.01:
+		poly.resize(poly.size() - 1)
+	if poly.size() < 3:
+		return false
+	var tris := Geometry2D.triangulate_polygon(poly)
+	if tris.size() < 3:
+		return false
+
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for t in range(0, tris.size(), 3):
+		for j in range(3):
+			var p: Vector2 = poly[int(tris[t + j])]
+			st.add_vertex(Vector3(p.x, height, p.y))
+	for i in range(poly.size()):
+		var p0: Vector2 = poly[i]
+		var p1: Vector2 = poly[(i + 1) % poly.size()]
+		st.add_vertex(Vector3(p0.x, 0.0, p0.y))
+		st.add_vertex(Vector3(p1.x, 0.0, p1.y))
+		st.add_vertex(Vector3(p1.x, height, p1.y))
+		st.add_vertex(Vector3(p0.x, 0.0, p0.y))
+		st.add_vertex(Vector3(p1.x, height, p1.y))
+		st.add_vertex(Vector3(p0.x, height, p0.y))
+	st.generate_normals()
+	var mesh := st.commit()
+	if mesh == null:
+		return false
+
+	var visual := MeshInstance3D.new()
+	visual.name = "OSMFootprintVisual_%d" % seed
+	visual.mesh = mesh
+	visual.material_override = _osm_building_material(building, seed)
+	visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	visual.visibility_range_end = MOBILE_BUILDING_VISUAL_RADIUS
+	visual.set_meta("osm_footprint_visual_only", true)
+	visual.set_meta("osm_id", int(building.get("osm_id", 0)))
+	parent.add_child(visual)
+	return true
+
 func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float, seed: int) -> bool:
 	var footprint = building.get("footprint", [])
 	if not footprint is Array or footprint.size() < 3:
@@ -1722,6 +1775,7 @@ func _on_map_ready(map_data: Dictionary):
 			map_segments.append([[a.x, a.y], [b.x, b.y], width, kind, oneway])
 
 	var exact_building_count := 0
+	var mobile_visual_only_building_count := 0
 	var fallback_building_count := 0
 	generic_tenement_facade_count = 0
 	generic_tenement_window_count = 0
@@ -1753,14 +1807,20 @@ func _on_map_ready(map_data: Dictionary):
 			if not commercial_pois.is_empty():
 				visual_building = building.duplicate(true)
 				visual_building["_mapped_commercial_pois"] = commercial_pois
-		var exact_radius = LOW_SPEC_EXACT_FOOTPRINT_RADIUS if low_spec_mode else (620.0 if pc_max_mode else 260.0)
+		var exact_radius = MOBILE_COLLIDING_BUILDING_RADIUS if mobile_mode else (LOW_SPEC_EXACT_FOOTPRINT_RADIUS if low_spec_mode else (620.0 if pc_max_mode else 260.0))
 		var exact_detail_origin := detail_origin if mobile_mode else Vector2.ZERO
-		var exact = Vector2(cx, cz).distance_to(exact_detail_origin) <= exact_radius and _add_exact_osm_building(map_root, visual_building, h, seed)
-		if not exact:
+		var building_distance := Vector2(cx, cz).distance_to(exact_detail_origin)
+		var exact = building_distance <= exact_radius and _add_exact_osm_building(map_root, visual_building, h, seed)
+		if exact:
+			exact_building_count += 1
+		elif mobile_mode and _add_mobile_osm_footprint_visual(map_root, visual_building, h, seed):
+			mobile_visual_only_building_count += 1
+		else:
+			# Desktop/legacy fallback remains unchanged. Mobile only reaches this for
+			# malformed footprints that cannot be triangulated; keep those rare cases
+			# visible but outside the normal exact-footprint path.
 			_add_edinburgh_building(map_root, Vector3(cx, 0.0, cz), Vector3(sx, h, sz), seed, kind)
 			fallback_building_count += 1
-		else:
-			exact_building_count += 1
 		_add_named_building_marker(map_root, building)
 
 	_add_mapped_linear_features(map_root, linear_features)
@@ -1783,6 +1843,7 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_road_count", roads.size())
 		car.set_meta("map_building_count", buildings.size())
 		car.set_meta("map_exact_building_count", exact_building_count)
+		car.set_meta("map_mobile_visual_only_building_count", mobile_visual_only_building_count)
 		car.set_meta("generic_tenement_facade_count", generic_tenement_facade_count)
 		car.set_meta("generic_tenement_window_count", generic_tenement_window_count)
 		car.set_meta("generic_tenement_door_count", generic_tenement_door_count)
@@ -2404,6 +2465,38 @@ func _add_edinburgh_building(parent: Node3D, base: Vector3, size: Vector3, seed:
 	if industrial and seed % 3 == 0:
 		_visual_box(parent, base + Vector3(sx * 0.22, h + 0.7, -sz * 0.12), Vector3(3.6, 1.4, 2.6), metal_mat)
 
+
+
+func _mobile_footprint_regression() -> Dictionary:
+	# Synthetic angled/L-shaped footprints prove that mobile far geometry preserves
+	# the polygon rather than expanding to its axis-aligned bounding rectangle.
+	var samples := [
+		PackedVector2Array([Vector2(0,0),Vector2(12,3),Vector2(10,9),Vector2(-2,6)]),
+		PackedVector2Array([Vector2(0,0),Vector2(10,0),Vector2(10,3),Vector2(4,3),Vector2(4,9),Vector2(0,9)])
+	]
+	var passed := 0
+	for poly in samples:
+		var tris := Geometry2D.triangulate_polygon(poly)
+		if tris.size() < 3:
+			continue
+		var polygon_area := 0.0
+		var min_x := INF
+		var max_x := -INF
+		var min_y := INF
+		var max_y := -INF
+		for i in range(poly.size()):
+			var a := poly[i]
+			var b := poly[(i + 1) % poly.size()]
+			polygon_area += a.x * b.y - b.x * a.y
+			min_x = minf(min_x, a.x)
+			max_x = maxf(max_x, a.x)
+			min_y = minf(min_y, a.y)
+			max_y = maxf(max_y, a.y)
+		polygon_area = absf(polygon_area) * 0.5
+		var bbox_area := (max_x - min_x) * (max_y - min_y)
+		if polygon_area > 0.1 and bbox_area > polygon_area * 1.08:
+			passed += 1
+	return {"passed": passed, "total": samples.size(), "visual_radius": MOBILE_BUILDING_VISUAL_RADIUS, "collision_radius": MOBILE_COLLIDING_BUILDING_RADIUS}
 
 func _bind_pua_api():
 	var api = get_node_or_null("PUAAPI")

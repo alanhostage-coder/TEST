@@ -53,17 +53,26 @@ jobs:
           else
             echo "EH15_STREAM_SKIP pre-harvest commit"
           fi
+      - name: Mobile footprint road-safety regression
+        run: |
+          set +e
+          timeout 30s godot --headless --path godot --script res://mobile_footprint_test.gd > /tmp/mobile-footprint.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/mobile-footprint.log
+          test "$status" -eq 0
+          grep -q 'MOBILE_FOOTPRINT_OK' /tmp/mobile-footprint.log
       - name: Export Android debug APK
         run: |
           mkdir -p build/android
           EXPORT_DIR="$(readlink -f build/android)"
-          godot --headless --verbose --path godot --export-debug "Android" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_80.apk"
-          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_80.apk"
-          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_80.apk"
+          godot --headless --verbose --path godot --export-debug "Android" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_81.apk"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_81.apk"
+          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_81.apk"
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.80-ANDROID
-          path: build/android/PROCEED_UNTIL_APPREHENDED_0_80.apk
+          name: PUA-0.81-ANDROID
+          path: build/android/PROCEED_UNTIL_APPREHENDED_0_81.apk
           if-no-files-found: error
           retention-days: 30
