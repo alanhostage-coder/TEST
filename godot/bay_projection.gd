@@ -93,6 +93,14 @@ var driver_chrome_idle := 0.0
 var driver_chrome_alpha := 1.0
 
 func _ready():
+	if OS.has_feature("mobile"):
+		# Projector calibration/render surfaces are desktop-only. Building five
+		# hidden SubViewports on Android wastes GPU and exposes irrelevant controls.
+		visible = false
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_process(false)
+		set_process_input(false)
+		return
 	projector_max_mode = OS.has_feature("projector_max")
 	pc_max_mode = OS.has_feature("pc_max")
 	xps_9530_mode = OS.has_feature("xps_9530")

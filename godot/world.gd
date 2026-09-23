@@ -25,8 +25,8 @@ const ROAD_MICRO_STEP := 6.5
 # while remaining a bounded low-spec draw/collision radius for future patches.
 const LOW_SPEC_EXACT_FOOTPRINT_RADIUS := 220.0
 const DRIVER_DETAIL_RADIUS := 38.0
-const MOBILE_BUILDING_VISUAL_RADIUS := 620.0
-const MOBILE_COLLIDING_BUILDING_RADIUS := 220.0
+const MOBILE_BUILDING_VISUAL_RADIUS := 420.0
+const MOBILE_COLLIDING_BUILDING_RADIUS := 190.0
 const XPS_LIGHT_GRADE := "edinburgh-side-light-v1"
 var low_spec_mode := false
 var projector_max_mode := false
@@ -113,6 +113,11 @@ func _ready():
 	elif projector_max_mode:
 		api_detail_pressure = 0.32
 		$Sun.directional_shadow_max_distance = 58.0
+	elif mobile_mode:
+		# Phone screenshots showed deep black canyons and too much distant geometry.
+		# Spend the mobile budget on a readable 400m street bubble instead.
+		api_detail_pressure = 0.50
+		$Sun.directional_shadow_max_distance = 52.0
 	elif low_spec_mode:
 		api_detail_pressure = 0.42
 		$Sun.directional_shadow_max_distance = 82.0
@@ -1657,13 +1662,19 @@ func _apply_weather_visuals():
 	kerb_mat.roughness = lerp(0.94, 0.68, wetness)
 	concrete_mat.roughness = lerp(0.86, 0.62, wetness)
 	weather_sun_energy = (lerp(1.03, 0.58, cloud) if xps_9530_mode else lerp(0.95, 0.56, cloud)) * lerp(1.0, 0.90, wetness)
+	if mobile_mode:
+		weather_sun_energy *= 0.82
 	var env = $WorldEnvironment.environment
 	if env:
 		env.fog_enabled = true
 		var visibility_fog = clamp(1.0 - visibility / 22000.0, 0.0, 0.92)
 		env.fog_density = 0.0022 + visibility_fog * 0.008 + clamp(aqi / 150.0, 0.0, 1.0) * 0.002
 		env.fog_light_color = Color(0.46, 0.50, 0.51).lerp(Color(0.36, 0.40, 0.42), cloud)
-		if xps_9530_mode:
+		if mobile_mode:
+			env.ambient_light_energy = lerp(1.10, 0.88, cloud) * lerp(1.0, 0.96, wetness)
+			env.ambient_light_color = Color(0.62, 0.64, 0.64).lerp(Color(0.49, 0.53, 0.55), cloud)
+			env.tonemap_exposure = lerp(1.34, 1.18, cloud)
+		elif xps_9530_mode:
 			env.ambient_light_energy = lerp(0.78, 0.63, cloud) * lerp(1.0, 0.94, wetness)
 			env.ambient_light_color = Color(0.53, 0.54, 0.54).lerp(Color(0.41, 0.45, 0.47), cloud)
 			env.tonemap_exposure = lerp(1.18, 1.06, cloud) * lerp(1.0, 0.98, wetness)
@@ -1875,6 +1886,50 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_opening_anchor_annotated", _add_opening_anchor_annotation(map_root, car, poi_features, buildings, point_features))
 
 
+
+func _building_footprint_clearance(point: Vector2, building: Dictionary) -> float:
+	var footprint = building.get("footprint", [])
+	if not footprint is Array or footprint.size() < 3:
+		return INF
+	var poly := PackedVector2Array()
+	for raw in footprint:
+		if raw is Array and raw.size() >= 2:
+			poly.append(Vector2(float(raw[0]), float(raw[1])))
+	if poly.size() < 3:
+		return INF
+	if Geometry2D.is_point_in_polygon(point, poly):
+		return 0.0
+	var best := INF
+	for i in range(poly.size()):
+		best = minf(best, _point_segment_distance_2d(point, poly[i], poly[(i + 1) % poly.size()]))
+	return best
+
+func _point_segment_distance_2d(point: Vector2, a: Vector2, b: Vector2) -> float:
+	var ab := b - a
+	var denom := ab.length_squared()
+	if denom < 0.001:
+		return point.distance_to(a)
+	var t := clampf((point - a).dot(ab) / denom, 0.0, 1.0)
+	return point.distance_to(a + ab * t)
+
+func _opening_building_clearance(point: Vector2, local_buildings: Array) -> float:
+	var best := INF
+	for building in local_buildings:
+		if not building is Dictionary:
+			continue
+		var center = building.get("center", [])
+		var size = building.get("size", [])
+		if not center is Array or center.size() < 2:
+			continue
+		var c := Vector2(float(center[0]), float(center[1]))
+		var quick_radius := 35.0
+		if size is Array and size.size() >= 2:
+			quick_radius += maxf(float(size[0]), float(size[1])) * 0.55
+		if c.distance_to(point) > quick_radius:
+			continue
+		best = minf(best, _building_footprint_clearance(point, building))
+	return best
+
 func _place_car_for_first_impression(car, roads: Array, buildings: Array, poi_features: Array, point_features: Array):
 	# Persona 8: choose an opening from verified map facts rather than whichever
 	# junction happens to occur first in source order. The car starts on a real
@@ -1997,6 +2052,16 @@ func _place_car_for_first_impression(car, roads: Array, buildings: Array, poi_fe
 	var best_anchor_source := ""
 	var best_anchor_distance := INF
 	var best_visible_anchor_count := 0
+	var best_building_clearance := 0.0
+	var opening_buildings: Array = []
+	for building in buildings:
+		if not building is Dictionary:
+			continue
+		var center = building.get("center", [])
+		if center is Array and center.size() >= 2:
+			var c := Vector2(float(center[0]), float(center[1]))
+			if c.length() <= OPENING_SEARCH_RADIUS + 70.0:
+				opening_buildings.append(building)
 
 	for item in junctions.values():
 		var memberships: Dictionary = item["roads"]
@@ -2028,6 +2093,10 @@ func _place_car_for_first_impression(car, roads: Array, buildings: Array, poi_fe
 			var approach = min(OPENING_APPROACH_MAX, max(6.0, leg_length * 0.30))
 			var spawn = junction + outward * approach
 			var heading = -outward
+			var spawn_clearance := _opening_building_clearance(spawn, opening_buildings)
+			var required_clearance := maxf(5.5, float(leg.get("width", 5.0)) * 0.5 + 2.0)
+			if spawn_clearance < required_clearance:
+				continue
 			var score = float(memberships.size()) * 12.0
 			score += min(leg_length, 45.0) * 0.25
 			score += float(named_roads.size()) * 3.0
@@ -2063,6 +2132,7 @@ func _place_car_for_first_impression(car, roads: Array, buildings: Array, poi_fe
 					candidate_anchor_source = str(anchor["source"])
 					candidate_anchor_distance = anchor_distance
 			score += min(4, visible_anchor_count) * 1.5
+			score += minf(spawn_clearance, 28.0) * 0.32
 
 			if score > best_score:
 				best_score = score
@@ -2077,6 +2147,7 @@ func _place_car_for_first_impression(car, roads: Array, buildings: Array, poi_fe
 				best_anchor_source = candidate_anchor_source
 				best_anchor_distance = candidate_anchor_distance
 				best_visible_anchor_count = visible_anchor_count
+				best_building_clearance = spawn_clearance
 
 	if best_heading.length() < 0.1:
 		best_heading = Vector2(0, -1)
@@ -2100,6 +2171,7 @@ func _place_car_for_first_impression(car, roads: Array, buildings: Array, poi_fe
 	car.set_meta("map_opening_verified_anchor_source", best_anchor_source)
 	car.set_meta("map_opening_verified_anchor_distance_m", best_anchor_distance)
 	car.set_meta("map_opening_visible_anchor_count", best_visible_anchor_count)
+	car.set_meta("map_opening_building_clearance_m", best_building_clearance)
 
 
 

@@ -198,39 +198,45 @@ func _draw():
 	var viewport_size = get_viewport_rect().size
 	var focus_rect := _driver_focus_rect(viewport_size)
 	var focus_x := focus_rect.position.x + focus_rect.size.x * 0.5
-	# Keep instruments clear of the bay calibration controls at the upper left.
-	draw_set_transform(Vector2(focus_x - 109.0, viewport_size.y - 154.0))
-	# A restrained instrument layer gives the driving view a readable centre of gravity
-	# without covering the mapped scene. It scales from the PC projector canvas down to
-	# the mobile viewport automatically.
-	draw_rect(Rect2(22, 42, 174, 72), Color(0.015, 0.020, 0.024, 0.68), true)
-	draw_line(Vector2(22, 42), Vector2(196, 42), Color(0.88, 0.49, 0.20, 0.82), 2.0)
-	draw_string(font, Vector2(34, 72), "%03d" % int(speed), HORIZONTAL_ALIGNMENT_LEFT, -1, 28, Color(0.94, 0.91, 0.82, 0.96))
-	draw_string(font, Vector2(105, 70), "KM/H", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.88, 0.49, 0.20, 0.90))
-	draw_string(font, Vector2(34, 96), "%s  ·  %s" % [road_state, source], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.74, 0.78, 0.76, 0.82))
-	draw_string(font, Vector2(34, 106), "%d ROADS  %d BUILDINGS" % [roads, buildings], HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.55, 0.62, 0.62, 0.75))
-	draw_set_transform(Vector2.ZERO)
-	var weather = get_node_or_null("../WorldState")
-	if weather:
-		draw_string(font, Vector2(focus_x - 100.0, viewport_size.y - 119), "WEATHER: %s  [F6]" % str(weather.state.get("source", "offline")).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.9, 0.85, 0.7))
+	if OS.has_feature("mobile"):
+		draw_set_transform(Vector2(focus_x - 76.0, viewport_size.y - 92.0))
+		draw_rect(Rect2(0, 18, 152, 52), Color(0.015, 0.020, 0.024, 0.58), true)
+		draw_line(Vector2(0, 18), Vector2(152, 18), Color(0.88, 0.49, 0.20, 0.76), 2.0)
+		draw_string(font, Vector2(12, 49), "%03d" % int(speed), HORIZONTAL_ALIGNMENT_LEFT, -1, 24, Color(0.94, 0.91, 0.82, 0.96))
+		draw_string(font, Vector2(76, 47), "KM/H", HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.88, 0.49, 0.20, 0.88))
+		draw_string(font, Vector2(12, 64), road_state, HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.68, 0.74, 0.73, 0.78))
+		draw_set_transform(Vector2.ZERO)
+	else:
+		# Keep instruments clear of the bay calibration controls at the upper left.
+		draw_set_transform(Vector2(focus_x - 109.0, viewport_size.y - 154.0))
+		draw_rect(Rect2(22, 42, 174, 72), Color(0.015, 0.020, 0.024, 0.68), true)
+		draw_line(Vector2(22, 42), Vector2(196, 42), Color(0.88, 0.49, 0.20, 0.82), 2.0)
+		draw_string(font, Vector2(34, 72), "%03d" % int(speed), HORIZONTAL_ALIGNMENT_LEFT, -1, 28, Color(0.94, 0.91, 0.82, 0.96))
+		draw_string(font, Vector2(105, 70), "KM/H", HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.88, 0.49, 0.20, 0.90))
+		draw_string(font, Vector2(34, 96), "%s  ·  %s" % [road_state, source], HORIZONTAL_ALIGNMENT_LEFT, -1, 10, Color(0.74, 0.78, 0.76, 0.82))
+		draw_string(font, Vector2(34, 106), "%d ROADS  %d BUILDINGS" % [roads, buildings], HORIZONTAL_ALIGNMENT_LEFT, -1, 9, Color(0.55, 0.62, 0.62, 0.75))
+		draw_set_transform(Vector2.ZERO)
+		var weather = get_node_or_null("../WorldState")
+		if weather:
+			draw_string(font, Vector2(focus_x - 100.0, viewport_size.y - 119), "WEATHER: %s  [F6]" % str(weather.state.get("source", "offline")).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 12, Color(0.9, 0.85, 0.7))
 	if OS.has_feature("mobile"):
 		var destination_name := str(car.get_meta("eh15_destination_name", "")).strip_edges()
 		var destination_point = car.get_meta("eh15_destination_point", [])
 		var destination_distance := float(car.get_meta("eh15_destination_distance_m", 0.0))
 		if destination_name != "" and destination_point is Array and destination_point.size() >= 2:
-			var panel_width := minf(viewport_size.x - 24.0, 430.0)
+			var panel_width := minf(viewport_size.x - 24.0, 360.0)
 			var panel_x: float = (float(viewport_size.x) - panel_width) * 0.5
-			draw_rect(Rect2(panel_x, 14.0, panel_width, 58.0), Color(0.012, 0.016, 0.020, 0.78), true)
-			draw_line(Vector2(panel_x, 14.0), Vector2(panel_x + panel_width, 14.0), Color(0.88, 0.49, 0.20, 0.88), 2.0)
+			draw_rect(Rect2(panel_x, 10.0, panel_width, 44.0), Color(0.012, 0.016, 0.020, 0.78), true)
+			draw_line(Vector2(panel_x, 10.0), Vector2(panel_x + panel_width, 10.0), Color(0.88, 0.49, 0.20, 0.88), 2.0)
 			var label := destination_name
 			if label.length() > 34:
 				label = label.substr(0, 31) + "..."
-			draw_string(font, Vector2(panel_x + 48.0, 39.0), "EH15 · NEXT  " + label, HORIZONTAL_ALIGNMENT_LEFT, panel_width - 62.0, 13, Color(0.94, 0.91, 0.82, 0.96))
-			draw_string(font, Vector2(panel_x + 48.0, 58.0), "%d m" % int(round(destination_distance)), HORIZONTAL_ALIGNMENT_LEFT, panel_width - 62.0, 11, Color(0.72, 0.78, 0.78, 0.88))
+			draw_string(font, Vector2(panel_x + 42.0, 29.0), "EH15 · NEXT  " + label, HORIZONTAL_ALIGNMENT_LEFT, panel_width - 54.0, 11, Color(0.94, 0.91, 0.82, 0.96))
+			draw_string(font, Vector2(panel_x + 42.0, 46.0), "%d m" % int(round(destination_distance)), HORIZONTAL_ALIGNMENT_LEFT, panel_width - 54.0, 9, Color(0.72, 0.78, 0.78, 0.88))
 			var target_world := Vector3(float(destination_point[0]), car.global_position.y, float(destination_point[1]))
 			var local_target: Vector3 = car.to_local(target_world)
 			var arrow_angle := atan2(local_target.x, -local_target.z)
-			var arrow_centre := Vector2(panel_x + 25.0, 43.0)
+			var arrow_centre := Vector2(panel_x + 22.0, 33.0)
 			var arrow_dir := Vector2(sin(arrow_angle), -cos(arrow_angle))
 			draw_line(arrow_centre - arrow_dir * 7.0, arrow_centre + arrow_dir * 10.0, Color(1.0, 0.78, 0.42, 0.96), 3.0)
 			var wing := arrow_dir.rotated(2.45)
@@ -246,20 +252,20 @@ func _draw():
 		var landmark_name := str(car.get_meta("mobile_landmark_name", "")).strip_edges()
 		var landmark_distance := float(car.get_meta("mobile_landmark_distance_m", INF))
 		if road_name != "" or place_name != "" or landmark_name != "":
-			var identity_width := minf(viewport_size.x - 24.0, 430.0)
+			var identity_width := minf(viewport_size.x - 24.0, 360.0)
 			var identity_x: float = (float(viewport_size.x) - identity_width) * 0.5
-			draw_rect(Rect2(identity_x, 78.0, identity_width, 68.0), Color(0.010, 0.014, 0.018, 0.82), true)
-			draw_line(Vector2(identity_x, 78.0), Vector2(identity_x + identity_width, 78.0), Color(0.28, 0.78, 0.92, 0.92), 2.0)
+			draw_rect(Rect2(identity_x, 58.0, identity_width, 52.0), Color(0.010, 0.014, 0.018, 0.82), true)
+			draw_line(Vector2(identity_x, 58.0), Vector2(identity_x + identity_width, 58.0), Color(0.28, 0.78, 0.92, 0.92), 2.0)
 			var area_label := place_name.to_upper() if place_name != "" else "EH15"
 			if area_label.length() > 30:
 				area_label = area_label.substr(0, 27) + "..."
-			draw_string(font, Vector2(identity_x + 12.0, 97.0), area_label, HORIZONTAL_ALIGNMENT_LEFT, identity_width - 24.0, 10, Color(0.40, 0.84, 0.96, 0.96))
+			draw_string(font, Vector2(identity_x + 10.0, 74.0), area_label, HORIZONTAL_ALIGNMENT_LEFT, identity_width - 20.0, 9, Color(0.40, 0.84, 0.96, 0.96))
 			var road_label := road_name
 			if road_label.length() > 34:
 				road_label = road_label.substr(0, 31) + "..."
 			if road_label != "":
 				var road_prefix := "" if road_distance <= 22.0 else "NEAR "
-				draw_string(font, Vector2(identity_x + 12.0, 120.0), road_prefix + road_label.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, identity_width - 24.0, 17, Color(0.97, 0.96, 0.90, 0.98))
+				draw_string(font, Vector2(identity_x + 10.0, 92.0), road_prefix + road_label.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, identity_width - 20.0, 14, Color(0.97, 0.96, 0.90, 0.98))
 			var context := ""
 			if near_road_name != "" and near_road_distance <= 180.0:
 				context = "NEAR " + near_road_name
@@ -269,7 +275,11 @@ func _draw():
 			if context.length() > 52:
 				context = context.substr(0, 49) + "..."
 			if context != "":
-				draw_string(font, Vector2(identity_x + 12.0, 139.0), context, HORIZONTAL_ALIGNMENT_LEFT, identity_width - 24.0, 10, Color(0.72, 0.78, 0.78, 0.90))
+				draw_string(font, Vector2(identity_x + 10.0, 105.0), context, HORIZONTAL_ALIGNMENT_LEFT, identity_width - 24.0, 10, Color(0.72, 0.78, 0.78, 0.90))
+		if not bool(car.get("on_road")) and abs(float(car.get("speed"))) < 4.0:
+			draw_rect(Rect2(18.0, 42.0, 118.0, 46.0), Color(0.06, 0.075, 0.08, 0.84), true)
+			draw_line(Vector2(18.0, 42.0), Vector2(136.0, 42.0), Color(0.88, 0.49, 0.20, 0.92), 2.0)
+			draw_string(font, Vector2(33.0, 71.0), "RECOVER ROAD", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.96, 0.92, 0.82, 0.96))
 	if not OS.has_feature("mobile") and (not _projector_driving_view_active() or projector_hint_alpha > 0.01):
 		var map_control = "   M  MAP" if OS.has_feature("pc_max") or OS.has_feature("projector_max") else ""
 		var hint_alpha := projector_hint_alpha if _projector_driving_view_active() else 1.0

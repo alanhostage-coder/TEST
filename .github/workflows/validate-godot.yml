@@ -49,6 +49,13 @@ jobs:
           grep -q 'MOBILE_FOOTPRINT_OK' /tmp/mobile-footprint.log
           ! grep -E 'SCRIPT ERROR|Parse Error|MOBILE_FOOTPRINT_FAIL' /tmp/mobile-footprint.log
 
+      - name: Mobile first-impression regression
+        run: |
+          set -o pipefail
+          timeout 30s godot --headless --path godot --script res://mobile_first_impression_test.gd 2>&1 | tee /tmp/mobile-first.log
+          grep -q 'MOBILE_FIRST_IMPRESSION_OK' /tmp/mobile-first.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|MOBILE_FIRST_IMPRESSION_FAIL' /tmp/mobile-first.log
+
       - name: Greybeard invariants
         run: |
           grep -q 'renderer/rendering_method="mobile"' godot/project.godot

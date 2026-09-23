@@ -36,6 +36,7 @@ var assisted_target_speed := 17.5
 var wheel_spin := 0.0
 var steering_velocity := 0.0
 var lateral_load := 0.0
+const MOBILE_RECOVER_RECT := Rect2(18.0, 42.0, 118.0, 46.0)
 
 
 func _ready():
@@ -85,6 +86,11 @@ func _exit_tree():
 	_save_state()
 
 func _input(event):
+	if OS.has_feature("mobile") and event is InputEventScreenTouch and event.pressed:
+		if MOBILE_RECOVER_RECT.has_point(event.position) and not on_road and absf(speed) < 4.0:
+			recover_to_road()
+			get_viewport().set_input_as_handled()
+			return
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_R:
 			recover_to_road()
