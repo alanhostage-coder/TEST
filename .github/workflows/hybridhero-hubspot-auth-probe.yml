@@ -1,40 +1,62 @@
-name: HybridHero HubSpot auth probe
+name: HybridHero HubSpot project validate
 
 on:
+  push:
+    branches:
+      - hubspot-auth-probe
   workflow_dispatch:
 
 permissions:
   contents: read
 
-env:
-  HUBSPOT_ACCOUNT_ID: "149343114"
-  HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
-  USE_ENVIRONMENT_HUBSPOT_CONFIG: "true"
-  DEFAULT_ACCOUNT_ID: "149343114"
-  DEFAULT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
-
 jobs:
-  auth-probe:
+  validate:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
+      - name: Checkout staging branch
         uses: actions/checkout@v4
 
-      - name: Check HubSpot secret exists
+      - name: Check HubSpot credential
         shell: bash
+        env:
+          HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
         run: |
           if [ -z "$HUBSPOT_PERSONAL_ACCESS_KEY" ]; then
-            echo "::error::HUBSPOT_PERSONAL_ACCESS_KEY is not configured in this repository."
+            echo "::error::HUBSPOT_PERSONAL_ACCESS_KEY is not configured."
             exit 2
           fi
-          echo "HubSpot secret is configured; proceeding with read-only auth check."
+          echo "HubSpot credential is available."
 
-      - name: Install HubSpot CLI
-        uses: HubSpot/hubspot-project-actions/install-hubspot-cli@v1.1.0
-        with:
-          cli_version: "8.12.0"
-
-      - name: Read-only account authentication check
+      - name: Assemble HybridHero quote project
         shell: bash
         run: |
-          hs account info
+          set -euo pipefail
+          git clone --depth 1 https://github.com/HubSpot/quote-dev-starter.git hybridhero-project
+          rm -rf hybridhero-project/src/cms-assets/my-react-assets/components/modules/*
+          MOD="hybridhero-project/src/cms-assets/my-react-assets/components/modules/HybridHeroOrderForm"
+          mkdir -p "$MOD"
+          base64 -d hybridhero-staging/entityProfiles.ts.b64 > "$MOD/entityProfiles.ts"
+          base64 -d hybridhero-staging/fields.tsx.b64 > "$MOD/fields.tsx"
+          base64 -d hybridhero-staging/index.tsx.b64 > "$MOD/index.tsx"
+          base64 -d hybridhero-staging/OrderForm.module.css.b64 > "$MOD/OrderForm.module.css"
+          python -c "import json; p='hybridhero-project/hsproject.json'; d=json.load(open(p)); d['name']='hybridhero-revenue-quotes'; open(p,'w').write(json.dumps(d,indent=2)+'\\n')"
+          echo "Assembled module files:"
+          find "$MOD" -maxdepth 1 -type f -print
+
+      - name: Install project dependencies
+        working-directory: hybridhero-project
+        shell: bash
+        run: npm install
+
+      - name: TypeScript check
+        working-directory: hybridhero-project/src/cms-assets/my-react-assets
+        shell: bash
+        run: npx tsc --noEmit
+
+      - name: HubSpot project validation
+        uses: HubSpot/hubspot-project-actions/project-validate@v1.1.0
+        with:
+          project_dir: "./hybridhero-project"
+          account_id: "149343114"
+          personal_access_key: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+          cli_version: "8.12.0"
