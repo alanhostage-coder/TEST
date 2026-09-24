@@ -1,0 +1,27 @@
+name: HybridHero HubSpot project status
+
+on:
+  push:
+    branches:
+      - hubspot-auth-probe
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install HubSpot CLI
+        uses: HubSpot/hubspot-project-actions/install-hubspot-cli@v1.1.0
+        with:
+          cli_version: "8.12.0"
+
+      - name: Show HybridHero project builds
+        shell: bash
+        env:
+          HUBSPOT_ACCOUNT_ID: "149343114"
+          HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+        run: |
+          hs project list-builds --project hybridhero-revenue-quotes --limit 5 --use-env --json
