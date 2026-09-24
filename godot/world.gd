@@ -888,8 +888,8 @@ func _mapped_commercial_pois_inside_building(building: Dictionary, poi_features:
 	for poi in poi_features:
 		if not poi is Dictionary:
 			continue
-		var poi_kind = str(poi.get("kind", "")).to_lower()
-		var poi_value := poi_kind
+		var poi_kind: String = str(poi.get("kind", "")).to_lower()
+		var poi_value: String = poi_kind
 		if ":" in poi_kind:
 			poi_value = poi_kind.get_slice(":", 1)
 		if poi_value not in COMMERCIAL_GROUND_FLOOR_POI_KINDS:
@@ -1033,7 +1033,7 @@ func _add_mobile_osm_facade_detail(body: Node3D, poly: PackedVector2Array, heigh
 		inward = Vector2(-tangent.y, tangent.x)
 
 	var mapped_commercial_pois: Array = building.get("_mapped_commercial_pois", [])
-	var slots := clamp(int(floor(length / 3.4)), 2, 6)
+	var slots: int = clampi(int(floor(length / 3.4)), 2, 6)
 	var shop_slots := {}
 	for poi in mapped_commercial_pois:
 		var raw_p = poi.get("point", [])
@@ -1053,7 +1053,7 @@ func _add_mobile_osm_facade_detail(body: Node3D, poly: PackedVector2Array, heigh
 		_mobile_facade_box(body, Vector3(edge_mid.x, height - 0.16, edge_mid.y), Vector3(0.08, 0.22, length * 0.97), roof_mat, angle)
 		detail_count += 1
 
-	var floors := clamp(int(floor(height / 3.0)), 1, 2)
+	var floors: int = clampi(int(floor(height / 3.0)), 1, 2)
 	for floor_index in range(floors):
 		var y := 1.65 + float(floor_index) * 2.75
 		if y > height - 0.55:
