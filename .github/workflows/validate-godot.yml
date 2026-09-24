@@ -70,6 +70,13 @@ jobs:
           grep -q 'MOBILE_STARTUP_OK' /tmp/mobile-startup.log
           ! grep -E 'SCRIPT ERROR|Parse Error|MOBILE_STARTUP_FAIL' /tmp/mobile-startup.log
 
+      - name: Portobello field facade regression
+        run: |
+          set -o pipefail
+          timeout 45s godot --headless --path godot --script res://mobile_facade_test.gd 2>&1 | tee /tmp/mobile-facade.log
+          grep -q 'MOBILE_FACADE_OK' /tmp/mobile-facade.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|MOBILE_FACADE_FAIL' /tmp/mobile-facade.log
+
       - name: Greybeard invariants
         run: |
           grep -q 'renderer/rendering_method="mobile"' godot/project.godot
