@@ -40,4 +40,4 @@ jobs:
       - name: Read-only account authentication check
         shell: bash
         run: |
-          hs account info 149343114
+          hs account info
