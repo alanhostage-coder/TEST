@@ -1,4 +1,4 @@
-name: HybridHero HubSpot project validate
+name: HybridHero HubSpot project upload
 
 on:
   push:
@@ -10,7 +10,7 @@ permissions:
   contents: read
 
 jobs:
-  validate:
+  upload:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout staging branch
@@ -40,8 +40,6 @@ jobs:
           base64 -d hybridhero-staging/index.tsx.b64 > "$MOD/index.tsx"
           base64 -d hybridhero-staging/OrderForm.module.css.b64 > "$MOD/OrderForm.module.css"
           python -c "import json; p='hybridhero-project/hsproject.json'; d=json.load(open(p)); d['name']='hybridhero-revenue-quotes'; open(p,'w').write(json.dumps(d,indent=2)+'\\n')"
-          echo "Assembled module files:"
-          find "$MOD" -maxdepth 1 -type f -print
 
       - name: Install project dependencies
         working-directory: hybridhero-project
@@ -53,10 +51,17 @@ jobs:
         shell: bash
         run: npx tsc --noEmit
 
-      - name: HubSpot project validation
-        uses: HubSpot/hubspot-project-actions/project-validate@v1.1.0
+      - name: HubSpot project upload
+        id: hubspot_upload
+        uses: HubSpot/hubspot-project-actions/project-upload@v1.1.0
         with:
           project_dir: "./hybridhero-project"
           account_id: "149343114"
           personal_access_key: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
           cli_version: "8.12.0"
+
+      - name: Report HubSpot build IDs
+        shell: bash
+        run: |
+          echo "build_id=${{ steps.hubspot_upload.outputs.build_id }}"
+          echo "deploy_id=${{ steps.hubspot_upload.outputs.deploy_id }}"
