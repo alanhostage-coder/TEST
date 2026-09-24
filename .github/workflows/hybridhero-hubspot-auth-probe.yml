@@ -1,0 +1,43 @@
+name: HybridHero HubSpot auth probe
+
+on:
+  push:
+    branches:
+      - hubspot-auth-probe
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HUBSPOT_ACCOUNT_ID: "149343114"
+  HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+  USE_ENVIRONMENT_HUBSPOT_CONFIG: "true"
+  DEFAULT_ACCOUNT_ID: "149343114"
+  DEFAULT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+
+jobs:
+  auth-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check HubSpot secret exists
+        shell: bash
+        run: |
+          if [ -z "$HUBSPOT_PERSONAL_ACCESS_KEY" ]; then
+            echo "::error::HUBSPOT_PERSONAL_ACCESS_KEY is not configured in this repository."
+            exit 2
+          fi
+          echo "HubSpot secret is configured; proceeding with read-only auth check."
+
+      - name: Install HubSpot CLI
+        uses: HubSpot/hubspot-project-actions/install-hubspot-cli@v1.1.0
+        with:
+          cli_version: "8.12.0"
+
+      - name: Read-only account authentication check
+        shell: bash
+        run: |
+          hs account info 149343114 --use-env
