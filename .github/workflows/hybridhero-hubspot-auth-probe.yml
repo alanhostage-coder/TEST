@@ -1,9 +1,6 @@
 name: HybridHero HubSpot project upload
 
 on:
-  push:
-    branches:
-      - hubspot-auth-probe
   workflow_dispatch:
 
 permissions:
