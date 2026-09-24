@@ -27,6 +27,7 @@ const LOW_SPEC_EXACT_FOOTPRINT_RADIUS := 220.0
 const DRIVER_DETAIL_RADIUS := 38.0
 const MOBILE_BUILDING_VISUAL_RADIUS := 420.0
 const MOBILE_COLLIDING_BUILDING_RADIUS := 190.0
+const MOBILE_FACADE_RADIUS := 92.0
 const XPS_LIGHT_GRADE := "edinburgh-side-light-v1"
 var low_spec_mode := false
 var projector_max_mode := false
@@ -888,7 +889,10 @@ func _mapped_commercial_pois_inside_building(building: Dictionary, poi_features:
 		if not poi is Dictionary:
 			continue
 		var poi_kind = str(poi.get("kind", "")).to_lower()
-		if poi_kind not in COMMERCIAL_GROUND_FLOOR_POI_KINDS:
+		var poi_value := poi_kind
+		if ":" in poi_kind:
+			poi_value = poi_kind.get_slice(":", 1)
+		if poi_value not in COMMERCIAL_GROUND_FLOOR_POI_KINDS:
 			continue
 		var raw_p = poi.get("point", [])
 		if not raw_p is Array or raw_p.size() < 2:
@@ -957,10 +961,132 @@ func _osm_building_material(building: Dictionary, seed: int):
 		_:
 			return sandstone_warm_mat
 
+
+func _nearest_drivable_road_distance(point: Vector2) -> float:
+	var best := INF
+	for segment in map_segments:
+		if not segment is Array or segment.size() < 4:
+			continue
+		var kind := str(segment[3]).to_lower()
+		if kind in ["service", "track", "path", "footway", "cycleway"]:
+			continue
+		var a := Vector2(float(segment[0][0]), float(segment[0][1]))
+		var b := Vector2(float(segment[1][0]), float(segment[1][1]))
+		best = minf(best, _point_segment_distance_2d(point, a, b))
+	return best
+
+func _mobile_facade_box(body: Node3D, pos: Vector3, size: Vector3, material, angle: float, range_end: float = 105.0):
+	_visual_box(body, pos, size, material)
+	var node = body.get_child(body.get_child_count() - 1)
+	if node is MeshInstance3D:
+		node.rotation.y = angle
+		node.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		node.visibility_range_end = range_end
+		node.set_meta("mobile_facade_detail", true)
+
+func _add_mobile_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height: float, seed: int, building: Dictionary):
+	if not mobile_mode or poly.size() < 3 or height < 3.8:
+		return
+	var kind := str(building.get("kind", "yes")).to_lower()
+	if kind in ["garage", "garages", "shed", "roof", "industrial", "warehouse"]:
+		return
+	var car = get_node_or_null("Car")
+	if car == null:
+		return
+	var centroid := Vector2.ZERO
+	for p in poly:
+		centroid += p
+	centroid /= float(poly.size())
+	var car2 := Vector2(car.global_position.x, car.global_position.z)
+	if centroid.distance_to(car2) > MOBILE_FACADE_RADIUS:
+		return
+
+	var best_edge := -1
+	var best_score := INF
+	for edge_index in range(poly.size()):
+		var p0: Vector2 = poly[edge_index]
+		var p1: Vector2 = poly[(edge_index + 1) % poly.size()]
+		var length := p0.distance_to(p1)
+		if length < 5.0:
+			continue
+		var edge_mid := (p0 + p1) * 0.5
+		var road_distance := _nearest_drivable_road_distance(edge_mid)
+		var car_distance := edge_mid.distance_to(car2)
+		var score := road_distance * 4.0 + car_distance
+		if road_distance <= 18.0 and score < best_score:
+			best_score = score
+			best_edge = edge_index
+	if best_edge < 0:
+		return
+
+	var p0: Vector2 = poly[best_edge]
+	var p1: Vector2 = poly[(best_edge + 1) % poly.size()]
+	var delta := p1 - p0
+	var length := delta.length()
+	if length < 5.0:
+		return
+	var tangent := delta / length
+	var angle := atan2(tangent.x, tangent.y)
+	var edge_mid := (p0 + p1) * 0.5
+	var inward := (centroid - edge_mid).normalized()
+	if inward.length() < 0.5:
+		inward = Vector2(-tangent.y, tangent.x)
+
+	var mapped_commercial_pois: Array = building.get("_mapped_commercial_pois", [])
+	var slots := clamp(int(floor(length / 3.4)), 2, 6)
+	var shop_slots := {}
+	for poi in mapped_commercial_pois:
+		var raw_p = poi.get("point", [])
+		if not raw_p is Array or raw_p.size() < 2:
+			continue
+		var poi_point := Vector2(float(raw_p[0]), float(raw_p[1]))
+		if _nearest_poly_edge(poly, poi_point) != best_edge:
+			continue
+		var along := clampf((poi_point - p0).dot(delta) / maxf(length * length, 0.001), 0.0, 0.999)
+		shop_slots[int(floor(along * float(slots)))] = true
+
+	var detail_count := 0
+	var shopfront_count := 0
+	_mobile_facade_box(body, Vector3(edge_mid.x, 0.20, edge_mid.y), Vector3(0.08, 0.40, length * 0.97), roof_mat, angle)
+	detail_count += 1
+	if height > 5.2:
+		_mobile_facade_box(body, Vector3(edge_mid.x, height - 0.16, edge_mid.y), Vector3(0.08, 0.22, length * 0.97), roof_mat, angle)
+		detail_count += 1
+
+	var floors := clamp(int(floor(height / 3.0)), 1, 2)
+	for floor_index in range(floors):
+		var y := 1.65 + float(floor_index) * 2.75
+		if y > height - 0.55:
+			continue
+		for slot in range(slots):
+			var t := (float(slot) + 0.5) / float(slots)
+			var p := p0.lerp(p1, t)
+			var slot_width := maxf(1.1, length / float(slots) * 0.58)
+			if floor_index == 0 and shop_slots.has(slot):
+				var recessed := p + inward * 0.10
+				_mobile_facade_box(body, Vector3(recessed.x, 1.15, recessed.y), Vector3(0.07, 2.10, minf(2.7, slot_width * 1.35)), tenement_sash_glass_mat, angle, 120.0)
+				_mobile_facade_box(body, Vector3(p.x, 2.35, p.y), Vector3(0.09, 0.30, minf(2.9, slot_width * 1.45)), tenement_sash_frame_mat, angle, 120.0)
+				detail_count += 2
+				shopfront_count += 1
+				continue
+			var recessed_window := p + inward * 0.08
+			_mobile_facade_box(body, Vector3(recessed_window.x, y, recessed_window.y), Vector3(0.06, 1.35, minf(1.25, slot_width)), tenement_sash_glass_mat, angle)
+			detail_count += 1
+
+	body.set_meta("mobile_facade_detail_count", detail_count)
+	body.set_meta("mobile_shopfront_count", shopfront_count)
+	body.set_meta("mobile_facade_edge", best_edge)
+	body.set_meta("mobile_facade_source", "osm_footprint+generic_visuals")
+
 func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height: float, seed: int, building: Dictionary):
 	# Keep the mapped polygon authoritative. All facade treatment is generic visual
 	# approximation attached to real OSM wall edges, never replacement geometry.
-	if not pc_max_mode or low_spec_mode or poly.size() < 3:
+	if poly.size() < 3:
+		return
+	if mobile_mode:
+		_add_mobile_osm_facade_detail(body, poly, height, seed, building)
+		return
+	if not pc_max_mode or low_spec_mode:
 		return
 	var centroid := Vector2.ZERO
 	for p in poly:
@@ -1293,6 +1419,8 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 		return false
 	var body = StaticBody3D.new()
 	body.name = "OSMFootprint_%d" % seed
+	body.set_meta("osm_id", int(building.get("osm_id", 0)))
+	body.set_meta("osm_kind", str(building.get("kind", "")))
 	var visual = MeshInstance3D.new()
 	visual.mesh = mesh
 	visual.material_override = _osm_building_material(building, seed)
@@ -1813,15 +1941,15 @@ func _on_map_ready(map_data: Dictionary):
 			continue
 		var seed = int(abs(cx * 17.0 + cz * 31.0 + sx * 11.0 + sz * 7.0))
 		var kind = str(building.get("kind", "yes"))
+		var exact_detail_origin := detail_origin if mobile_mode else Vector2.ZERO
+		var building_distance := Vector2(cx, cz).distance_to(exact_detail_origin)
 		var visual_building: Dictionary = building
-		if pc_max_mode and not low_spec_mode:
+		if (pc_max_mode and not low_spec_mode) or (mobile_mode and building_distance <= MOBILE_FACADE_RADIUS):
 			var commercial_pois := _mapped_commercial_pois_inside_building(building, poi_features)
 			if not commercial_pois.is_empty():
 				visual_building = building.duplicate(true)
 				visual_building["_mapped_commercial_pois"] = commercial_pois
 		var exact_radius = MOBILE_COLLIDING_BUILDING_RADIUS if mobile_mode else (LOW_SPEC_EXACT_FOOTPRINT_RADIUS if low_spec_mode else (620.0 if pc_max_mode else 260.0))
-		var exact_detail_origin := detail_origin if mobile_mode else Vector2.ZERO
-		var building_distance := Vector2(cx, cz).distance_to(exact_detail_origin)
 		var exact = building_distance <= exact_radius and _add_exact_osm_building(map_root, visual_building, h, seed)
 		if exact:
 			exact_building_count += 1
