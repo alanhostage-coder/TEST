@@ -1044,6 +1044,10 @@ func _add_mobile_osm_facade_detail(body: Node3D, poly: PackedVector2Array, heigh
 			continue
 		var along := clampf((poi_point - p0).dot(delta) / maxf(length * length, 0.001), 0.0, 0.999)
 		shop_slots[int(floor(along * float(slots)))] = true
+	if shop_slots.is_empty() and not mapped_commercial_pois.is_empty():
+		# OSM proves commercial presence inside this building, but not an exact
+		# frontage unit. Put one generic cue on the chosen street-facing edge.
+		shop_slots[int(floor(float(slots) * 0.5))] = true
 
 	var detail_count := 0
 	var shopfront_count := 0
