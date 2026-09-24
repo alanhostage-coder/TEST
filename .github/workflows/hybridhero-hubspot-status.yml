@@ -24,4 +24,4 @@ jobs:
           HUBSPOT_ACCOUNT_ID: "149343114"
           HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
         run: |
-          hs project list-builds --project hybridhero-revenue-quotes --limit 5 --use-env --json
+          hs project list-builds --project hybridhero-revenue-quotes --limit 5 --use-env
