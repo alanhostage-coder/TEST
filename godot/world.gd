@@ -1331,7 +1331,7 @@ func _add_mobile_osm_facade_detail(body: Node3D, poly: PackedVector2Array, heigh
 	# stacks are generic visual dressing, not a claim about mapped chimney counts.
 	if height > 5.4 and centroid.distance_to(car2) <= 190.0 and kind not in ["garage", "garages", "shed", "roof", "industrial", "warehouse"]:
 		var roof_axis := (p1 - p0).normalized()
-		var chimney_count := 1 + (abs(seed) % 2)
+		var chimney_count: int = 1 + (abs(seed) % 2)
 		for chimney_index in range(chimney_count):
 			var chimney_offset := (float(chimney_index) - float(chimney_count - 1) * 0.5) * 2.2
 			var chimney_p := centroid + roof_axis * chimney_offset
