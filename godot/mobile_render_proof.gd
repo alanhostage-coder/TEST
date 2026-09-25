@@ -82,15 +82,21 @@ func run() -> void:
 		car.steering_velocity = 0.0
 		car.lateral_load = 0.0
 		car.camera_yaw = 0.0
+		car.look_touching = false
 		if bool(target.get("focus", false)):
 			var focus_direction: Vector2 = (point - p).normalized()
 			if focus_direction.length() > 0.5:
 				var focus_heading: float = atan2(-focus_direction.x, -focus_direction.y)
-				car.camera_yaw = clampf(wrapf(focus_heading - car.rotation.y, -PI, PI), -1.05, 1.05)
+				car.camera_yaw = clampf(wrapf(focus_heading - car.rotation.y, -PI, PI), -1.45, 1.45)
+				car.look_touching = true
 		car.camera_pitch = 0.0
-		car.camera_idle = 2.0
+		car.camera_idle = 0.0
 		car.camera_lag = Vector3.ZERO
 		car.previous_position = car.global_position
+		var director = root.get_node_or_null("OpenWorldDirector")
+		if director:
+			director.built_signature = ""
+			director._try_build_from_live_roads()
 		for _settle in range(18):
 			await physics_frame
 			await process_frame
@@ -100,6 +106,7 @@ func run() -> void:
 			push_error("PUA_MOBILE_RENDER_FAIL save " + str(target["slug"]))
 			_finish(2)
 			return
+		car.look_touching = false
 	print("PUA_MOBILE_RENDER_OK captures=5")
 	_finish(0)
 
