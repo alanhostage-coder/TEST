@@ -36,6 +36,7 @@ var assisted_target_speed := 17.5
 var wheel_spin := 0.0
 var steering_velocity := 0.0
 var lateral_load := 0.0
+var terrain_pitch := 0.0
 const MOBILE_RECOVER_RECT := Rect2(18.0, 42.0, 118.0, 46.0)
 
 
@@ -218,7 +219,8 @@ func _physics_process(delta):
 	velocity = velocity.lerp(desired_velocity, 1.0 - exp(-delta * grip))
 	var before = global_position
 	move_and_slide()
-	distance_driven += before.distance_to(global_position)
+	_follow_mobile_terrain(delta)
+	distance_driven += Vector2(before.x, before.z).distance_to(Vector2(global_position.x, global_position.z))
 	if is_on_wall():
 		impact_kick = min(1.0, impact_kick + abs(speed) / 22.0)
 		speed *= 0.24
@@ -241,6 +243,33 @@ func _physics_process(delta):
 	if persist_timer >= 5.0:
 		persist_timer = 0.0
 		_save_state()
+
+
+func _mobile_terrain_height(point: Vector2) -> float:
+	if not (OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1"):
+		return 0.0
+	var stream = get_node_or_null("../MapStream")
+	if stream and stream.has_method("terrain_height_at"):
+		return float(stream.terrain_height_at(point))
+	return 0.0
+
+func _follow_mobile_terrain(delta: float):
+	if not (OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1"):
+		terrain_pitch = lerp(terrain_pitch, 0.0, 1.0 - exp(-delta * 4.0))
+		return
+	var p := Vector2(global_position.x, global_position.z)
+	var ground_y := _mobile_terrain_height(p)
+	global_position.y = lerpf(global_position.y, ground_y + 0.58, 1.0 - exp(-delta * 14.0))
+	var forward := -global_transform.basis.z
+	var forward2 := Vector2(forward.x, forward.z).normalized()
+	if forward2.length() < 0.5:
+		return
+	var ahead_y := _mobile_terrain_height(p + forward2 * 5.0)
+	var behind_y := _mobile_terrain_height(p - forward2 * 5.0)
+	var target_pitch := atan2(ahead_y - behind_y, 10.0)
+	terrain_pitch = lerp(terrain_pitch, target_pitch, 1.0 - exp(-delta * 5.0))
+	set_meta("terrain_ground_y", ground_y)
+	set_meta("terrain_pitch_deg", rad_to_deg(terrain_pitch))
 
 func _is_near_road() -> bool:
 	var segments = get_meta("map_road_segments", [])
@@ -277,7 +306,7 @@ func recover_to_road():
 			best = point.distance_squared_to(p)
 			target = point
 			heading = atan2(-d.x, -d.y)
-	global_position = Vector3(target.x, 0.58, target.y)
+	global_position = Vector3(target.x, _mobile_terrain_height(target) + 0.58 if (OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1") else 0.58, target.y)
 	rotation.y = heading
 	speed = 0.0
 	velocity = Vector3.ZERO
@@ -296,7 +325,7 @@ func _point_segment_distance(p: Vector2, a: Vector2, b: Vector2) -> float:
 
 func _update_visuals(delta, speed_ratio):
 	var body_roll = -lateral_load * 0.052
-	var body_pitch = -suspension_pitch * 0.65
+	var body_pitch = terrain_pitch - suspension_pitch * 0.65
 	$Body.rotation.z = lerp_angle($Body.rotation.z, body_roll, 1.0 - exp(-delta * 6.0))
 	$Body.rotation.x = lerp_angle($Body.rotation.x, body_pitch, 1.0 - exp(-delta * 7.0))
 	$Roof.rotation.z = lerp_angle($Roof.rotation.z, body_roll, 1.0 - exp(-delta * 6.0))
