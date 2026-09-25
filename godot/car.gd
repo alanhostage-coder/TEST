@@ -351,10 +351,12 @@ func _mobile_camera_clearance(lateral: float, height: float, distance: float) ->
 		return distance
 	var hit_position: Vector3 = hit.get("position", desired_world)
 	var total_distance := maxf(0.01, ray_origin.distance_to(desired_world))
-	var clear_distance := maxf(0.0, ray_origin.distance_to(hit_position) - 0.55)
-	var ratio := clampf(clear_distance / total_distance, 0.34, 1.0)
+	var clear_distance := maxf(0.0, ray_origin.distance_to(hit_position) - 0.42)
+	# Do not enforce a large minimum here. If a wall is closer than the minimum,
+	# forcing the camera back through that wall defeats the collision test.
+	var ratio := clampf(clear_distance / total_distance, 0.05, 1.0)
 	set_meta("mobile_camera_clearance_ratio", ratio)
-	return maxf(2.85, distance * ratio)
+	return maxf(0.85, distance * ratio)
 
 func _update_camera(delta, speed_ratio):
 	var rig = $CameraRig
@@ -385,8 +387,14 @@ func _update_camera(delta, speed_ratio):
 	chase_height += shake + road_texture - suspension_heave
 	var chase_distance = (6.25 + speed_ratio * 1.55) if mobile_runtime else (7.7 + speed_ratio * 3.7)
 	chase_distance += camera_lag.z
+	var camera_clearance_ratio := 1.0
 	if mobile_runtime:
 		chase_distance = _mobile_camera_clearance(lateral, chase_height, chase_distance)
+		camera_clearance_ratio = float(get_meta("mobile_camera_clearance_ratio", 1.0))
+		if camera_clearance_ratio < 0.58:
+			# When there is no room for a conventional chase view, rise above the
+			# rear bodywork instead of clipping backwards into the building.
+			chase_height += (0.58 - camera_clearance_ratio) * 4.6
 	rig.position.x = lerp(rig.position.x, lateral, 1.0 - exp(-delta * 4.0 if mobile_runtime else delta * 3.0))
 	rig.position.y = lerp(rig.position.y, chase_height, 1.0 - exp(-delta * 3.2 if mobile_runtime else delta * 2.2))
 	rig.position.z = lerp(rig.position.z, chase_distance, 1.0 - exp(-delta * 5.5 if mobile_runtime else delta * 1.7))
@@ -395,6 +403,8 @@ func _update_camera(delta, speed_ratio):
 	rig.rotation.y = lerp_angle(rig.rotation.y, camera_yaw + camera_look_ahead - camera_lag.x * 0.025, 1.0 - exp(-delta * 3.1))
 	rig.rotation.z = lerp_angle(rig.rotation.z, -lateral_load * 0.006, 1.0 - exp(-delta * 4.8))
 	var target_fov: float = (68.0 + speed_ratio * 4.5) if mobile_runtime else (60.0 + speed_ratio * 13.0)
+	if mobile_runtime and camera_clearance_ratio < 0.58:
+		target_fov += (0.58 - camera_clearance_ratio) * 8.0
 	$CameraRig/Camera3D.fov = lerp($CameraRig/Camera3D.fov, target_fov, 1.0 - exp(-delta * 1.65))
 
 func _save_state():
