@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-import json, math, os
+import json, math, os, struct
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -11,6 +11,91 @@ LON_STEP=0.0195
 OUT=Path(os.environ.get("PUA_EH15_OUT","eh15_full"))
 HIGHWAYS={"motorway","trunk","primary","secondary","tertiary","residential","unclassified","living_street","service","track"}
 ATTENTION={"traffic_signals","crossing","bus_stop","stop","give_way"}
+HGT_SIZE=3601
+HGT_SOUTH=55.0
+HGT_WEST=-4.0
+TERRAIN_STEP_M=25.0
+_HGT=None
+_TERRAIN_REFERENCE_M=0.0
+
+def load_hgt(path):
+    global _HGT,_TERRAIN_REFERENCE_M
+    raw=Path(path).read_bytes()
+    expected=HGT_SIZE*HGT_SIZE*2
+    if len(raw)!=expected:
+        raise RuntimeError(f"Unexpected HGT byte size {len(raw)} expected {expected}")
+    _HGT=raw
+    _TERRAIN_REFERENCE_M=sample_elevation_abs(CENTER_LAT,CENTER_LON)
+    if not math.isfinite(_TERRAIN_REFERENCE_M):
+        raise RuntimeError("Terrain reference elevation invalid")
+
+def _hgt_value(row,col):
+    row=max(0,min(HGT_SIZE-1,int(row))); col=max(0,min(HGT_SIZE-1,int(col)))
+    off=(row*HGT_SIZE+col)*2
+    value=struct.unpack_from(">h",_HGT,off)[0]
+    return None if value<=-32768 else float(value)
+
+def sample_elevation_abs(lat,lon):
+    if _HGT is None:
+        return 0.0
+    # N55W004 covers 55..56N, -4..-3E. HGT rows run north to south.
+    rf=(56.0-float(lat))*(HGT_SIZE-1)
+    cf=(float(lon)-HGT_WEST)*(HGT_SIZE-1)
+    r0=math.floor(rf); c0=math.floor(cf)
+    tr=rf-r0; tc=cf-c0
+    vals=[]
+    for rr,wr in ((r0,1.0-tr),(r0+1,tr)):
+        for cc,wc in ((c0,1.0-tc),(c0+1,tc)):
+            v=_hgt_value(rr,cc)
+            if v is not None: vals.append((v,wr*wc))
+    if not vals:
+        return _TERRAIN_REFERENCE_M
+    weight=sum(w for _,w in vals)
+    return sum(v*w for v,w in vals)/weight if weight>0 else vals[0][0]
+
+def terrain_y(lat,lon):
+    return sample_elevation_abs(lat,lon)-_TERRAIN_REFERENCE_M
+
+def local_to_lat_lon(x,z):
+    lat=CENTER_LAT-float(z)/111320.0
+    lon=CENTER_LON+float(x)/(111320.0*math.cos(math.radians(CENTER_LAT)))
+    return lat,lon
+
+def build_elevation_grid(outdir):
+    sw=local(SOUTH,WEST); ne=local(NORTH,EAST)
+    min_x=min(sw[0],ne[0]); max_x=max(sw[0],ne[0])
+    min_z=min(sw[1],ne[1]); max_z=max(sw[1],ne[1])
+    cols=int(math.ceil((max_x-min_x)/TERRAIN_STEP_M))+1
+    rows=int(math.ceil((max_z-min_z)/TERRAIN_STEP_M))+1
+    values=[]; min_y=1e9; max_y=-1e9
+    for rz in range(rows):
+        z=min(max_z,min_z+rz*TERRAIN_STEP_M)
+        for cx in range(cols):
+            x=min(max_x,min_x+cx*TERRAIN_STEP_M)
+            lat,lon=local_to_lat_lon(x,z)
+            y=terrain_y(lat,lon)
+            min_y=min(min_y,y); max_y=max(max_y,y)
+            values.append(int(round(y*10.0)))
+    payload={
+      "format":1,
+      "source":"Mapzen Terrain Tiles / AWS Open Data",
+      "source_url":"https://registry.opendata.aws/terrain-tiles/",
+      "source_tile":"N55W004",
+      "source_format":"Skadi HGT (SRTM1-compatible)",
+      "license_url":"https://github.com/tilezen/joerd/blob/master/docs/attribution.md",
+      "reference_lat":CENTER_LAT,"reference_lon":CENTER_LON,
+      "reference_elevation_m":round(_TERRAIN_REFERENCE_M,3),
+      "sea_level_local_y_m":round(-_TERRAIN_REFERENCE_M,3),
+      "min_x":round(min_x,3),"min_z":round(min_z,3),
+      "max_x":round(max_x,3),"max_z":round(max_z,3),
+      "step_m":TERRAIN_STEP_M,"cols":cols,"rows":rows,
+      "encoding":"signed_decimetres_relative_to_reference",
+      "min_y_m":round(min_y,2),"max_y_m":round(max_y,2),
+      "values_dm":values
+    }
+    (outdir/"elevation.json").write_text(json.dumps(payload,separators=(",",":")))
+    return payload
+
 
 def local(lat,lon):
     return [(lon-CENTER_LON)*(111320.0*math.cos(math.radians(CENTER_LAT))), -(lat-CENTER_LAT)*111320.0]
@@ -38,13 +123,13 @@ def road_width(tags):
 def points(coords,min_gap=.75):
     out=[];last=None
     for lon,lat,*_ in coords:
-        p=local(float(lat),float(lon))
+        lat=float(lat); lon=float(lon); p=local(lat,lon)
         if last is None or math.hypot(p[0]-last[0],p[1]-last[1])>=min_gap:
-            out.append([round(p[0],3),round(p[1],3)]);last=p
+            out.append([round(p[0],3),round(p[1],3),round(terrain_y(lat,lon),2)]);last=p
     if len(coords)>1:
-        lon,lat,*_=coords[-1];p=local(float(lat),float(lon))
+        lon,lat,*_=coords[-1];lat=float(lat);lon=float(lon);p=local(lat,lon)
         if not out or math.hypot(p[0]-out[-1][0],p[1]-out[-1][1])>2:
-            out.append([round(p[0],3),round(p[1],3)])
+            out.append([round(p[0],3),round(p[1],3),round(terrain_y(lat,lon),2)])
     return out
 
 def number(tags,key):
@@ -59,10 +144,12 @@ def building(tags,coords,oid):
     sx=max(xs)-min(xs);sz=max(zs)-min(zs)
     if sx<2 or sz<2 or sx>220 or sz>220:return None
     levels=number(tags,"building:levels"); tagged=number(tags,"height")
+    ys=[float(p[2]) for p in pts if len(p)>=3]
+    ground_y=sorted(ys)[len(ys)//2] if ys else 0.0
     h=tagged if tagged>1.5 else max(3.2,levels*3.0)
     if h<=3.2:h=6.0
     return {"osm_id":oid,"center":[round((min(xs)+max(xs))/2,3),round((min(zs)+max(zs))/2,3)],
-      "size":[round(sx,3),round(sz,3)],"footprint":pts,"height":round(max(3,min(48,h)),2),
+      "size":[round(sx,3),round(sz,3)],"footprint":pts,"height":round(max(3,min(48,h)),2),"ground_y":round(ground_y,2),
       "footprint_source":"osm:way_geometry","height_source":"osm:height" if tagged>1.5 else ("estimated:osm_levels_x_3m" if levels>0 else "estimated:no_osm_height_default"),
       "levels":levels,"kind":str(tags.get("building","yes")),"material":str(tags.get("building:material","")),
       "roof_shape":str(tags.get("roof:shape","")),"roof_material":str(tags.get("roof:material","")),
@@ -187,6 +274,10 @@ def build_destinations(outdir,tiles,source_timestamp):
 
 def main():
     path=Path(os.environ.get("EH15_GEOJSON","eh15.geojson"))
+    hgt_path=os.environ.get("EH15_HGT","")
+    if not hgt_path:
+        raise RuntimeError("EH15_HGT is required; Android EH15 may not be built flat")
+    load_hgt(hgt_path)
     fc=json.loads(path.read_text())
     rows=math.ceil((NORTH-SOUTH)/LAT_STEP);cols=math.ceil((EAST-WEST)/LON_STEP)
     bytile={}
@@ -199,12 +290,12 @@ def main():
         props=props_clean(f.get("properties") or {});geom=f.get("geometry") or {};typ=geom.get("type","");coords=geom.get("coordinates") or [];oid=osm_id(f.get("properties") or {})
         item=None;key=None
         if typ=="Point":
-            lon,lat,*_=coords;p=local(lat,lon);highway=str(props.get("highway",""))
+            lon,lat,*_=coords;lat=float(lat);lon=float(lon);p=local(lat,lon);ground_y=round(terrain_y(lat,lon),2);highway=str(props.get("highway",""))
             if props.get("natural")=="tree" or highway in ATTENTION or "traffic_sign" in props:
-                item={"osm_id":oid,"kind":"tree" if props.get("natural")=="tree" else ("traffic_sign" if "traffic_sign" in props and not highway else highway),"name":str(props.get("name","")),"traffic_sign":str(props.get("traffic_sign","")),"point":[round(p[0],3),round(p[1],3)]};key="point_features"
+                item={"osm_id":oid,"kind":"tree" if props.get("natural")=="tree" else ("traffic_sign" if "traffic_sign" in props and not highway else highway),"name":str(props.get("name","")),"traffic_sign":str(props.get("traffic_sign","")),"point":[round(p[0],3),round(p[1],3)],"ground_y":ground_y};key="point_features"
             if props.get("name") and any(k in props for k in ("amenity","shop","tourism","leisure","historic","place")):
                 kind=next((k+":"+str(props[k]) for k in ("amenity","shop","tourism","leisure","historic","place") if k in props),"poi")
-                poi={"osm_id":oid,"kind":kind,"name":str(props.get("name","")),"point":[round(p[0],3),round(p[1],3)]}
+                poi={"osm_id":oid,"kind":kind,"name":str(props.get("name","")),"point":[round(p[0],3),round(p[1],3)],"ground_y":ground_y}
                 x,z=feature_point(poi);bytile[tile_for_point(x,z,rows,cols)]["poi_features"].append(poi)
             if item:
                 x,z=feature_point(item);bytile[tile_for_point(x,z,rows,cols)][key].append(item)
@@ -261,6 +352,7 @@ def main():
             x,z=feature_point(item);bytile[tile_for_point(x,z,rows,cols)][key].append(item)
     road_conflict_culled=cull_buildings_in_drivable_corridors(bytile)
     OUT.mkdir(parents=True,exist_ok=True)
+    elevation=build_elevation_grid(OUT)
     source_timestamp=os.environ.get("OSM_SOURCE_TIMESTAMP","")
     tiles=[];records=[];totals={k:0 for k in ("roads","buildings","linear_features","point_features","poi_features","identity_features")}
     identity_kind_totals={}
@@ -275,7 +367,20 @@ def main():
             identity_kind_totals[kind]=identity_kind_totals.get(kind,0)+1
         records.append(tile);tiles.append({"id":tid,"file":fn,"bbox":tile["bbox"],"local_bounds":tile["local_bounds"],"counts":counts})
     dest=build_destinations(OUT,records,source_timestamp)
-    manifest={"patch_format":2,"patch_id":"uk-edinburgh-eh15-full","display_name":"EH15 · Edinburgh","source":"packaged_osm_tiles","source_name":"OpenStreetMap via Geofabrik Scotland extract","source_url":"https://download.geofabrik.de/europe/united-kingdom/scotland.html","source_timestamp_utc":source_timestamp,"generated_utc":datetime.now(timezone.utc).isoformat(),"license":"ODbL 1.0; © OpenStreetMap contributors","start_postcode":"EH15","center_lat":CENTER_LAT,"center_lon":CENTER_LON,"coverage_bbox":[SOUTH,WEST,NORTH,EAST],"coverage_note":"Conservative envelope covers EH15 plus a small fringe; not asserted as an official postal boundary.","tile_rows":rows,"tile_cols":cols,"tiles":tiles,"raw_tile_totals":totals,"identity_kind_totals":identity_kind_totals,"dedupe_policy":"osm_id+kind per tile","road_conflict_policy":"offline_nonservice_corridor_cull_v1","road_conflict_culled":road_conflict_culled,"destination_count":dest}
+    manifest={"patch_format":2,"patch_id":"uk-edinburgh-eh15-full","display_name":"EH15 · Edinburgh","source":"packaged_osm_tiles","source_name":"OpenStreetMap via Geofabrik Scotland extract","source_url":"https://download.geofabrik.de/europe/united-kingdom/scotland.html","source_timestamp_utc":source_timestamp,"generated_utc":datetime.now(timezone.utc).isoformat(),"license":"ODbL 1.0; © OpenStreetMap contributors","start_postcode":"EH15","center_lat":CENTER_LAT,"center_lon":CENTER_LON,"coverage_bbox":[SOUTH,WEST,NORTH,EAST],"coverage_note":"Conservative envelope covers EH15 plus a small fringe; not asserted as an official postal boundary.","tile_rows":rows,"tile_cols":cols,"tiles":tiles,"raw_tile_totals":totals,"identity_kind_totals":identity_kind_totals,"dedupe_policy":"osm_id+kind per tile","road_conflict_policy":"offline_nonservice_corridor_cull_v1","road_conflict_culled":road_conflict_culled,
+        "terrain":{"file":"elevation.json","source":elevation["source"],"source_url":elevation["source_url"],"source_tile":elevation["source_tile"],
+        "reference_elevation_m":elevation["reference_elevation_m"],"sea_level_local_y_m":elevation["sea_level_local_y_m"],
+        "min_y_m":elevation["min_y_m"],"max_y_m":elevation["max_y_m"],"step_m":elevation["step_m"]},"destination_count":dest}
     (OUT/"manifest.json").write_text(json.dumps(manifest,separators=(",",":")))
-    print(json.dumps({"tiles":len(tiles),"totals":totals,"identity_kinds":identity_kind_totals,"road_conflict_culled":road_conflict_culled,"destinations":dest,"source_timestamp":source_timestamp},indent=2))
+    pittville=[]
+    for tile in records:
+        for road in tile["roads"]:
+            if str(road.get("name","")).strip().lower()=="pittville street":
+                pittville.extend(road.get("points",[]))
+    pittville_y=[float(p[2]) for p in pittville if isinstance(p,list) and len(p)>=3]
+    pittville_relief=(max(pittville_y)-min(pittville_y)) if pittville_y else 0.0
+    print(json.dumps({"tiles":len(tiles),"totals":totals,"identity_kinds":identity_kind_totals,
+      "road_conflict_culled":road_conflict_culled,"terrain_relief_m":round(elevation["max_y_m"]-elevation["min_y_m"],2),
+      "pittville_relief_m":round(pittville_relief,2),"terrain_reference_m":elevation["reference_elevation_m"],
+      "destinations":dest,"source_timestamp":source_timestamp},indent=2))
 if __name__=="__main__":main()
