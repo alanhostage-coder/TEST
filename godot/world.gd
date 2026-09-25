@@ -2430,11 +2430,11 @@ func _place_car_for_first_impression(car, roads: Array, buildings: Array, poi_fe
 		best_junction = fallback
 		best_spawn = fallback
 		best_approach = 0.0
-	car.global_position = Vector3(best_spawn.x, max(car.global_position.y, 0.58), best_spawn.y)
+	car.global_position = Vector3(best_spawn.x, _terrain_height(best_spawn) + 0.58 if mobile_mode else max(car.global_position.y, 0.58), best_spawn.y)
 	car.rotation.y = atan2(-best_heading.x, -best_heading.y)
 	car.set_meta("map_spawn_junction", [best_junction.x, best_junction.y])
 	car.set_meta("map_spawn_heading", [best_heading.x, best_heading.y])
-	car.set_meta("map_opening_policy", "verified-first-impression-v1")
+	car.set_meta("map_opening_policy", "terrain-aware-first-impression-v2" if mobile_mode else "verified-first-impression-v1")
 	car.set_meta("map_opening_hook_score", best_score)
 	car.set_meta("map_opening_branch_count", best_branch_count)
 	car.set_meta("map_opening_approach_m", best_approach)
