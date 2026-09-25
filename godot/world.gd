@@ -229,6 +229,15 @@ func _make_materials():
 		sea_mat.albedo_color = Color(0.055, 0.23, 0.33)
 		beach_mat.albedo_color = Color(0.62, 0.54, 0.39)
 		tenement_sash_frame_mat.albedo_color = Color(0.88, 0.86, 0.78)
+		# OSM footprints can arrive with either winding direction. Building shells
+		# must therefore remain opaque from both sides on Android; otherwise far-side
+		# window/detail boxes become visible through a culled wall and appear to float.
+		for shell_material in [
+			sandstone_mat, sandstone_warm_mat, soot_stone_mat, soot_stone_cool_mat,
+			brick_mat, render_mat, concrete_mat, roof_mat,
+			tenement_weathered_mat, tenement_warm_mat, tenement_soot_mat
+		]:
+			shell_material.cull_mode = BaseMaterial3D.CULL_DISABLED
 		for stone_material in [sandstone_mat, sandstone_warm_mat, soot_stone_mat]:
 			stone_material.emission_enabled = true
 			stone_material.emission = stone_material.albedo_color
