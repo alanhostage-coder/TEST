@@ -27,7 +27,7 @@ const LOW_SPEC_EXACT_FOOTPRINT_RADIUS := 220.0
 const DRIVER_DETAIL_RADIUS := 38.0
 const MOBILE_BUILDING_VISUAL_RADIUS := 420.0
 const MOBILE_COLLIDING_BUILDING_RADIUS := 190.0
-const MOBILE_FACADE_RADIUS := 300.0
+const MOBILE_FACADE_RADIUS := 340.0
 const MOBILE_ROAD_VISUAL_RADIUS := 540.0
 const MOBILE_STREET_DETAIL_RADIUS := 235.0
 const XPS_LIGHT_GRADE := "edinburgh-side-light-v1"
@@ -1189,11 +1189,11 @@ func _add_mobile_osm_facade_detail(body: Node3D, poly: PackedVector2Array, heigh
 		if _nearest_poly_edge(poly, poi_point) != best_edge:
 			continue
 		var along := clampf((poi_point - p0).dot(delta) / maxf(length * length, 0.001), 0.0, 0.999)
-		shop_slots[int(floor(along * float(slots)))] = true
+		shop_slots[int(floor(along * float(slots)))] = str(poi.get("name", "")).strip_edges()
 	if shop_slots.is_empty() and not mapped_commercial_pois.is_empty():
 		# OSM proves commercial presence inside this building, but not an exact
 		# frontage unit. Put one generic cue on the chosen street-facing edge.
-		shop_slots[int(floor(float(slots) * 0.5))] = true
+		shop_slots[int(floor(float(slots) * 0.5))] = str(mapped_commercial_pois[0].get("name", "")).strip_edges()
 
 	var detail_count := 0
 	var shopfront_count := 0
@@ -1203,7 +1203,7 @@ func _add_mobile_osm_facade_detail(body: Node3D, poly: PackedVector2Array, heigh
 		_mobile_facade_box(body, Vector3(edge_mid.x, height - 0.16, edge_mid.y), Vector3(0.08, 0.22, length * 0.97), roof_mat, angle)
 		detail_count += 1
 
-	var floors: int = clampi(int(floor(height / 3.0)), 1, 2)
+	var floors: int = clampi(int(floor(height / 3.0)), 1, 3)
 	for floor_index in range(floors):
 		var y := 1.65 + float(floor_index) * 2.75
 		if y > height - 0.55:
@@ -1213,15 +1213,22 @@ func _add_mobile_osm_facade_detail(body: Node3D, poly: PackedVector2Array, heigh
 			var p := p0.lerp(p1, t)
 			var slot_width := maxf(1.1, length / float(slots) * 0.58)
 			if floor_index == 0 and shop_slots.has(slot):
-				var recessed := p + inward * 0.10
-				_mobile_facade_box(body, Vector3(recessed.x, 1.15, recessed.y), Vector3(0.07, 2.10, minf(2.7, slot_width * 1.35)), tenement_sash_glass_mat, angle, 120.0)
-				_mobile_facade_box(body, Vector3(p.x, 2.35, p.y), Vector3(0.09, 0.30, minf(2.9, slot_width * 1.45)), tenement_sash_frame_mat, angle, 120.0)
-				detail_count += 2
+				var shop_name := str(shop_slots.get(slot, "")).to_lower()
+				var shop_frame_mat = sign_blue_mat if shop_name.contains("twelve triangles") else tenement_sash_frame_mat
+				var recessed := p + inward * 0.11
+				_mobile_facade_box(body, Vector3(recessed.x, 1.18, recessed.y), Vector3(0.07, 2.16, minf(2.85, slot_width * 1.42)), tenement_sash_glass_mat, angle, 155.0)
+				_mobile_facade_box(body, Vector3(p.x, 2.42, p.y), Vector3(0.10, 0.38, minf(3.05, slot_width * 1.52)), shop_frame_mat, angle, 155.0)
+				for shop_side in [-1.0, 1.0]:
+					var shop_jamb: Vector2 = p + tangent * float(shop_side) * minf(1.45, slot_width * 0.72)
+					_mobile_facade_box(body, Vector3(shop_jamb.x, 1.20, shop_jamb.y), Vector3(0.10, 2.26, 0.13), shop_frame_mat, angle, 155.0)
+				detail_count += 4
 				shopfront_count += 1
 				continue
-			var recessed_window := p + inward * 0.08
-			_mobile_facade_box(body, Vector3(recessed_window.x, y, recessed_window.y), Vector3(0.06, 1.35, minf(1.25, slot_width)), tenement_sash_glass_mat, angle)
-			detail_count += 1
+			var frame_width := minf(1.42, slot_width + 0.18)
+			_mobile_facade_box(body, Vector3(p.x, y, p.y), Vector3(0.075, 1.58, frame_width), tenement_sash_frame_mat, angle, 150.0)
+			var recessed_window := p + inward * 0.09
+			_mobile_facade_box(body, Vector3(recessed_window.x, y, recessed_window.y), Vector3(0.055, 1.26, minf(1.18, slot_width * 0.82)), tenement_sash_glass_mat, angle, 150.0)
+			detail_count += 2
 
 	body.set_meta("mobile_facade_detail_count", detail_count)
 	body.set_meta("mobile_shopfront_count", shopfront_count)
@@ -1554,6 +1561,42 @@ func _footprint_hits_drivable_centerline(poly: PackedVector2Array) -> bool:
 				return true
 	return false
 
+func _building_hits_drivable_centerline(building: Dictionary) -> bool:
+	var footprint = building.get("footprint", [])
+	if not footprint is Array or footprint.size() < 3:
+		return false
+	var poly := PackedVector2Array()
+	for raw_point in footprint:
+		if raw_point is Array and raw_point.size() >= 2:
+			poly.append(Vector2(float(raw_point[0]), float(raw_point[1])))
+	if poly.size() > 2 and poly[0].distance_squared_to(poly[poly.size() - 1]) < 0.01:
+		poly.resize(poly.size() - 1)
+	return _footprint_hits_drivable_centerline(poly)
+
+func _mobile_visual_height(building: Dictionary, base_height: float, building_distance: float, has_commercial_frontage: bool) -> float:
+	if not mobile_mode:
+		return base_height
+	var source := str(building.get("height_source", "")).to_lower()
+	if not source.contains("estimated"):
+		return base_height
+	var name := str(building.get("name", "")).strip_edges().to_lower()
+	if name == "bellfield community hub":
+		return maxf(base_height, 7.4)
+	if name == "st mark's church":
+		return maxf(base_height, 7.2)
+	var kind := str(building.get("kind", "yes")).to_lower()
+	if kind in ["garage", "garages", "shed", "roof", "industrial", "warehouse"]:
+		return base_height
+	if has_commercial_frontage and building_distance <= 380.0:
+		return maxf(base_height, 9.2)
+	var size = building.get("size", [])
+	if building_distance <= 380.0 and size is Array and size.size() >= 2:
+		var sx := float(size[0])
+		var sz := float(size[1])
+		if maxf(sx, sz) >= 12.0 and minf(sx, sz) >= 5.0:
+			return maxf(base_height, 8.4)
+	return base_height
+
 func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float, seed: int) -> bool:
 	var footprint = building.get("footprint", [])
 	if not footprint is Array or footprint.size() < 3:
@@ -1564,8 +1607,6 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 			continue
 		poly.append(Vector2(float(point[0]), float(point[1])))
 	if poly.size() < 3:
-		return false
-	if _footprint_hits_drivable_centerline(poly):
 		return false
 	var tris = Geometry2D.triangulate_polygon(poly)
 	if tris.size() < 3:
@@ -1781,7 +1822,7 @@ func _add_mobile_terrain_surface(parent: Node3D, centre: Vector2):
 	var stream = get_node_or_null("MapStream")
 	if stream == null or not stream.has_method("terrain_available") or not bool(stream.terrain_available()):
 		return
-	const STEP := 25.0
+	const STEP := 12.5
 	const RADIUS := 500.0
 	var cols := int(floor((RADIUS * 2.0) / STEP)) + 1
 	var rows := cols
@@ -2249,6 +2290,7 @@ func _on_map_ready(map_data: Dictionary):
 	var exact_building_count := 0
 	var mobile_visual_only_building_count := 0
 	var fallback_building_count := 0
+	var runtime_road_conflict_culled := 0
 	generic_tenement_facade_count = 0
 	generic_tenement_window_count = 0
 	generic_tenement_door_count = 0
@@ -2275,12 +2317,17 @@ func _on_map_ready(map_data: Dictionary):
 		var kind = str(building.get("kind", "yes"))
 		var exact_detail_origin := detail_origin if mobile_mode else Vector2.ZERO
 		var building_distance := Vector2(cx, cz).distance_to(exact_detail_origin)
+		if mobile_mode and building_distance <= 240.0 and _building_hits_drivable_centerline(building):
+			runtime_road_conflict_culled += 1
+			continue
 		var visual_building: Dictionary = building
+		var commercial_pois: Array = []
 		if (pc_max_mode and not low_spec_mode) or (mobile_mode and building_distance <= MOBILE_FACADE_RADIUS):
-			var commercial_pois := _mapped_commercial_pois_inside_building(building, poi_features)
+			commercial_pois = _mapped_commercial_pois_inside_building(building, poi_features)
 			if not commercial_pois.is_empty():
 				visual_building = building.duplicate(true)
 				visual_building["_mapped_commercial_pois"] = commercial_pois
+		h = _mobile_visual_height(visual_building, h, building_distance, not commercial_pois.is_empty())
 		var exact_radius = MOBILE_COLLIDING_BUILDING_RADIUS if mobile_mode else (LOW_SPEC_EXACT_FOOTPRINT_RADIUS if low_spec_mode else (620.0 if pc_max_mode else 260.0))
 		var exact = building_distance <= exact_radius and _add_exact_osm_building(map_root, visual_building, h, seed)
 		if exact:
@@ -2316,6 +2363,7 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_building_count", buildings.size())
 		car.set_meta("map_exact_building_count", exact_building_count)
 		car.set_meta("map_mobile_visual_only_building_count", mobile_visual_only_building_count)
+		car.set_meta("map_runtime_road_conflict_culled", runtime_road_conflict_culled)
 		car.set_meta("generic_tenement_facade_count", generic_tenement_facade_count)
 		car.set_meta("generic_tenement_window_count", generic_tenement_window_count)
 		car.set_meta("generic_tenement_door_count", generic_tenement_door_count)
