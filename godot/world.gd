@@ -121,8 +121,11 @@ func _ready():
 		# Phone screenshots benefit more from readable nearby architecture than from
 		# distant shadow work. Keep the budget local but give facades enough light
 		# and range to make Portobello's street walls legible.
-		api_detail_pressure = 0.62
-		$Sun.directional_shadow_max_distance = 68.0
+		api_detail_pressure = 0.66
+		$Sun.directional_shadow_max_distance = 72.0
+		$Sun.rotation_degrees = Vector3(-34.0, -52.0, 0.0)
+		$Sun.light_color = Color(1.0, 0.94, 0.82)
+		$Sun.shadow_opacity = 0.46
 	elif low_spec_mode:
 		api_detail_pressure = 0.42
 		$Sun.directional_shadow_max_distance = 82.0
@@ -907,34 +910,46 @@ func _add_named_landmark_signature(body: Node3D, poly: PackedVector2Array, heigh
 		# Former Portobello Old Parish Church: broad symmetrical stone front,
 		# central square clock tower, then an octagonal louvred belfry.
 		var tower_center := front_mid + inward * 3.0
-		_rotated_visual_box(body, Vector3(tower_center.x, height + 2.55, tower_center.y), Vector3(4.9, 5.1, 4.9), soot_stone_mat, angle, 380.0)
+		_rotated_visual_box(body, Vector3(tower_center.x, height + 2.85, tower_center.y), Vector3(5.1, 5.7, 5.1), sandstone_warm_mat, angle, 420.0)
 		for face_angle in [0.0, PI * 0.5, PI, PI * 1.5]:
-			var face_offset: Vector2 = Vector2(sin(float(face_angle)), cos(float(face_angle))) * 2.48
-			_rotated_visual_box(body, Vector3(tower_center.x + face_offset.x, height + 3.0, tower_center.y + face_offset.y), Vector3(1.40, 1.40, 0.09), sign_white_mat, face_angle, 380.0)
-		_visual_cylinder(body, Vector3(tower_center.x, height + 6.15, tower_center.y), 1.85, 2.05, 2.2, soot_stone_cool_mat, 8, 390.0)
-		_visual_cylinder(body, Vector3(tower_center.x, height + 7.75, tower_center.y), 0.28, 2.05, 1.05, roof_mat, 8, 400.0)
-		body.set_meta("landmark_signature", "bellfield-clock-tower-v1")
+			var face_offset: Vector2 = Vector2(sin(float(face_angle)), cos(float(face_angle))) * 2.58
+			_rotated_visual_box(body, Vector3(tower_center.x + face_offset.x, height + 3.25, tower_center.y + face_offset.y), Vector3(1.55, 1.55, 0.10), sign_white_mat, face_angle, 420.0)
+		_visual_cylinder(body, Vector3(tower_center.x, height + 6.65, tower_center.y), 1.90, 2.15, 2.35, soot_stone_cool_mat, 8, 430.0)
+		_visual_cylinder(body, Vector3(tower_center.x, height + 8.35, tower_center.y), 0.30, 2.10, 1.10, roof_mat, 8, 440.0)
+		_visual_sphere(body, Vector3(tower_center.x, height + 9.02, tower_center.y), 0.22, 0.44, metal_mat, 440.0)
+		body.set_meta("landmark_signature", "bellfield-clock-tower-v2")
 	else:
 		# St Mark's is villa-like rather than a conventional spired church. Its
-		# semi-circular Doric porch and low dome are the recognition features.
+		# semi-circular Doric porch, round-headed openings and low dome are the cues.
 		var porch_center := front_mid + outward * 1.10
-		_visual_cylinder(body, Vector3(porch_center.x, 1.62, porch_center.y), 2.55, 2.55, 3.24, sandstone_mat, 18, 350.0)
+		_visual_cylinder(body, Vector3(porch_center.x, 1.62, porch_center.y), 2.55, 2.55, 3.24, sandstone_mat, 18, 390.0)
 		for side in [-1.0, 1.0]:
 			var column_p: Vector2 = front_mid + tangent * float(side) * 1.82 + outward * 2.18
-			_visual_cylinder(body, Vector3(column_p.x, 1.52, column_p.y), 0.19, 0.23, 3.04, sandstone_warm_mat, 10, 350.0)
+			_visual_cylinder(body, Vector3(column_p.x, 1.52, column_p.y), 0.19, 0.23, 3.04, sandstone_warm_mat, 10, 390.0)
+		for window_index in range(3):
+			var offset := (float(window_index) - 1.0) * 2.35
+			var window_p := front_mid + tangent * offset + outward * 0.08
+			_rotated_visual_box(body, Vector3(window_p.x, 2.25, window_p.y), Vector3(0.08, 2.65, 1.10), tenement_sash_glass_mat, angle, 390.0)
+			_rotated_visual_box(body, Vector3(window_p.x, 3.72, window_p.y), Vector3(0.09, 0.22, 1.28), sandstone_warm_mat, angle, 390.0)
 		var dome_center := front_mid + inward * 1.00
-		_visual_cylinder(body, Vector3(dome_center.x, height + 0.30, dome_center.y), 2.35, 2.55, 0.60, roof_mat, 16, 375.0)
-		_visual_sphere(body, Vector3(dome_center.x, height + 0.85, dome_center.y), 2.18, 1.45, roof_mat, 375.0)
-		body.set_meta("landmark_signature", "st-marks-dome-portico-v1")
+		_visual_cylinder(body, Vector3(dome_center.x, height + 0.42, dome_center.y), 2.65, 2.85, 0.84, roof_mat, 18, 410.0)
+		_visual_sphere(body, Vector3(dome_center.x, height + 1.28, dome_center.y), 2.52, 1.95, roof_mat, 410.0)
+		_visual_cylinder(body, Vector3(dome_center.x, height + 2.25, dome_center.y), 0.42, 0.62, 0.85, soot_stone_cool_mat, 10, 420.0)
+		body.set_meta("landmark_signature", "st-marks-dome-portico-v2")
 
 func _add_hugh_dewar_memorial(parent: Node3D, point: Vector2, base_y: float):
-	# Polished-granite stepped drinking fountain with a tapered obelisk and ball
-	# finial. Four-sided low-poly geometry reads correctly from every approach.
-	_visual_box(parent, Vector3(point.x, base_y + 0.16, point.y), Vector3(1.70, 0.32, 1.70), soot_stone_cool_mat)
-	_visual_box(parent, Vector3(point.x, base_y + 0.52, point.y), Vector3(1.35, 0.40, 1.35), soot_stone_mat)
-	_visual_box(parent, Vector3(point.x, base_y + 1.10, point.y), Vector3(1.05, 0.76, 1.05), sandstone_mat)
-	_visual_cylinder(parent, Vector3(point.x, base_y + 2.55, point.y), 0.20, 0.72, 2.20, soot_stone_cool_mat, 4, 280.0)
-	_visual_sphere(parent, Vector3(point.x, base_y + 3.78, point.y), 0.20, 0.40, soot_stone_cool_mat, 280.0)
+	# Polished-granite stepped drinking fountain with the distinctive open support
+	# course, tall four-sided taper and ball finial visible in period/current photos.
+	_visual_box(parent, Vector3(point.x, base_y + 0.18, point.y), Vector3(1.95, 0.36, 1.95), soot_stone_cool_mat)
+	_visual_box(parent, Vector3(point.x, base_y + 0.58, point.y), Vector3(1.58, 0.46, 1.58), soot_stone_mat)
+	_visual_box(parent, Vector3(point.x, base_y + 1.20, point.y), Vector3(1.28, 0.82, 1.28), sandstone_mat)
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			_visual_sphere(parent, Vector3(point.x + float(sx) * 0.46, base_y + 1.83, point.y + float(sz) * 0.46), 0.18, 0.36, soot_stone_cool_mat, 320.0)
+	_visual_box(parent, Vector3(point.x, base_y + 2.02, point.y), Vector3(1.46, 0.22, 1.46), soot_stone_cool_mat)
+	_visual_cylinder(parent, Vector3(point.x, base_y + 3.25, point.y), 0.18, 0.82, 2.35, soot_stone_cool_mat, 4, 330.0)
+	_visual_cylinder(parent, Vector3(point.x, base_y + 4.30, point.y), 0.11, 0.24, 0.38, soot_stone_cool_mat, 8, 330.0)
+	_visual_sphere(parent, Vector3(point.x, base_y + 4.62, point.y), 0.22, 0.44, soot_stone_cool_mat, 330.0)
 
 func _road_micro_detail(parent: Node3D, a: Vector2, b: Vector2, width: float, seed: int, budget: int) -> int:
 	if budget <= 0:
@@ -1045,9 +1060,15 @@ func _mapped_commercial_pois_inside_building(building: Dictionary, poi_features:
 			continue
 		var p := Vector2(float(raw_p[0]), float(raw_p[1]))
 		if Geometry2D.is_point_in_polygon(p, poly):
-			# Presence is source-backed by the mapped POI. We intentionally do not copy
-			# its business name onto the facade: the shopfront itself remains generic.
-			matches.append({"point": [p.x, p.y], "kind": poi_kind, "source": "osm_poi"})
+			# Preserve the mapped name for recognisable frontage cues. Geometry and
+			# placement still come from OSM; this only lets a known shop keep its
+			# characteristic palette instead of becoming another anonymous unit.
+			matches.append({
+				"point": [p.x, p.y],
+				"kind": poi_kind,
+				"name": str(poi.get("name", "")).strip_edges(),
+				"source": "osm_poi"
+			})
 	return matches
 
 
@@ -1079,6 +1100,13 @@ func _uses_generic_edinburgh_tenement_texture(building: Dictionary) -> bool:
 
 func _osm_building_material(building: Dictionary, seed: int):
 	var tagged = str(building.get("material", "")).to_lower()
+	var named := str(building.get("name", "")).strip_edges().to_lower()
+	# Named landmarks get a restrained material cue based on their real visual
+	# character so their silhouettes do not disappear into the generic building set.
+	if named == "bellfield community hub":
+		return sandstone_warm_mat
+	if named == "st mark's church":
+		return soot_stone_cool_mat
 	if _uses_generic_edinburgh_tenement_texture(building):
 		# Generic visual approximation only. The OSM footprint stays authoritative;
 		# these shared textures do not claim surveyed facade accuracy.
@@ -1214,13 +1242,15 @@ func _add_mobile_osm_facade_detail(body: Node3D, poly: PackedVector2Array, heigh
 			var slot_width := maxf(1.1, length / float(slots) * 0.58)
 			if floor_index == 0 and shop_slots.has(slot):
 				var shop_name := str(shop_slots.get(slot, "")).to_lower()
-				var shop_frame_mat = sign_blue_mat if shop_name.contains("twelve triangles") else tenement_sash_frame_mat
+				var is_twelve_triangles := shop_name.contains("twelve triangles")
+				var shop_frame_mat = sign_blue_mat if is_twelve_triangles else tenement_sash_frame_mat
+				var shop_glass_mat = _mat(Color(0.72, 0.31, 0.07), 0.24, 0.02) if is_twelve_triangles else tenement_sash_glass_mat
 				var recessed := p + inward * 0.11
-				_mobile_facade_box(body, Vector3(recessed.x, 1.18, recessed.y), Vector3(0.07, 2.16, minf(2.85, slot_width * 1.42)), tenement_sash_glass_mat, angle, 155.0)
-				_mobile_facade_box(body, Vector3(p.x, 2.42, p.y), Vector3(0.10, 0.38, minf(3.05, slot_width * 1.52)), shop_frame_mat, angle, 155.0)
+				_mobile_facade_box(body, Vector3(recessed.x, 1.18, recessed.y), Vector3(0.07, 2.16, minf(2.85, slot_width * 1.42)), shop_glass_mat, angle, 175.0)
+				_mobile_facade_box(body, Vector3(p.x, 2.42, p.y), Vector3(0.10, 0.46 if is_twelve_triangles else 0.38, minf(3.20, slot_width * 1.58)), shop_frame_mat, angle, 175.0)
 				for shop_side in [-1.0, 1.0]:
 					var shop_jamb: Vector2 = p + tangent * float(shop_side) * minf(1.45, slot_width * 0.72)
-					_mobile_facade_box(body, Vector3(shop_jamb.x, 1.20, shop_jamb.y), Vector3(0.10, 2.26, 0.13), shop_frame_mat, angle, 155.0)
+					_mobile_facade_box(body, Vector3(shop_jamb.x, 1.20, shop_jamb.y), Vector3(0.10, 2.26, 0.13), shop_frame_mat, angle, 175.0)
 				detail_count += 4
 				shopfront_count += 1
 				continue
@@ -2166,9 +2196,11 @@ func _apply_weather_visuals():
 		env.fog_light_color = Color(0.64, 0.69, 0.70).lerp(Color(0.40, 0.45, 0.47), cloud)
 		env.background_color = Color(0.52, 0.62, 0.66).lerp(Color(0.31, 0.37, 0.40), cloud)
 		if mobile_mode:
-			env.ambient_light_energy = lerp(1.16, 0.90, cloud) * lerp(1.0, 0.96, wetness)
-			env.ambient_light_color = Color(0.68, 0.69, 0.66).lerp(Color(0.50, 0.54, 0.56), cloud)
-			env.tonemap_exposure = lerp(1.28, 1.14, cloud)
+			# The phone renderer has less shadow detail than the desktop path. Lift
+			# ambient fill enough to keep stone readable without washing out the road.
+			env.ambient_light_energy = lerp(1.30, 0.98, cloud) * lerp(1.0, 0.96, wetness)
+			env.ambient_light_color = Color(0.72, 0.71, 0.67).lerp(Color(0.52, 0.56, 0.58), cloud)
+			env.tonemap_exposure = lerp(1.34, 1.18, cloud)
 		elif xps_9530_mode:
 			env.ambient_light_energy = lerp(0.94, 0.74, cloud) * lerp(1.0, 0.94, wetness)
 			env.ambient_light_color = Color(0.61, 0.61, 0.58).lerp(Color(0.44, 0.48, 0.50), cloud)
