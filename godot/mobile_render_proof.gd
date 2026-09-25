@@ -36,14 +36,19 @@ func run() -> void:
 	world.atmosphere_aqi = world.atmosphere_target_aqi
 	world._apply_weather_visuals()
 	world.get_node("BayProjection")._set_mode(0)
-	world.get_node("HUD").visible = true
+	var hud = world.get_node("HUD")
+	hud.visible = true
+	hud.credit_clock = 999.0
+	hud._update_parkview_credit(0.0)
 
 	var targets := [
-		{"slug":"pitville-street", "point":Vector2(-0.679,62.829), "road_point":Vector2(3.8,52.5), "road_a":Vector2(-0.679,62.829), "road_b":Vector2(6.856,45.474), "focus":false},
-		{"slug":"hugh-dewar-fountain", "point":Vector2(56.157,65.189), "road_point":Vector2(29.836,76.054), "road_a":Vector2(-0.679,62.829), "road_b":Vector2(39.497,80.239), "focus":true},
-		{"slug":"bellfield-community-hub", "point":Vector2(-91.668,-76.972), "road_point":Vector2(-72.0,-40.0), "road_a":Vector2(-77.872,-27.285), "road_b":Vector2(-35.483,-125.435), "focus":true},
-		{"slug":"st-marks-church", "point":Vector2(-110.398,90.453), "road_point":Vector2(-82.0,80.0), "road_a":Vector2(-65.244,40.354), "road_b":Vector2(-101.108,125.313), "focus":true},
-		{"slug":"twelve-triangles-high-street", "point":Vector2(-117.849,-2.438), "road_point":Vector2(-135.0,2.8), "road_a":Vector2(-146.582,-2.638), "road_b":Vector2(-120.279,9.674), "focus":true}
+		# Pittville is captured from inside the street looking downhill towards the
+		# coast, rather than backwards into the Abercorn/High Street junction.
+		{"slug":"pitville-street", "point":Vector2(37.403,-24.824), "road_point":Vector2(8.5,41.5), "road_a":Vector2(6.856,45.474), "road_b":Vector2(22.157,12.011), "focus":false},
+		{"slug":"hugh-dewar-fountain", "point":Vector2(56.157,65.189), "road_point":Vector2(48.031,83.938), "road_a":Vector2(39.497,80.239), "road_b":Vector2(98.907,105.988), "focus":true},
+		{"slug":"bellfield-community-hub", "point":Vector2(-91.668,-76.972), "road_point":Vector2(-61.955,-64.140), "road_a":Vector2(-77.872,-27.285), "road_b":Vector2(-35.483,-125.435), "focus":true},
+		{"slug":"st-marks-church", "point":Vector2(-110.398,90.453), "road_point":Vector2(-90.023,99.054), "road_a":Vector2(-65.244,40.354), "road_b":Vector2(-101.108,125.313), "focus":true},
+		{"slug":"twelve-triangles-high-street", "point":Vector2(-117.849,-2.438), "road_point":Vector2(-105.0,16.8), "road_a":Vector2(-98.278,19.971), "road_b":Vector2(-120.279,9.674), "focus":true}
 	]
 	for target in targets:
 		var point: Vector2 = target["point"]
