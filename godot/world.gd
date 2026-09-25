@@ -27,9 +27,9 @@ const LOW_SPEC_EXACT_FOOTPRINT_RADIUS := 220.0
 const DRIVER_DETAIL_RADIUS := 38.0
 const MOBILE_BUILDING_VISUAL_RADIUS := 420.0
 const MOBILE_COLLIDING_BUILDING_RADIUS := 190.0
-const MOBILE_FACADE_RADIUS := 92.0
-const MOBILE_ROAD_VISUAL_RADIUS := 510.0
-const MOBILE_STREET_DETAIL_RADIUS := 185.0
+const MOBILE_FACADE_RADIUS := 180.0
+const MOBILE_ROAD_VISUAL_RADIUS := 540.0
+const MOBILE_STREET_DETAIL_RADIUS := 235.0
 const XPS_LIGHT_GRADE := "edinburgh-side-light-v1"
 var low_spec_mode := false
 var projector_max_mode := false
@@ -101,10 +101,11 @@ var commercial_zone_mat
 
 func _ready():
 	var force_xps_proof := bool(get_meta("force_xps_proof", false))
+	var force_mobile_proof := bool(get_meta("force_mobile_proof", false))
 	projector_max_mode = OS.has_feature("projector_max") or force_xps_proof
 	pc_max_mode = OS.has_feature("pc_max") or force_xps_proof
 	xps_9530_mode = OS.has_feature("xps_9530") or force_xps_proof
-	mobile_mode = OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1"
+	mobile_mode = OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1" or force_mobile_proof
 	low_spec_mode = OS.has_feature("thinkpad_low") or (projector_max_mode and not xps_9530_mode) or mobile_mode
 	if xps_9530_mode:
 		# Final reference-machine grade: slightly lower, more lateral light makes the
@@ -117,10 +118,11 @@ func _ready():
 		api_detail_pressure = 0.32
 		$Sun.directional_shadow_max_distance = 58.0
 	elif mobile_mode:
-		# Phone screenshots showed deep black canyons and too much distant geometry.
-		# Spend the mobile budget on a readable 400m street bubble instead.
-		api_detail_pressure = 0.50
-		$Sun.directional_shadow_max_distance = 52.0
+		# Phone screenshots benefit more from readable nearby architecture than from
+		# distant shadow work. Keep the budget local but give facades enough light
+		# and range to make Portobello's street walls legible.
+		api_detail_pressure = 0.62
+		$Sun.directional_shadow_max_distance = 68.0
 	elif low_spec_mode:
 		api_detail_pressure = 0.42
 		$Sun.directional_shadow_max_distance = 82.0
@@ -1665,19 +1667,27 @@ func _mobile_terrain_strip(parent: Node3D, a: Vector2, b: Vector2, width: float,
 	var aa := a + normal * lateral_offset
 	var bb := b + normal * lateral_offset
 	var half_width := width * 0.5
-	var a_left := aa - normal * half_width
-	var a_right := aa + normal * half_width
-	var b_left := bb - normal * half_width
-	var b_right := bb + normal * half_width
-	var ay := _terrain_height(aa) + y_offset
-	var by := _terrain_height(bb) + y_offset
+	# Long OSM segments cannot be one giant sloping quad: that creates the road
+	# wedges visible in the Android screenshots. Sample source terrain repeatedly.
+	var section_count := clampi(int(ceil(length / 14.0)), 1, 72)
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-	for v in [
-		Vector3(a_left.x, ay, a_left.y), Vector3(a_right.x, ay, a_right.y), Vector3(b_right.x, by, b_right.y),
-		Vector3(a_left.x, ay, a_left.y), Vector3(b_right.x, by, b_right.y), Vector3(b_left.x, by, b_left.y)
-	]:
-		surface.add_vertex(v)
+	for section in range(section_count):
+		var t0 := float(section) / float(section_count)
+		var t1 := float(section + 1) / float(section_count)
+		var c0 := aa.lerp(bb, t0)
+		var c1 := aa.lerp(bb, t1)
+		var c0_left := c0 - normal * half_width
+		var c0_right := c0 + normal * half_width
+		var c1_left := c1 - normal * half_width
+		var c1_right := c1 + normal * half_width
+		var y0 := _terrain_height(c0) + y_offset
+		var y1 := _terrain_height(c1) + y_offset
+		for v in [
+			Vector3(c0_left.x, y0, c0_left.y), Vector3(c0_right.x, y0, c0_right.y), Vector3(c1_right.x, y1, c1_right.y),
+			Vector3(c0_left.x, y0, c0_left.y), Vector3(c1_right.x, y1, c1_right.y), Vector3(c1_left.x, y1, c1_left.y)
+		]:
+			surface.add_vertex(v)
 	surface.generate_normals()
 	var strip_mesh := surface.commit()
 	if strip_mesh == null:
@@ -1686,8 +1696,9 @@ func _mobile_terrain_strip(parent: Node3D, a: Vector2, b: Vector2, width: float,
 	visual.mesh = strip_mesh
 	visual.material_override = material
 	visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	visual.visibility_range_end = 650.0
+	visual.visibility_range_end = 680.0
 	visual.set_meta("mobile_terrain_strip", label)
+	visual.set_meta("terrain_sections", section_count)
 	parent.add_child(visual)
 
 func _add_mobile_road_segment(parent: Node3D, a: Vector2, b: Vector2, width: float, kind: String, material, sidewalk: String):
