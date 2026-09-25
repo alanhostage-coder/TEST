@@ -28,6 +28,8 @@ const DRIVER_DETAIL_RADIUS := 38.0
 const MOBILE_BUILDING_VISUAL_RADIUS := 420.0
 const MOBILE_COLLIDING_BUILDING_RADIUS := 190.0
 const MOBILE_FACADE_RADIUS := 92.0
+const MOBILE_ROAD_VISUAL_RADIUS := 510.0
+const MOBILE_STREET_DETAIL_RADIUS := 185.0
 const XPS_LIGHT_GRADE := "edinburgh-side-light-v1"
 var low_spec_mode := false
 var projector_max_mode := false
@@ -1690,14 +1692,18 @@ func _mobile_terrain_strip(parent: Node3D, a: Vector2, b: Vector2, width: float,
 
 func _add_mobile_road_segment(parent: Node3D, a: Vector2, b: Vector2, width: float, kind: String, material, sidewalk: String):
 	_mobile_terrain_strip(parent, a, b, width, 0.0, 0.055, material, "road")
-	if kind not in ["motorway", "trunk", "track"] and sidewalk not in ["no", "none"]:
+	var car = get_node_or_null("Car")
+	var midpoint := (a + b) * 0.5
+	var driver2 := Vector2(car.global_position.x, car.global_position.z) if car else Vector2.ZERO
+	var close_detail := midpoint.distance_to(driver2) <= MOBILE_STREET_DETAIL_RADIUS
+	if close_detail and kind not in ["motorway", "trunk", "track"] and sidewalk not in ["no", "none"]:
 		var pavement_offset := width * 0.5 + 0.72
 		_mobile_terrain_strip(parent, a, b, 1.28, -pavement_offset, 0.115, pavement_mat, "pavement")
 		_mobile_terrain_strip(parent, a, b, 1.28, pavement_offset, 0.115, pavement_mat, "pavement")
 		var kerb_offset := width * 0.5 + 0.10
 		_mobile_terrain_strip(parent, a, b, 0.18, -kerb_offset, 0.145, kerb_mat, "kerb")
 		_mobile_terrain_strip(parent, a, b, 0.18, kerb_offset, 0.145, kerb_mat, "kerb")
-	if width >= 6.0 and kind in ["primary", "secondary", "tertiary"]:
+	if close_detail and width >= 6.0 and kind in ["primary", "secondary", "tertiary"]:
 		_mobile_terrain_strip(parent, a, b, 0.09, 0.0, 0.075, marking_mat, "centre_marking")
 
 func _make_landmarks():
@@ -2043,6 +2049,8 @@ func _on_map_ready(map_data: Dictionary):
 			if length < 2.0:
 				continue
 			var mid = (a + b) * 0.5
+			if mobile_mode and mid.distance_to(detail_origin) > MOBILE_ROAD_VISUAL_RADIUS + length * 0.5:
+				continue
 			var angle = atan2(road_delta.x, road_delta.y)
 			if mobile_mode:
 				_add_mobile_road_segment(map_root, a, b, width, kind, road_material, sidewalk)
