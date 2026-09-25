@@ -1563,7 +1563,115 @@ func _make_ground():
 	ground.position = Vector3(0, -0.24, 0)
 	ground.add_child(mesh)
 	ground.add_child(col)
+	if mobile_mode:
+		# Android uses the source-backed EH15 height field. The legacy flat slab
+		# would otherwise cut through downhill roads and cover coastal relief.
+		ground.visible = false
+		col.disabled = true
 	add_child(ground)
+
+func _terrain_height(local_position: Vector2) -> float:
+	if not mobile_mode:
+		return 0.0
+	var stream = get_node_or_null("MapStream")
+	if stream and stream.has_method("terrain_height_at"):
+		return float(stream.terrain_height_at(local_position))
+	return 0.0
+
+func _terrain_sea_y() -> float:
+	var stream = get_node_or_null("MapStream")
+	if stream and stream.has_method("terrain_sea_level_y"):
+		return float(stream.terrain_sea_level_y())
+	return 0.0
+
+func _add_mobile_terrain_surface(parent: Node3D, centre: Vector2):
+	if not mobile_mode:
+		return
+	var stream = get_node_or_null("MapStream")
+	if stream == null or not stream.has_method("terrain_available") or not bool(stream.terrain_available()):
+		return
+	const STEP := 25.0
+	const RADIUS := 500.0
+	var cols := int(floor((RADIUS * 2.0) / STEP)) + 1
+	var rows := cols
+	var start := centre - Vector2(RADIUS, RADIUS)
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for z_index in range(rows - 1):
+		for x_index in range(cols - 1):
+			var x0 := start.x + float(x_index) * STEP
+			var x1 := x0 + STEP
+			var z0 := start.y + float(z_index) * STEP
+			var z1 := z0 + STEP
+			var p00 := Vector2(x0, z0)
+			var p10 := Vector2(x1, z0)
+			var p01 := Vector2(x0, z1)
+			var p11 := Vector2(x1, z1)
+			var v00 := Vector3(x0, _terrain_height(p00) - 0.08, z0)
+			var v10 := Vector3(x1, _terrain_height(p10) - 0.08, z0)
+			var v01 := Vector3(x0, _terrain_height(p01) - 0.08, z1)
+			var v11 := Vector3(x1, _terrain_height(p11) - 0.08, z1)
+			for v in [v00, v10, v11, v00, v11, v01]:
+				surface.add_vertex(v)
+	surface.generate_normals()
+	var terrain_mesh := surface.commit()
+	if terrain_mesh == null:
+		return
+	var visual := MeshInstance3D.new()
+	visual.name = "MobileEHTerrain"
+	visual.mesh = terrain_mesh
+	visual.material_override = ground_mat
+	visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	visual.visibility_range_end = 900.0
+	visual.set_meta("terrain_source_backed", true)
+	parent.add_child(visual)
+
+func _mobile_terrain_strip(parent: Node3D, a: Vector2, b: Vector2, width: float, lateral_offset: float, y_offset: float, material, label: String):
+	var delta := b - a
+	var length := delta.length()
+	if length < 0.2:
+		return
+	var tangent := delta / length
+	var normal := Vector2(-tangent.y, tangent.x)
+	var aa := a + normal * lateral_offset
+	var bb := b + normal * lateral_offset
+	var half_width := width * 0.5
+	var a_left := aa - normal * half_width
+	var a_right := aa + normal * half_width
+	var b_left := bb - normal * half_width
+	var b_right := bb + normal * half_width
+	var ay := _terrain_height(aa) + y_offset
+	var by := _terrain_height(bb) + y_offset
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for v in [
+		Vector3(a_left.x, ay, a_left.y), Vector3(a_right.x, ay, a_right.y), Vector3(b_right.x, by, b_right.y),
+		Vector3(a_left.x, ay, a_left.y), Vector3(b_right.x, by, b_right.y), Vector3(b_left.x, by, b_left.y)
+	]:
+		surface.add_vertex(v)
+	surface.generate_normals()
+	var strip_mesh := surface.commit()
+	if strip_mesh == null:
+		return
+	var visual := MeshInstance3D.new()
+	visual.mesh = strip_mesh
+	visual.material_override = material
+	visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	visual.visibility_range_end = 650.0
+	visual.set_meta("mobile_terrain_strip", label)
+	parent.add_child(visual)
+
+func _add_mobile_road_segment(parent: Node3D, a: Vector2, b: Vector2, width: float, kind: String, material, sidewalk: String):
+	_mobile_terrain_strip(parent, a, b, width, 0.0, 0.055, material, "road")
+	if kind not in ["motorway", "trunk", "track"] and sidewalk not in ["no", "none"]:
+		var pavement_offset := width * 0.5 + 0.72
+		_mobile_terrain_strip(parent, a, b, 1.28, -pavement_offset, 0.115, pavement_mat, "pavement")
+		_mobile_terrain_strip(parent, a, b, 1.28, pavement_offset, 0.115, pavement_mat, "pavement")
+		var kerb_offset := width * 0.5 + 0.10
+		_mobile_terrain_strip(parent, a, b, 0.18, -kerb_offset, 0.145, kerb_mat, "kerb")
+		_mobile_terrain_strip(parent, a, b, 0.18, kerb_offset, 0.145, kerb_mat, "kerb")
+	if width >= 6.0 and kind in ["primary", "secondary", "tertiary"]:
+		_mobile_terrain_strip(parent, a, b, 0.09, 0.0, 0.075, marking_mat, "centre_marking")
 
 func _make_landmarks():
 	var dock = Node3D.new()
@@ -1877,6 +1985,8 @@ func _on_map_ready(map_data: Dictionary):
 			if p is Array and p.size() >= 2: bd = min(bd, Vector2(float(p[0]), float(p[1])).distance_squared_to(detail_origin))
 		return ad < bd
 	)
+	if mobile_mode:
+		_add_mobile_terrain_surface(map_root, detail_origin)
 	var identity_counts := _add_identity_features(map_root, identity_features)
 	var street_edge_budget := 0
 	var marking_budget := 0
@@ -1907,15 +2017,18 @@ func _on_map_ready(map_data: Dictionary):
 				continue
 			var mid = (a + b) * 0.5
 			var angle = atan2(road_delta.x, road_delta.y)
-			_road_rotated_material(map_root, Vector3(mid.x, 0.035, mid.y), length + 1.0, width, angle, road_material)
-			if micro_budget > 0:
-				micro_budget -= _road_micro_detail(map_root, a, b, width, int(abs(a.x * 11.0 + a.y * 17.0 + b.x * 23.0 + b.y * 29.0)), micro_budget)
-			if street_edge_budget < street_edge_limit and length > 7.0 and kind not in ["motorway", "trunk", "track"] and sidewalk not in ["no", "none"]:
-				_street_edges_rotated(map_root, Vector3(mid.x, 0.035, mid.y), length + 0.6, width, angle, kind)
-				street_edge_budget += 1
-			if marking_budget < marking_limit and length > 9.0 and width >= 5.8:
-				_live_road_markings(map_root, Vector3(mid.x, 0.035, mid.y), length, width, angle, kind)
-				marking_budget += 1
+			if mobile_mode:
+				_add_mobile_road_segment(map_root, a, b, width, kind, road_material, sidewalk)
+			else:
+				_road_rotated_material(map_root, Vector3(mid.x, 0.035, mid.y), length + 1.0, width, angle, road_material)
+				if micro_budget > 0:
+					micro_budget -= _road_micro_detail(map_root, a, b, width, int(abs(a.x * 11.0 + a.y * 17.0 + b.x * 23.0 + b.y * 29.0)), micro_budget)
+				if street_edge_budget < street_edge_limit and length > 7.0 and kind not in ["motorway", "trunk", "track"] and sidewalk not in ["no", "none"]:
+					_street_edges_rotated(map_root, Vector3(mid.x, 0.035, mid.y), length + 0.6, width, angle, kind)
+					street_edge_budget += 1
+				if marking_budget < marking_limit and length > 9.0 and width >= 5.8:
+					_live_road_markings(map_root, Vector3(mid.x, 0.035, mid.y), length, width, angle, kind)
+					marking_budget += 1
 			map_segments.append([[a.x, a.y], [b.x, b.y], width, kind, oneway])
 
 	var exact_building_count := 0
