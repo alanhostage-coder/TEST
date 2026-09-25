@@ -125,7 +125,9 @@ func _ready():
 		$Sun.directional_shadow_max_distance = 72.0
 		$Sun.rotation_degrees = Vector3(-34.0, -52.0, 0.0)
 		$Sun.light_color = Color(1.0, 0.94, 0.82)
-		$Sun.shadow_opacity = 0.46
+		# Narrow Portobello streets spend a lot of time in building shade. Lower
+		# contrast keeps the shaded facade readable on phone screens.
+		$Sun.shadow_opacity = 0.26
 	elif low_spec_mode:
 		api_detail_pressure = 0.42
 		$Sun.directional_shadow_max_distance = 82.0
@@ -1243,6 +1245,18 @@ func _uses_generic_edinburgh_tenement_texture(building: Dictionary) -> bool:
 func _osm_building_material(building: Dictionary, seed: int):
 	var tagged = str(building.get("material", "")).to_lower()
 	var named := str(building.get("name", "")).strip_edges().to_lower()
+	var kind := str(building.get("kind", "yes")).to_lower()
+	# Android gets the window-bearing facade tile on ordinary residential stock,
+	# not only the narrower tenement heuristic. The exact OSM footprint remains
+	# authoritative; this is generic Edinburgh visual treatment.
+	if mobile_mode and named == "" and kind in ["house", "apartments", "residential", "detached", "terrace", "yes", "semidetached_house"]:
+		match abs(seed) % 10:
+			0, 1:
+				return tenement_warm_mat
+			2:
+				return tenement_soot_mat
+			_:
+				return tenement_weathered_mat
 	# Named landmarks get a restrained material cue based on their real visual
 	# character so their silhouettes do not disappear into the generic building set.
 	if named == "bellfield community hub":
@@ -2444,9 +2458,9 @@ func _apply_weather_visuals():
 		if mobile_mode:
 			# The phone renderer has less shadow detail than the desktop path. Lift
 			# ambient fill enough to keep stone readable without washing out the road.
-			env.ambient_light_energy = lerp(1.30, 0.98, cloud) * lerp(1.0, 0.96, wetness)
-			env.ambient_light_color = Color(0.72, 0.71, 0.67).lerp(Color(0.52, 0.56, 0.58), cloud)
-			env.tonemap_exposure = lerp(1.34, 1.18, cloud)
+			env.ambient_light_energy = lerp(1.46, 1.08, cloud) * lerp(1.0, 0.96, wetness)
+			env.ambient_light_color = Color(0.76, 0.74, 0.69).lerp(Color(0.56, 0.59, 0.60), cloud)
+			env.tonemap_exposure = lerp(1.38, 1.22, cloud)
 		elif xps_9530_mode:
 			env.ambient_light_energy = lerp(0.94, 0.74, cloud) * lerp(1.0, 0.94, wetness)
 			env.ambient_light_color = Color(0.61, 0.61, 0.58).lerp(Color(0.44, 0.48, 0.50), cloud)
