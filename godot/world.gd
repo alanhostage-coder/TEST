@@ -1754,6 +1754,54 @@ func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height
 
 
 
+func _osm_surface_roof_vertex(st: SurfaceTool, p: Vector2, height: float):
+	st.set_normal(Vector3.UP)
+	st.set_uv(Vector2(p.x / 8.0, p.y / 8.0))
+	st.add_vertex(Vector3(p.x, height, p.y))
+
+
+func _osm_surface_wall_edge(st: SurfaceTool, p0: Vector2, p1: Vector2, height: float, centroid: Vector2):
+	var delta := p1 - p0
+	if delta.length_squared() < 0.0001:
+		return
+	var edge_mid := (p0 + p1) * 0.5
+	var outward := (edge_mid - centroid).normalized()
+	if outward.length_squared() < 0.25:
+		outward = Vector2(-delta.y, delta.x).normalized()
+	var left_normal := Vector2(-delta.y, delta.x).normalized()
+	var reverse_winding := left_normal.dot(outward) < 0.0
+	var wall_normal := Vector3(outward.x, 0.0, outward.y)
+	var wall_u := maxf(0.2, p0.distance_to(p1) / 8.0)
+	var wall_v := maxf(1.0, height / 4.2)
+
+	if not reverse_winding:
+		for item in [
+			[p0, 0.0, Vector2(0.0, wall_v)],
+			[p1, 0.0, Vector2(wall_u, wall_v)],
+			[p1, height, Vector2(wall_u, 0.0)],
+			[p0, 0.0, Vector2(0.0, wall_v)],
+			[p1, height, Vector2(wall_u, 0.0)],
+			[p0, height, Vector2(0.0, 0.0)]
+		]:
+			var wp: Vector2 = item[0]
+			st.set_normal(wall_normal)
+			st.set_uv(item[2])
+			st.add_vertex(Vector3(wp.x, float(item[1]), wp.y))
+	else:
+		for item in [
+			[p0, 0.0, Vector2(0.0, wall_v)],
+			[p1, height, Vector2(wall_u, 0.0)],
+			[p1, 0.0, Vector2(wall_u, wall_v)],
+			[p0, 0.0, Vector2(0.0, wall_v)],
+			[p0, height, Vector2(0.0, 0.0)],
+			[p1, height, Vector2(wall_u, 0.0)]
+		]:
+			var wp: Vector2 = item[0]
+			st.set_normal(wall_normal)
+			st.set_uv(item[2])
+			st.add_vertex(Vector3(wp.x, float(item[1]), wp.y))
+
+
 func _add_mobile_osm_footprint_visual(parent: Node3D, building: Dictionary, height: float, seed: int) -> bool:
 	# Far mobile buildings must preserve the mapped OSM polygon. The old low-spec
 	# fallback used the footprint bounding box, which could rotate/expand an angled
@@ -1774,31 +1822,21 @@ func _add_mobile_osm_footprint_visual(parent: Node3D, building: Dictionary, heig
 	if tris.size() < 3:
 		return false
 
+	var mesh_centroid := Vector2.ZERO
+	for footprint_point in poly:
+		mesh_centroid += footprint_point
+	mesh_centroid /= float(poly.size())
+
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for t in range(0, tris.size(), 3):
 		for j in range(3):
 			var p: Vector2 = poly[int(tris[t + j])]
-			st.set_uv(Vector2(p.x / 8.0, p.y / 8.0))
-			st.add_vertex(Vector3(p.x, height, p.y))
+			_osm_surface_roof_vertex(st, p, height)
 	for i in range(poly.size()):
 		var p0: Vector2 = poly[i]
 		var p1: Vector2 = poly[(i + 1) % poly.size()]
-		var wall_u := maxf(0.2, p0.distance_to(p1) / 8.0)
-		var wall_v := maxf(1.0, height / 4.2)
-		st.set_uv(Vector2(0.0, wall_v))
-		st.add_vertex(Vector3(p0.x, 0.0, p0.y))
-		st.set_uv(Vector2(wall_u, wall_v))
-		st.add_vertex(Vector3(p1.x, 0.0, p1.y))
-		st.set_uv(Vector2(wall_u, 0.0))
-		st.add_vertex(Vector3(p1.x, height, p1.y))
-		st.set_uv(Vector2(0.0, wall_v))
-		st.add_vertex(Vector3(p0.x, 0.0, p0.y))
-		st.set_uv(Vector2(wall_u, 0.0))
-		st.add_vertex(Vector3(p1.x, height, p1.y))
-		st.set_uv(Vector2(0.0, 0.0))
-		st.add_vertex(Vector3(p0.x, height, p0.y))
-	st.generate_normals()
+		_osm_surface_wall_edge(st, p0, p1, height, mesh_centroid)
 	var mesh := st.commit()
 	if mesh == null:
 		return false
@@ -1906,36 +1944,19 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 	var tris = Geometry2D.triangulate_polygon(poly)
 	if tris.size() < 3:
 		return false
+	var mesh_centroid := Vector2.ZERO
+	for footprint_point in poly:
+		mesh_centroid += footprint_point
+	mesh_centroid /= float(poly.size())
+
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for t in range(0, tris.size(), 3):
-		var p0 = poly[int(tris[t])]
-		var p1 = poly[int(tris[t + 1])]
-		var p2 = poly[int(tris[t + 2])]
-		st.set_uv(Vector2(p0.x / 8.0, p0.y / 8.0))
-		st.add_vertex(Vector3(p0.x, height, p0.y))
-		st.set_uv(Vector2(p1.x / 8.0, p1.y / 8.0))
-		st.add_vertex(Vector3(p1.x, height, p1.y))
-		st.set_uv(Vector2(p2.x / 8.0, p2.y / 8.0))
-		st.add_vertex(Vector3(p2.x, height, p2.y))
+		_osm_surface_roof_vertex(st, poly[int(tris[t])], height)
+		_osm_surface_roof_vertex(st, poly[int(tris[t + 1])], height)
+		_osm_surface_roof_vertex(st, poly[int(tris[t + 2])], height)
 	for i in range(poly.size()):
-		var p0 = poly[i]
-		var p1 = poly[(i + 1) % poly.size()]
-		var wall_u = maxf(0.2, p0.distance_to(p1) / 8.0)
-		var wall_v = maxf(1.0, height / 4.2)
-		st.set_uv(Vector2(0.0, wall_v))
-		st.add_vertex(Vector3(p0.x, 0.0, p0.y))
-		st.set_uv(Vector2(wall_u, wall_v))
-		st.add_vertex(Vector3(p1.x, 0.0, p1.y))
-		st.set_uv(Vector2(wall_u, 0.0))
-		st.add_vertex(Vector3(p1.x, height, p1.y))
-		st.set_uv(Vector2(0.0, wall_v))
-		st.add_vertex(Vector3(p0.x, 0.0, p0.y))
-		st.set_uv(Vector2(wall_u, 0.0))
-		st.add_vertex(Vector3(p1.x, height, p1.y))
-		st.set_uv(Vector2(0.0, 0.0))
-		st.add_vertex(Vector3(p0.x, height, p0.y))
-	st.generate_normals()
+		_osm_surface_wall_edge(st, poly[i], poly[(i + 1) % poly.size()], height, mesh_centroid)
 	var mesh = st.commit()
 	if mesh == null:
 		return false
