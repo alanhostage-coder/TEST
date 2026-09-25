@@ -1,0 +1,104 @@
+name: Fetch ALAN Archive Banks
+on:
+  pull_request:
+    branches: [ main ]
+    paths:
+      - '.github/workflows/fetch-alan-banks.yml'
+  workflow_dispatch:
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Fetch Archive.org machine packs
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p alan-source
+          base='https://archive.org/download/drum-machines-collection'
+          curl -L --fail --retry 4 --retry-delay 2 -o 'alan-source/TR909.zip' "$base/Roland%20TR-909.zip"
+          curl -L --fail --retry 4 --retry-delay 2 -o 'alan-source/TR707.zip' "$base/Roland%20TR707.zip"
+          curl -L --fail --retry 4 --retry-delay 2 -o 'alan-source/LinnDrum.zip' "$base/Linn%20Linndrum.zip"
+          curl -L --fail --retry 4 --retry-delay 2 -o 'alan-source/DMX.zip' "$base/Oberheim%20DMX.zip"
+          curl -L --fail --retry 4 --retry-delay 2 -o 'alan-source/TR606.zip' "$base/Roland%20TR606.zip"
+          curl -L --fail --retry 4 --retry-delay 2 -o 'alan-source/SDS5.zip' "$base/Simmons%20SDS5.zip"
+          curl -L --fail --retry 4 --retry-delay 2 -o 'alan-source/DR110.zip' "$base/Boss%20DR-110.zip"
+          ls -lh alan-source
+
+      - name: Find and fetch a compact Amen source from Internet Archive
+        shell: python
+        run: |
+          import json, os, urllib.parse, urllib.request, sys
+          out='alan-source'
+          q='title:(amen break OR amen breaks) AND mediatype:(audio OR data OR software)'
+          url='https://archive.org/advancedsearch.php?' + urllib.parse.urlencode({
+              'q':q,'fl[]':['identifier','title'],'rows':'50','page':'1','output':'json'
+          }, doseq=True)
+          with urllib.request.urlopen(url, timeout=45) as r:
+              docs=json.load(r)['response']['docs']
+          print('candidates:', [(d.get('identifier'), d.get('title')) for d in docs[:20]])
+          chosen=None
+          for d in docs:
+              ident=d.get('identifier')
+              if not ident: continue
+              try:
+                  with urllib.request.urlopen('https://archive.org/metadata/'+urllib.parse.quote(ident), timeout=45) as r:
+                      meta=json.load(r)
+              except Exception as e:
+                  print('metadata fail', ident, e); continue
+              files=meta.get('files',[])
+              candidates=[]
+              for f in files:
+                  name=f.get('name','')
+                  low=name.lower()
+                  if not (low.endswith('.zip') or low.endswith('.wav') or low.endswith('.aif') or low.endswith('.aiff') or low.endswith('.flac')):
+                      continue
+                  try: size=int(f.get('size') or 0)
+                  except: size=0
+                  if size and size > 120_000_000: continue
+                  score=0
+                  if 'amen' in low: score += 5
+                  if low.endswith('.zip'): score += 2
+                  if low.endswith('.wav'): score += 1
+                  candidates.append((score,size,name))
+              if candidates:
+                  candidates.sort(reverse=True)
+                  score,size,name=candidates[0]
+                  chosen=(ident,name,size,d.get('title',''))
+                  break
+          if not chosen:
+              print('No compact Archive Amen item located', file=sys.stderr); sys.exit(2)
+          ident,name,size,title=chosen
+          print('chosen:', chosen)
+          dl='https://archive.org/download/{}/{}'.format(
+              urllib.parse.quote(ident), urllib.parse.quote(name, safe='/'))
+          ext=os.path.splitext(name)[1].lower() or '.bin'
+          dest=os.path.join(out,'AmenSource'+ext)
+          req=urllib.request.Request(dl, headers={'User-Agent':'Mozilla/5.0 ALAN-bank-builder'})
+          with urllib.request.urlopen(req, timeout=120) as r, open(dest,'wb') as w:
+              while True:
+                  b=r.read(1024*1024)
+                  if not b: break
+                  w.write(b)
+          with open(os.path.join(out,'AmenSource.txt'),'w') as w:
+              w.write(f'identifier={ident}\nfile={name}\ntitle={title}\nurl={dl}\n')
+          print('saved', dest, os.path.getsize(dest))
+
+      - name: Inventory archives
+        shell: bash
+        run: |
+          set -e
+          for z in alan-source/*.zip; do
+            echo "===== $z ====="
+            unzip -l "$z" | head -80 || true
+          done
+          cat alan-source/AmenSource.txt || true
+          sha256sum alan-source/* > alan-source/SHA256SUMS.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ALAN-Archive-Source-Packs
+          path: alan-source/*
+          if-no-files-found: error
