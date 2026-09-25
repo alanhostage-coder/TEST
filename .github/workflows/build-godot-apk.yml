@@ -98,17 +98,35 @@ jobs:
           cat /tmp/mobile-facade.log
           test "$status" -eq 0
           grep -q 'MOBILE_FACADE_OK' /tmp/mobile-facade.log
+      - name: EH15 terrain data regression
+        run: |
+          set +e
+          timeout 45s godot --headless --path godot --script res://mobile_terrain_test.gd > /tmp/mobile-terrain.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/mobile-terrain.log
+          test "$status" -eq 0
+          grep -q 'MOBILE_TERRAIN_OK' /tmp/mobile-terrain.log
+      - name: Forced mobile terrain scene regression
+        run: |
+          set +e
+          timeout 60s godot --headless --path godot --script res://mobile_terrain_scene_test.gd > /tmp/mobile-terrain-scene.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/mobile-terrain-scene.log
+          test "$status" -eq 0
+          grep -q 'MOBILE_TERRAIN_SCENE_OK' /tmp/mobile-terrain-scene.log
       - name: Export Android debug APK
         run: |
           mkdir -p build/android
           EXPORT_DIR="$(readlink -f build/android)"
-          godot --headless --verbose --path godot --export-debug "Android" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_85.apk"
-          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_85.apk"
-          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_85.apk"
+          godot --headless --verbose --path godot --export-debug "Android" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_90.apk"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_90.apk"
+          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_90.apk"
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.85-ANDROID
-          path: build/android/PROCEED_UNTIL_APPREHENDED_0_85.apk
+          name: PUA-0.90-ANDROID
+          path: build/android/PROCEED_UNTIL_APPREHENDED_0_90.apk
           if-no-files-found: error
           retention-days: 30
