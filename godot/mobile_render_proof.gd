@@ -44,7 +44,7 @@ func run() -> void:
 	var targets := [
 		# Pittville is captured from inside the street looking downhill towards the
 		# coast, rather than backwards into the Abercorn/High Street junction.
-		{"slug":"pitville-street", "point":Vector2(37.403,-24.824), "road_point":Vector2(8.5,41.5), "road_a":Vector2(6.856,45.474), "road_b":Vector2(22.157,12.011), "focus":false},
+		{"slug":"pitville-street", "point":Vector2(90.624,-147.343), "road_point":Vector2(22.157,12.011), "road_a":Vector2(22.157,12.011), "road_b":Vector2(57.111,-67.939), "focus":false},
 		{"slug":"hugh-dewar-fountain", "point":Vector2(56.157,65.189), "road_point":Vector2(48.031,83.938), "road_a":Vector2(39.497,80.239), "road_b":Vector2(98.907,105.988), "focus":true},
 		{"slug":"bellfield-community-hub", "point":Vector2(-91.668,-76.972), "road_point":Vector2(-61.955,-64.140), "road_a":Vector2(-77.872,-27.285), "road_b":Vector2(-35.483,-125.435), "focus":true},
 		{"slug":"st-marks-church", "point":Vector2(-110.398,90.453), "road_point":Vector2(-90.023,99.054), "road_a":Vector2(-65.244,40.354), "road_b":Vector2(-101.108,125.313), "focus":true},
