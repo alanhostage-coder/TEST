@@ -917,7 +917,17 @@ func _add_named_landmark_signature(body: Node3D, poly: PackedVector2Array, heigh
 		_visual_cylinder(body, Vector3(tower_center.x, height + 6.65, tower_center.y), 1.90, 2.15, 2.35, soot_stone_cool_mat, 8, 430.0)
 		_visual_cylinder(body, Vector3(tower_center.x, height + 8.35, tower_center.y), 0.30, 2.10, 1.10, roof_mat, 8, 440.0)
 		_visual_sphere(body, Vector3(tower_center.x, height + 9.02, tower_center.y), 0.22, 0.44, metal_mat, 440.0)
-		body.set_meta("landmark_signature", "bellfield-clock-tower-v2")
+		# Bellfield Street elevation: central blue doors and paired tall window bays
+		# make the building readable before the clock tower is fully in frame.
+		var bellfield_door := front_mid + outward * 0.08
+		_rotated_visual_box(body, Vector3(bellfield_door.x, 1.35, bellfield_door.y), Vector3(0.10, 2.70, 1.65), sign_blue_mat, angle, 360.0)
+		_rotated_visual_box(body, Vector3(bellfield_door.x, 2.82, bellfield_door.y), Vector3(0.11, 0.28, 1.88), tenement_sash_frame_mat, angle, 360.0)
+		for side in [-1.0, 1.0]:
+			var window_p := front_mid + tangent * float(side) * 3.55 + outward * 0.07
+			_rotated_visual_box(body, Vector3(window_p.x, 3.25, window_p.y), Vector3(0.09, 3.65, 1.48), tenement_sash_frame_mat, angle, 360.0)
+			var glass_p := window_p + inward * 0.06
+			_rotated_visual_box(body, Vector3(glass_p.x, 3.25, glass_p.y), Vector3(0.06, 3.30, 1.20), tenement_sash_glass_mat, angle, 360.0)
+		body.set_meta("landmark_signature", "bellfield-clock-tower-v3")
 	else:
 		# St Mark's is villa-like rather than a conventional spired church. Its
 		# semi-circular Doric porch, round-headed openings and low dome are the cues.
@@ -1317,6 +1327,16 @@ func _add_mobile_osm_facade_detail(body: Node3D, poly: PackedVector2Array, heigh
 			detail_count += 2
 
 	_add_mobile_secondary_facade_edges(body, poly, height, centroid, best_edge)
+	# Roofline is one of the strongest Edinburgh cues at driving distance. These
+	# stacks are generic visual dressing, not a claim about mapped chimney counts.
+	if height > 5.4 and centroid.distance_to(car2) <= 190.0 and kind not in ["garage", "garages", "shed", "roof", "industrial", "warehouse"]:
+		var roof_axis := (p1 - p0).normalized()
+		var chimney_count := 1 + (abs(seed) % 2)
+		for chimney_index in range(chimney_count):
+			var chimney_offset := (float(chimney_index) - float(chimney_count - 1) * 0.5) * 2.2
+			var chimney_p := centroid + roof_axis * chimney_offset
+			_mobile_facade_box(body, Vector3(chimney_p.x, height + 0.62, chimney_p.y), Vector3(0.58, 1.24, 0.58), soot_stone_mat, 0.0, 220.0)
+			_mobile_facade_box(body, Vector3(chimney_p.x, height + 1.27, chimney_p.y), Vector3(0.70, 0.08, 0.70), roof_mat, 0.0, 220.0)
 	body.set_meta("mobile_facade_detail_count", detail_count)
 	body.set_meta("mobile_shopfront_count", shopfront_count)
 	body.set_meta("mobile_facade_edge", best_edge)
@@ -1620,6 +1640,7 @@ func _add_mobile_osm_footprint_visual(parent: Node3D, building: Dictionary, heig
 	# street face. Reuse the same cheap facade pass so the 190-340m zone does not
 	# collapse into blank extruded polygons.
 	_add_mobile_osm_facade_detail(visual, poly, height, seed, building)
+	_add_named_landmark_signature(visual, poly, height, building)
 	parent.add_child(visual)
 	return true
 
