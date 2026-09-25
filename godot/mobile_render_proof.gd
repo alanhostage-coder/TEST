@@ -39,11 +39,11 @@ func run() -> void:
 	world.get_node("HUD").visible = true
 
 	var targets := [
-		{"slug":"pitville-street", "point":Vector2(21.397,77.011)},
-		{"slug":"hugh-dewar-fountain", "point":Vector2(56.157,65.189)},
-		{"slug":"bellfield-community-hub", "point":Vector2(-91.668,-76.972)},
-		{"slug":"st-marks-church", "point":Vector2(-110.398,90.453)},
-		{"slug":"twelve-triangles-high-street", "point":Vector2(-117.849,-2.438)}
+		{"slug":"pitville-street", "point":Vector2(-0.679,62.829), "road_a":Vector2(-0.679,62.829), "road_b":Vector2(1.758,57.218), "focus":false},
+		{"slug":"hugh-dewar-fountain", "point":Vector2(56.157,65.189), "focus":true},
+		{"slug":"bellfield-community-hub", "point":Vector2(-91.668,-76.972), "focus":true},
+		{"slug":"st-marks-church", "point":Vector2(-110.398,90.453), "focus":true},
+		{"slug":"twelve-triangles-high-street", "point":Vector2(-117.849,-2.438), "focus":true}
 	]
 	for target in targets:
 		var point: Vector2 = target["point"]
@@ -54,7 +54,17 @@ func run() -> void:
 		stream.update_stream_position(point)
 		for _load in range(24):
 			await process_frame
-		var pose := _road_pose_for_target(car, point)
+		var pose: Dictionary = {}
+		if target.has("road_a") and target.has("road_b"):
+			var road_a: Vector2 = target["road_a"]
+			var road_b: Vector2 = target["road_b"]
+			var road_direction: Vector2 = (road_b - road_a).normalized()
+			pose = {
+				"position": road_a + road_direction * 4.5,
+				"heading": atan2(-road_direction.x, -road_direction.y)
+			}
+		else:
+			pose = _road_pose_for_target(car, point)
 		if pose.is_empty():
 			push_error("PUA_MOBILE_RENDER_FAIL no road pose " + str(target["slug"]))
 			_finish(2)
@@ -68,6 +78,11 @@ func run() -> void:
 		car.steering_velocity = 0.0
 		car.lateral_load = 0.0
 		car.camera_yaw = 0.0
+		if bool(target.get("focus", false)):
+			var focus_direction: Vector2 = (point - p).normalized()
+			if focus_direction.length() > 0.5:
+				var focus_heading: float = atan2(-focus_direction.x, -focus_direction.y)
+				car.camera_yaw = clampf(wrapf(focus_heading - car.rotation.y, -PI, PI), -0.92, 0.92)
 		car.camera_pitch = 0.0
 		car.camera_idle = 2.0
 		car.camera_lag = Vector3.ZERO
