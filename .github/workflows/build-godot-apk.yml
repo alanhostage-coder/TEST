@@ -24,6 +24,8 @@ jobs:
           mkdir -p "$HOME/.config/godot" "$HOME/.local/share/godot/export_templates"
           if [ -d /root/.config/godot ]; then cp -a /root/.config/godot/. "$HOME/.config/godot/"; fi
           if [ -d /root/.local/share/godot/export_templates/4.5.1.stable ]; then cp -a /root/.local/share/godot/export_templates/4.5.1.stable "$HOME/.local/share/godot/export_templates/"; fi
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xvfb xauth libfontconfig1 libxcursor1 libxinerama1 libxi6 libxrandr2 libxkbcommon-x11-0 libgl1 libegl1
           godot --version
           test -d "$HOME/.local/share/godot/export_templates/4.5.1.stable"
       - name: Strict project parse
@@ -116,17 +118,41 @@ jobs:
           cat /tmp/mobile-terrain-scene.log
           test "$status" -eq 0
           grep -q 'MOBILE_TERRAIN_SCENE_OK' /tmp/mobile-terrain-scene.log
+      - name: Render forced-mobile visual proof
+        run: |
+          mkdir -p build/mobile-proof
+          set +e
+          timeout 120s xvfb-run -a godot --path godot --display-driver x11 --resolution 1280x720 --script res://mobile_render_proof.gd > /tmp/pua-mobile-proof.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/pua-mobile-proof.log
+          test "$status" -eq 0
+          grep -q 'PUA_MOBILE_RENDER_OK' /tmp/pua-mobile-proof.log
+          test -s /tmp/pua-mobile-proof/pitville-street.png
+          test -s /tmp/pua-mobile-proof/hugh-dewar-fountain.png
+          test -s /tmp/pua-mobile-proof/bellfield-community-hub.png
+          test -s /tmp/pua-mobile-proof/st-marks-church.png
+          test -s /tmp/pua-mobile-proof/twelve-triangles-high-street.png
+          cp /tmp/pua-mobile-proof/*.png build/mobile-proof/
+          cp /tmp/pua-mobile-proof.log build/mobile-proof/
+      - name: Upload mobile visual proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: PUA-0.91-MOBILE-RENDER-PROOF
+          path: build/mobile-proof/
+          if-no-files-found: error
+          retention-days: 30
       - name: Export Android debug APK
         run: |
           mkdir -p build/android
           EXPORT_DIR="$(readlink -f build/android)"
-          godot --headless --verbose --path godot --export-debug "Android" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_90.apk"
-          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_90.apk"
-          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_90.apk"
+          godot --headless --verbose --path godot --export-debug "Android" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_91.apk"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_91.apk"
+          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_91.apk"
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.90-ANDROID
-          path: build/android/PROCEED_UNTIL_APPREHENDED_0_90.apk
+          name: PUA-0.91-ANDROID
+          path: build/android/PROCEED_UNTIL_APPREHENDED_0_91.apk
           if-no-files-found: error
           retention-days: 30
