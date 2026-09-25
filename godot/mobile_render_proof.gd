@@ -1,0 +1,119 @@
+extends SceneTree
+
+const OUTPUT_DIR := "/tmp/pua-mobile-proof"
+const MAP_READY_FRAMES := 360
+
+func _initialize() -> void:
+	OS.set_environment("PUA_FORCE_MOBILE_TEST", "1")
+	call_deferred("run")
+
+func _finish(code: int) -> void:
+	OS.set_environment("PUA_FORCE_MOBILE_TEST", "")
+	quit(code)
+
+func run() -> void:
+	DirAccess.make_dir_recursive_absolute(OUTPUT_DIR)
+	var world = load("res://world.tscn").instantiate()
+	world.set_meta("force_mobile_proof", true)
+	root.add_child(world)
+	current_scene = world
+
+	var car = world.get_node("Car")
+	for _i in range(MAP_READY_FRAMES):
+		await process_frame
+		if int(car.get_meta("map_road_count", 0)) > 0 and int(car.get_meta("map_building_count", 0)) > 0:
+			break
+	if int(car.get_meta("map_road_count", 0)) <= 0:
+		push_error("PUA_MOBILE_RENDER_FAIL map not ready")
+		_finish(2)
+		return
+
+	var world_state = world.get_node("WorldState")
+	world_state.set_weather_mode("CLEAR")
+	world.atmosphere_wetness = world.atmosphere_target_wetness
+	world.atmosphere_cloud = world.atmosphere_target_cloud
+	world.atmosphere_visibility = world.atmosphere_target_visibility
+	world.atmosphere_aqi = world.atmosphere_target_aqi
+	world._apply_weather_visuals()
+	world.get_node("BayProjection")._set_mode(0)
+	world.get_node("HUD").visible = true
+
+	var targets := [
+		{"slug":"pitville-street", "point":Vector2(21.397,77.011)},
+		{"slug":"hugh-dewar-fountain", "point":Vector2(56.157,65.189)},
+		{"slug":"bellfield-community-hub", "point":Vector2(-91.668,-76.972)},
+		{"slug":"st-marks-church", "point":Vector2(-110.398,90.453)},
+		{"slug":"twelve-triangles-high-street", "point":Vector2(-117.849,-2.438)}
+	]
+	for target in targets:
+		var point: Vector2 = target["point"]
+		var stream = world.get_node("MapStream")
+		stream.update_stream_position(point)
+		for _load in range(20):
+			await process_frame
+		var pose := _road_pose_for_target(car, point)
+		if pose.is_empty():
+			push_error("PUA_MOBILE_RENDER_FAIL no road pose " + str(target["slug"]))
+			_finish(2)
+			return
+		var p: Vector2 = pose["position"]
+		car.global_position = Vector3(p.x, world._terrain_height(p) + 0.58, p.y)
+		car.rotation.y = float(pose["heading"])
+		car.speed = 0.0
+		car.velocity = Vector3.ZERO
+		car.steer_smoothed = 0.0
+		car.steering_velocity = 0.0
+		car.lateral_load = 0.0
+		car.camera_yaw = 0.0
+		car.camera_pitch = 0.0
+		car.camera_idle = 2.0
+		car.camera_lag = Vector3.ZERO
+		car.previous_position = car.global_position
+		for _settle in range(18):
+			await physics_frame
+			await process_frame
+		var image := root.get_texture().get_image()
+		var path := "%s/%s.png" % [OUTPUT_DIR, str(target["slug"])]
+		if image == null or image.is_empty() or image.save_png(path) != OK:
+			push_error("PUA_MOBILE_RENDER_FAIL save " + str(target["slug"]))
+			_finish(2)
+			return
+	print("PUA_MOBILE_RENDER_OK captures=5")
+	_finish(0)
+
+func _road_pose_for_target(car: Node, target: Vector2) -> Dictionary:
+	var best_distance := INF
+	var best_projection := Vector2.ZERO
+	var best_direction := Vector2.ZERO
+	var best_t := 0.0
+	var best_length := 0.0
+	for segment in car.get_meta("map_road_segments", []):
+		if not segment is Array or segment.size() < 2 or not segment[0] is Array or not segment[1] is Array:
+			continue
+		var a := Vector2(float(segment[0][0]), float(segment[0][1]))
+		var b := Vector2(float(segment[1][0]), float(segment[1][1]))
+		var d := b - a
+		var length := d.length()
+		if length < 2.0:
+			continue
+		var t := clampf((target-a).dot(d)/d.length_squared(),0.0,1.0)
+		var projection := a + d*t
+		var d2 := projection.distance_squared_to(target)
+		if d2 < best_distance:
+			best_distance=d2
+			best_projection=projection
+			best_direction=d/length
+			best_t=t
+			best_length=length
+	if best_length <= 0.0:
+		return {}
+	var direction := best_direction
+	var road_position := best_projection
+	var room_a := best_t*best_length
+	var room_b := (1.0-best_t)*best_length
+	if room_a >= room_b:
+		road_position -= best_direction*minf(14.0,maxf(4.0,room_a*0.68))
+	else:
+		road_position += best_direction*minf(14.0,maxf(4.0,room_b*0.68))
+		direction = -best_direction
+	return {"position":road_position,"heading":atan2(-direction.x,-direction.y)}
