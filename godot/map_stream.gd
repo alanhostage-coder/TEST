@@ -11,6 +11,7 @@ const PATCH_PATH := "res://patches/eh15_2bz.json"
 const EH15_FULL_MANIFEST_PATH := "res://patches/eh15_full/manifest.json"
 const EH15_FULL_TILE_DIR := "res://patches/eh15_full"
 const EH15_DESTINATIONS_PATH := "res://patches/eh15_full/destinations.json"
+const EH15_ELEVATION_PATH := "res://patches/eh15_full/elevation.json"
 const MOBILE_STREAM_RADIUS_METERS := 650.0
 const MOBILE_MAX_ACTIVE_TILES := 4
 var CACHE_PATH := "user://pua_map_stream_eh15_2bz_v7_pc_max.json" if OS.has_feature("pc_max") else "user://pua_map_stream_eh15_2bz_v7.json"
@@ -53,6 +54,7 @@ var full_tiles: Array = []
 var full_stream_enabled := false
 var active_tile_signature := ""
 var district_destinations: Array = []
+var terrain_profile: Dictionary = {}
 
 func _ready():
 	if (OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1") and _load_full_eh15_manifest():
@@ -91,11 +93,80 @@ func _load_full_eh15_manifest() -> bool:
 		return false
 	full_manifest = parsed
 	full_tiles = tiles
+	if not _load_full_eh15_elevation():
+		return false
 	full_stream_enabled = true
 	center_lat = float(parsed.get("center_lat", FALLBACK_LAT))
 	center_lon = float(parsed.get("center_lon", FALLBACK_LON))
 	resolved_postcode = "EH15"
 	return true
+
+
+func _load_full_eh15_elevation() -> bool:
+	terrain_profile.clear()
+	if not FileAccess.file_exists(EH15_ELEVATION_PATH):
+		return false
+	var file = FileAccess.open(EH15_ELEVATION_PATH, FileAccess.READ)
+	if not file:
+		return false
+	var parsed = JSON.parse_string(file.get_as_text())
+	if not parsed is Dictionary:
+		return false
+	var cols := int(parsed.get("cols", 0))
+	var rows := int(parsed.get("rows", 0))
+	var values = parsed.get("values_dm", [])
+	if cols < 2 or rows < 2 or not values is Array or values.size() != cols * rows:
+		return false
+	terrain_profile = parsed
+	return true
+
+func terrain_available() -> bool:
+	return not terrain_profile.is_empty()
+
+func terrain_height_at(local_position: Vector2) -> float:
+	if terrain_profile.is_empty():
+		return 0.0
+	var min_x := float(terrain_profile.get("min_x", 0.0))
+	var min_z := float(terrain_profile.get("min_z", 0.0))
+	var max_x := float(terrain_profile.get("max_x", min_x))
+	var max_z := float(terrain_profile.get("max_z", min_z))
+	var step := float(terrain_profile.get("step_m", 25.0))
+	var cols := int(terrain_profile.get("cols", 0))
+	var rows := int(terrain_profile.get("rows", 0))
+	var values = terrain_profile.get("values_dm", [])
+	if cols < 2 or rows < 2 or not values is Array:
+		return 0.0
+	var x := clampf(local_position.x, min_x, max_x)
+	var z := clampf(local_position.y, min_z, max_z)
+	var fx := (x - min_x) / step
+	var fz := (z - min_z) / step
+	var x0 := clampi(int(floor(fx)), 0, cols - 1)
+	var z0 := clampi(int(floor(fz)), 0, rows - 1)
+	var x1 := mini(x0 + 1, cols - 1)
+	var z1 := mini(z0 + 1, rows - 1)
+	var tx := clampf(fx - float(x0), 0.0, 1.0)
+	var tz := clampf(fz - float(z0), 0.0, 1.0)
+	var y00 := float(values[z0 * cols + x0]) * 0.1
+	var y10 := float(values[z0 * cols + x1]) * 0.1
+	var y01 := float(values[z1 * cols + x0]) * 0.1
+	var y11 := float(values[z1 * cols + x1]) * 0.1
+	return lerpf(lerpf(y00, y10, tx), lerpf(y01, y11, tx), tz)
+
+func terrain_sea_level_y() -> float:
+	return float(terrain_profile.get("sea_level_local_y_m", 0.0))
+
+func terrain_summary() -> Dictionary:
+	if terrain_profile.is_empty():
+		return {}
+	return {
+		"source": str(terrain_profile.get("source", "")),
+		"source_tile": str(terrain_profile.get("source_tile", "")),
+		"reference_elevation_m": float(terrain_profile.get("reference_elevation_m", 0.0)),
+		"sea_level_local_y_m": terrain_sea_level_y(),
+		"min_y_m": float(terrain_profile.get("min_y_m", 0.0)),
+		"max_y_m": float(terrain_profile.get("max_y_m", 0.0)),
+		"step_m": float(terrain_profile.get("step_m", 0.0))
+	}
 
 func _load_district_destinations():
 	district_destinations.clear()
