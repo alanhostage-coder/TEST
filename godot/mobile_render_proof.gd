@@ -47,9 +47,12 @@ func run() -> void:
 	]
 	for target in targets:
 		var point: Vector2 = target["point"]
+		# Move first so a streamed tile rebuild spends facade/detail budget around
+		# the place we are about to photograph, not the previous stop.
+		car.global_position = Vector3(point.x, world._terrain_height(point) + 0.58, point.y)
 		var stream = world.get_node("MapStream")
 		stream.update_stream_position(point)
-		for _load in range(20):
+		for _load in range(24):
 			await process_frame
 		var pose := _road_pose_for_target(car, point)
 		if pose.is_empty():
@@ -82,6 +85,7 @@ func run() -> void:
 	_finish(0)
 
 func _road_pose_for_target(car: Node, target: Vector2) -> Dictionary:
+	var best_score := INF
 	var best_distance := INF
 	var best_projection := Vector2.ZERO
 	var best_direction := Vector2.ZERO
@@ -99,7 +103,15 @@ func _road_pose_for_target(car: Node, target: Vector2) -> Dictionary:
 		var t := clampf((target-a).dot(d)/d.length_squared(),0.0,1.0)
 		var projection := a + d*t
 		var d2 := projection.distance_squared_to(target)
-		if d2 < best_distance:
+		var kind := str(segment[3]).to_lower() if segment.size() >= 4 else "road"
+		var road_penalty := 0.0
+		if kind == "service":
+			road_penalty = 625.0
+		elif kind in ["track", "path", "footway", "cycleway"]:
+			road_penalty = 2500.0
+		var score := d2 + road_penalty
+		if score < best_score:
+			best_score=score
 			best_distance=d2
 			best_projection=projection
 			best_direction=d/length
