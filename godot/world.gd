@@ -206,7 +206,7 @@ func _make_materials():
 	var warm_texture := mobile_facade_texture if mobile_mode else "res://assets/edinburgh_tenement/walls/edin_ten_wall_warm_a_alb.png"
 	tenement_weathered_mat = _tenement_texture_mat(weathered_texture, Color(1.0, 0.975, 0.93), 0.93)
 	tenement_warm_mat = _tenement_texture_mat(warm_texture, Color(1.0, 0.95, 0.86), 0.92)
-	tenement_soot_mat = _tenement_texture_mat(weathered_texture, Color(0.68, 0.675, 0.63), 0.95)
+	tenement_soot_mat = _tenement_texture_mat(weathered_texture, Color(0.82, 0.805, 0.75), 0.95)
 	tenement_sash_frame_mat = _mat(Color(0.83, 0.81, 0.74), 0.78, 0.0)
 	tenement_sash_glass_mat = _mat(Color(0.035, 0.052, 0.060), 0.18, 0.22)
 	tenement_door_mats = [
@@ -229,6 +229,10 @@ func _make_materials():
 		sea_mat.albedo_color = Color(0.055, 0.23, 0.33)
 		beach_mat.albedo_color = Color(0.62, 0.54, 0.39)
 		tenement_sash_frame_mat.albedo_color = Color(0.88, 0.86, 0.78)
+		for stone_material in [sandstone_mat, sandstone_warm_mat, soot_stone_mat]:
+			stone_material.emission_enabled = true
+			stone_material.emission = stone_material.albedo_color
+			stone_material.emission_energy_multiplier = 0.10
 
 func _tenement_texture_mat(path: String, tint: Color, roughness: float):
 	var material = _mat(tint, roughness, 0.0)
@@ -237,6 +241,13 @@ func _tenement_texture_mat(path: String, tint: Color, roughness: float):
 		material.albedo_texture = texture
 		material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 		material.texture_repeat = true
+		if mobile_mode:
+			# A tiny texture-matched emission term keeps sash/stone detail visible on
+			# walls facing away from the sun without flattening the daytime lighting.
+			material.emission_enabled = true
+			material.emission = Color(0.18, 0.17, 0.15)
+			material.emission_texture = texture
+			material.emission_energy_multiplier = 0.32
 	return material
 
 func _mat(color: Color, roughness: float, metallic: float):
