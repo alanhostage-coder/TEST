@@ -718,8 +718,15 @@ func _add_named_poi_markers(parent: Node3D, pois: Array):
 		var p = Vector2(float(point[0]), float(point[1]))
 		if p.distance_to(reference) > distance_limit:
 			continue
-		if mobile_mode:
-			var poi_y := float(poi.get("ground_y", _terrain_height(p)))
+		var poi_y := float(poi.get("ground_y", _terrain_height(p))) if mobile_mode else 0.0
+		var is_hugh_dewar := str(poi.get("kind", "")).to_lower() == "memorial" and poi_name.to_lower().contains("hugh dewar")
+		if is_hugh_dewar:
+			_add_hugh_dewar_memorial(parent, p, poi_y)
+			if mobile_mode:
+				_add_mobile_identity_annotation(parent, Vector3(p.x, poi_y + 4.35, p.y), poi_name, Color(0.72, 0.90, 1.0, 0.96), label_range)
+			else:
+				_add_world_label(parent, Vector3(p.x, 4.35, p.y), poi_name, Color(0.98, 0.98, 0.96), label_size, label_range)
+		elif mobile_mode:
 			_add_mobile_identity_annotation(parent, Vector3(p.x, poi_y + 3.0, p.y), poi_name, Color(0.72, 0.90, 1.0, 0.96), label_range)
 		else:
 			_visual_box(parent, Vector3(p.x, 1.35, p.y), Vector3(0.08, 2.70, 0.08), metal_mat)
@@ -807,6 +814,127 @@ func _visual_box(parent: Node3D, pos: Vector3, size: Vector3, material):
 	mesh.position = pos
 	_apply_secondary_visual_budget(mesh)
 	parent.add_child(mesh)
+
+func _rotated_visual_box(parent: Node3D, pos: Vector3, size: Vector3, material, angle: float, range_end := 260.0):
+	_visual_box(parent, pos, size, material)
+	var node = parent.get_child(parent.get_child_count() - 1)
+	if node is MeshInstance3D:
+		node.rotation.y = angle
+		node.visibility_range_end = range_end
+	return node
+
+func _visual_cylinder(parent: Node3D, pos: Vector3, top_radius: float, bottom_radius: float, height: float, material, radial_segments := 12, range_end := 260.0):
+	var mesh = MeshInstance3D.new()
+	var cm = CylinderMesh.new()
+	cm.top_radius = top_radius
+	cm.bottom_radius = bottom_radius
+	cm.height = height
+	cm.radial_segments = radial_segments
+	mesh.mesh = cm
+	mesh.material_override = material
+	mesh.position = pos
+	mesh.visibility_range_end = range_end
+	_apply_secondary_visual_budget(mesh, range_end)
+	parent.add_child(mesh)
+	return mesh
+
+func _visual_sphere(parent: Node3D, pos: Vector3, radius: float, height: float, material, range_end := 260.0):
+	var mesh = MeshInstance3D.new()
+	var sm = SphereMesh.new()
+	sm.radius = radius
+	sm.height = height
+	sm.radial_segments = 14 if not low_spec_mode else 9
+	sm.rings = 8 if not low_spec_mode else 5
+	mesh.mesh = sm
+	mesh.material_override = material
+	mesh.position = pos
+	mesh.visibility_range_end = range_end
+	_apply_secondary_visual_budget(mesh, range_end)
+	parent.add_child(mesh)
+	return mesh
+
+func _landmark_front_frame(poly: PackedVector2Array) -> Dictionary:
+	if poly.size() < 2:
+		return {}
+	var centroid := Vector2.ZERO
+	for p in poly:
+		centroid += p
+	centroid /= float(poly.size())
+	var best_edge := -1
+	var best_distance := INF
+	for edge_index in range(poly.size()):
+		var p0: Vector2 = poly[edge_index]
+		var p1: Vector2 = poly[(edge_index + 1) % poly.size()]
+		if p0.distance_to(p1) < 3.0:
+			continue
+		var edge_mid := (p0 + p1) * 0.5
+		var road_distance := _nearest_drivable_road_distance(edge_mid)
+		if road_distance < best_distance:
+			best_distance = road_distance
+			best_edge = edge_index
+	if best_edge < 0:
+		return {}
+	var p0: Vector2 = poly[best_edge]
+	var p1: Vector2 = poly[(best_edge + 1) % poly.size()]
+	var tangent := (p1 - p0).normalized()
+	var edge_mid := (p0 + p1) * 0.5
+	var inward := (centroid - edge_mid).normalized()
+	if inward.length() < 0.5:
+		inward = Vector2(-tangent.y, tangent.x)
+	return {
+		"mid": edge_mid,
+		"tangent": tangent,
+		"inward": inward,
+		"outward": -inward,
+		"angle": atan2(tangent.x, tangent.y)
+	}
+
+func _add_named_landmark_signature(body: Node3D, poly: PackedVector2Array, height: float, building: Dictionary):
+	var name := str(building.get("name", "")).strip_edges()
+	var lower := name.to_lower()
+	if lower != "bellfield community hub" and lower != "st mark's church":
+		return
+	var frame := _landmark_front_frame(poly)
+	if frame.is_empty():
+		return
+	var front_mid: Vector2 = frame["mid"]
+	var tangent: Vector2 = frame["tangent"]
+	var inward: Vector2 = frame["inward"]
+	var outward: Vector2 = frame["outward"]
+	var angle: float = frame["angle"]
+
+	if lower == "bellfield community hub":
+		# Former Portobello Old Parish Church: broad symmetrical stone front,
+		# central square clock tower, then an octagonal louvred belfry.
+		var tower_center := front_mid + inward * 3.0
+		_rotated_visual_box(body, Vector3(tower_center.x, height + 2.55, tower_center.y), Vector3(4.9, 5.1, 4.9), soot_stone_mat, angle, 380.0)
+		for face_angle in [0.0, PI * 0.5, PI, PI * 1.5]:
+			var face_offset := Vector2(sin(face_angle), cos(face_angle)) * 2.48
+			_rotated_visual_box(body, Vector3(tower_center.x + face_offset.x, height + 3.0, tower_center.y + face_offset.y), Vector3(1.40, 1.40, 0.09), sign_white_mat, face_angle, 380.0)
+		_visual_cylinder(body, Vector3(tower_center.x, height + 6.15, tower_center.y), 1.85, 2.05, 2.2, soot_stone_cool_mat, 8, 390.0)
+		_visual_cylinder(body, Vector3(tower_center.x, height + 7.75, tower_center.y), 0.28, 2.05, 1.05, roof_mat, 8, 400.0)
+		body.set_meta("landmark_signature", "bellfield-clock-tower-v1")
+	else:
+		# St Mark's is villa-like rather than a conventional spired church. Its
+		# semi-circular Doric porch and low dome are the recognition features.
+		var porch_center := front_mid + outward * 1.10
+		_visual_cylinder(body, Vector3(porch_center.x, 1.62, porch_center.y), 2.55, 2.55, 3.24, sandstone_mat, 18, 350.0)
+		for side in [-1.0, 1.0]:
+			var column_p := front_mid + tangent * side * 1.82 + outward * 2.18
+			_visual_cylinder(body, Vector3(column_p.x, 1.52, column_p.y), 0.19, 0.23, 3.04, sandstone_warm_mat, 10, 350.0)
+		var dome_center := front_mid + inward * 1.00
+		_visual_cylinder(body, Vector3(dome_center.x, height + 0.30, dome_center.y), 2.35, 2.55, 0.60, roof_mat, 16, 375.0)
+		_visual_sphere(body, Vector3(dome_center.x, height + 0.85, dome_center.y), 2.18, 1.45, roof_mat, 375.0)
+		body.set_meta("landmark_signature", "st-marks-dome-portico-v1")
+
+func _add_hugh_dewar_memorial(parent: Node3D, point: Vector2, base_y: float):
+	# Polished-granite stepped drinking fountain with a tapered obelisk and ball
+	# finial. Four-sided low-poly geometry reads correctly from every approach.
+	_visual_box(parent, Vector3(point.x, base_y + 0.16, point.y), Vector3(1.70, 0.32, 1.70), soot_stone_cool_mat)
+	_visual_box(parent, Vector3(point.x, base_y + 0.52, point.y), Vector3(1.35, 0.40, 1.35), soot_stone_mat)
+	_visual_box(parent, Vector3(point.x, base_y + 1.10, point.y), Vector3(1.05, 0.76, 1.05), sandstone_mat)
+	_visual_cylinder(parent, Vector3(point.x, base_y + 2.55, point.y), 0.20, 0.72, 2.20, soot_stone_cool_mat, 4, 280.0)
+	_visual_sphere(parent, Vector3(point.x, base_y + 3.78, point.y), 0.20, 0.40, soot_stone_cool_mat, 280.0)
 
 func _road_micro_detail(parent: Node3D, a: Vector2, b: Vector2, width: float, seed: int, budget: int) -> int:
 	if budget <= 0:
@@ -1469,6 +1597,7 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 	collision.shape = mesh.create_trimesh_shape()
 	body.add_child(collision)
 	_add_exact_osm_facade_detail(body, poly, height, seed, building)
+	_add_named_landmark_signature(body, poly, height, building)
 	parent.add_child(body)
 	return true
 
