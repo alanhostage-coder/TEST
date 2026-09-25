@@ -711,7 +711,30 @@ func _add_named_poi_markers(parent: Node3D, pois: Array):
 	var made := 0
 	var driver = get_node_or_null("Car")
 	var reference := Vector2(driver.global_position.x, driver.global_position.z) if mobile_mode and driver else Vector2.ZERO
-	for poi in pois:
+	var ordered_pois: Array = pois.duplicate()
+	if mobile_mode:
+		ordered_pois.sort_custom(func(a, b):
+			if not a is Dictionary:
+				return false
+			if not b is Dictionary:
+				return true
+			var ap = a.get("point", [])
+			var bp = b.get("point", [])
+			var ad := INF
+			var bd := INF
+			if ap is Array and ap.size() >= 2:
+				ad = Vector2(float(ap[0]), float(ap[1])).distance_squared_to(reference)
+			if bp is Array and bp.size() >= 2:
+				bd = Vector2(float(bp[0]), float(bp[1])).distance_squared_to(reference)
+			var an := str(a.get("name", "")).to_lower()
+			var bn := str(b.get("name", "")).to_lower()
+			if an.contains("hugh dewar"):
+				ad -= 1000000.0
+			if bn.contains("hugh dewar"):
+				bd -= 1000000.0
+			return ad < bd
+		)
+	for poi in ordered_pois:
 		if made >= cap or not poi is Dictionary:
 			break
 		var point = poi.get("point", [])
@@ -885,6 +908,7 @@ func _landmark_front_frame(poly: PackedVector2Array) -> Dictionary:
 	if inward.length() < 0.5:
 		inward = Vector2(-tangent.y, tangent.x)
 	return {
+		"centroid": centroid,
 		"mid": edge_mid,
 		"tangent": tangent,
 		"inward": inward,
@@ -900,6 +924,7 @@ func _add_named_landmark_signature(body: Node3D, poly: PackedVector2Array, heigh
 	var frame := _landmark_front_frame(poly)
 	if frame.is_empty():
 		return
+	var centroid: Vector2 = frame["centroid"]
 	var front_mid: Vector2 = frame["mid"]
 	var tangent: Vector2 = frame["tangent"]
 	var inward: Vector2 = frame["inward"]
@@ -909,7 +934,7 @@ func _add_named_landmark_signature(body: Node3D, poly: PackedVector2Array, heigh
 	if lower == "bellfield community hub":
 		# Former Portobello Old Parish Church: broad symmetrical stone front,
 		# central square clock tower, then an octagonal louvred belfry.
-		var tower_center := front_mid + inward * 3.0
+		var tower_center := centroid
 		_rotated_visual_box(body, Vector3(tower_center.x, height + 2.85, tower_center.y), Vector3(5.1, 5.7, 5.1), sandstone_warm_mat, angle, 420.0)
 		for face_angle in [0.0, PI * 0.5, PI, PI * 1.5]:
 			var face_offset: Vector2 = Vector2(sin(float(face_angle)), cos(float(face_angle))) * 2.58
@@ -929,23 +954,27 @@ func _add_named_landmark_signature(body: Node3D, poly: PackedVector2Array, heigh
 			_rotated_visual_box(body, Vector3(glass_p.x, 3.25, glass_p.y), Vector3(0.06, 3.30, 1.20), tenement_sash_glass_mat, angle, 360.0)
 		body.set_meta("landmark_signature", "bellfield-clock-tower-v3")
 	else:
-		# St Mark's is villa-like rather than a conventional spired church. Its
-		# semi-circular Doric porch, round-headed openings and low dome are the cues.
-		var porch_center := front_mid + outward * 1.10
-		_visual_cylinder(body, Vector3(porch_center.x, 1.62, porch_center.y), 2.55, 2.55, 3.24, sandstone_mat, 18, 390.0)
+		# St Mark's reads as a restrained classical church rather than a huge
+		# cylindrical porch. Keep the low dome central and make the street-facing
+		# portico from a doorway, four columns and a heavy stone lintel.
+		var porch_face := front_mid + outward * 0.22
+		_rotated_visual_box(body, Vector3(porch_face.x, 1.30, porch_face.y), Vector3(0.10, 2.60, 1.28), soot_stone_cool_mat, angle, 390.0)
+		for column_index in range(4):
+			var column_offset := (float(column_index) - 1.5) * 0.90
+			var column_p: Vector2 = front_mid + tangent * column_offset + outward * 0.58
+			_visual_cylinder(body, Vector3(column_p.x, 1.58, column_p.y), 0.17, 0.22, 3.16, sandstone_warm_mat, 10, 390.0)
+		var lintel_p := front_mid + outward * 0.56
+		_rotated_visual_box(body, Vector3(lintel_p.x, 3.18, lintel_p.y), Vector3(0.22, 0.34, 4.55), sandstone_warm_mat, angle, 395.0)
 		for side in [-1.0, 1.0]:
-			var column_p: Vector2 = front_mid + tangent * float(side) * 1.82 + outward * 2.18
-			_visual_cylinder(body, Vector3(column_p.x, 1.52, column_p.y), 0.19, 0.23, 3.04, sandstone_warm_mat, 10, 390.0)
-		for window_index in range(3):
-			var offset := (float(window_index) - 1.0) * 2.35
-			var window_p := front_mid + tangent * offset + outward * 0.08
-			_rotated_visual_box(body, Vector3(window_p.x, 2.25, window_p.y), Vector3(0.08, 2.65, 1.10), tenement_sash_glass_mat, angle, 390.0)
-			_rotated_visual_box(body, Vector3(window_p.x, 3.72, window_p.y), Vector3(0.09, 0.22, 1.28), sandstone_warm_mat, angle, 390.0)
-		var dome_center := front_mid + inward * 1.00
-		_visual_cylinder(body, Vector3(dome_center.x, height + 0.42, dome_center.y), 2.65, 2.85, 0.84, roof_mat, 18, 410.0)
-		_visual_sphere(body, Vector3(dome_center.x, height + 1.28, dome_center.y), 2.52, 1.95, roof_mat, 410.0)
-		_visual_cylinder(body, Vector3(dome_center.x, height + 2.25, dome_center.y), 0.42, 0.62, 0.85, soot_stone_cool_mat, 10, 420.0)
-		body.set_meta("landmark_signature", "st-marks-dome-portico-v2")
+			var window_p := front_mid + tangent * float(side) * 3.05 + outward * 0.08
+			_rotated_visual_box(body, Vector3(window_p.x, 2.55, window_p.y), Vector3(0.08, 3.25, 1.20), tenement_sash_frame_mat, angle, 395.0)
+			var glass_p := window_p + inward * 0.06
+			_rotated_visual_box(body, Vector3(glass_p.x, 2.55, glass_p.y), Vector3(0.055, 2.95, 0.94), tenement_sash_glass_mat, angle, 395.0)
+		var dome_center := centroid
+		_visual_cylinder(body, Vector3(dome_center.x, height + 0.28, dome_center.y), 1.75, 1.90, 0.56, sandstone_warm_mat, 18, 415.0)
+		_visual_sphere(body, Vector3(dome_center.x, height + 0.82, dome_center.y), 1.62, 1.16, roof_mat, 18, 415.0)
+		_visual_cylinder(body, Vector3(dome_center.x, height + 1.52, dome_center.y), 0.24, 0.38, 0.52, soot_stone_cool_mat, 10, 425.0)
+		body.set_meta("landmark_signature", "st-marks-classical-dome-v3")
 
 func _add_hugh_dewar_memorial(parent: Node3D, point: Vector2, base_y: float):
 	# Polished-granite stepped drinking fountain with the distinctive open support
@@ -1116,7 +1145,7 @@ func _osm_building_material(building: Dictionary, seed: int):
 	if named == "bellfield community hub":
 		return sandstone_warm_mat
 	if named == "st mark's church":
-		return soot_stone_cool_mat
+		return sandstone_warm_mat
 	if _uses_generic_edinburgh_tenement_texture(building):
 		# Generic visual approximation only. The OSM footprint stays authoritative;
 		# these shared textures do not claim surveyed facade accuracy.
@@ -1174,6 +1203,10 @@ func _add_mobile_secondary_facade_edges(body: Node3D, poly: PackedVector2Array, 
 	# Add restrained sash rhythm to up to two additional OSM edges that genuinely
 	# sit beside a drivable road. No invented doors, signs or shop names here.
 	var candidates: Array = []
+	var driver = get_node_or_null("Car")
+	var near_building := false
+	if driver:
+		near_building = centroid.distance_to(Vector2(driver.global_position.x, driver.global_position.z)) <= 105.0
 	for edge_index in range(poly.size()):
 		if edge_index == primary_edge:
 			continue
@@ -1184,13 +1217,14 @@ func _add_mobile_secondary_facade_edges(body: Node3D, poly: PackedVector2Array, 
 			continue
 		var edge_mid := (p0 + p1) * 0.5
 		var road_distance := _nearest_drivable_road_distance(edge_mid)
-		if road_distance > 13.5:
+		if road_distance > 13.5 and not near_building:
 			continue
 		candidates.append({"edge":edge_index, "score":road_distance, "length":length})
 	candidates.sort_custom(func(a, b): return float(a["score"]) < float(b["score"]))
 	var made := 0
+	var max_secondary_edges := 3 if near_building else 2
 	for candidate in candidates:
-		if made >= 2:
+		if made >= max_secondary_edges:
 			break
 		var edge_index := int(candidate["edge"])
 		var p0: Vector2 = poly[edge_index]
@@ -1241,6 +1275,7 @@ func _add_mobile_osm_facade_detail(body: Node3D, poly: PackedVector2Array, heigh
 	if centroid.distance_to(car2) > MOBILE_FACADE_RADIUS:
 		return
 
+	var mapped_commercial_pois: Array = building.get("_mapped_commercial_pois", [])
 	var best_edge := -1
 	var best_score := INF
 	for edge_index in range(poly.size()):
@@ -1253,6 +1288,13 @@ func _add_mobile_osm_facade_detail(body: Node3D, poly: PackedVector2Array, heigh
 		var road_distance := _nearest_drivable_road_distance(edge_mid)
 		var car_distance := edge_mid.distance_to(car2)
 		var score := road_distance * 4.0 + car_distance
+		for poi in mapped_commercial_pois:
+			var raw_p = poi.get("point", [])
+			if raw_p is Array and raw_p.size() >= 2:
+				var poi_point := Vector2(float(raw_p[0]), float(raw_p[1]))
+				if _nearest_poly_edge(poly, poi_point) == edge_index:
+					score -= 36.0
+					break
 		if road_distance <= 18.0 and score < best_score:
 			best_score = score
 			best_edge = edge_index
@@ -1272,7 +1314,6 @@ func _add_mobile_osm_facade_detail(body: Node3D, poly: PackedVector2Array, heigh
 	if inward.length() < 0.5:
 		inward = Vector2(-tangent.y, tangent.x)
 
-	var mapped_commercial_pois: Array = building.get("_mapped_commercial_pois", [])
 	var slots: int = clampi(int(floor(length / 3.4)), 2, 6)
 	var shop_slots := {}
 	for poi in mapped_commercial_pois:
