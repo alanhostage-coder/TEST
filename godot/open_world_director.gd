@@ -452,7 +452,7 @@ func _build_road_clutter(segments: Array):
 				var qm = QuadMesh.new()
 				qm.size = Vector2(0.16 + j * 0.05, 0.30 + j * 0.09)
 				weed.mesh = qm
-				var weed_p := edge + normal * float(j) * 0.12
+				var weed_p: Vector2 = edge + normal * float(j) * 0.12
 				weed.position = Vector3(weed_p.x, _terrain_y(weed_p) + 0.16, weed_p.y)
 				weed.rotation.y = atan2(normal.x, normal.y) + j * 0.55
 				weed.material_override = _material(Color(0.12, 0.16, 0.075), 0.95, 0.0)
