@@ -476,6 +476,69 @@ func _add_coastline_sea(parent: Node3D, features: Array) -> int:
 	parent.add_child(water)
 	return segment_count
 
+func _add_beach_edge_water(parent: Node3D, features: Array) -> int:
+	if not mobile_mode:
+		return 0
+	var sea_y := _terrain_sea_y()
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	var made := 0
+	for feature in features:
+		if not feature is Dictionary or str(feature.get("kind", "")).to_lower() != "beach":
+			continue
+		var raw_points = feature.get("points", [])
+		if not raw_points is Array or raw_points.size() < 3:
+			continue
+		var centroid := Vector2.ZERO
+		var valid := 0
+		for raw_point in raw_points:
+			if raw_point is Array and raw_point.size() >= 2:
+				centroid += Vector2(float(raw_point[0]), float(raw_point[1]))
+				valid += 1
+		if valid < 3:
+			continue
+		centroid /= float(valid)
+		for i in range(raw_points.size()):
+			var pa = raw_points[i]
+			var pb = raw_points[(i + 1) % raw_points.size()]
+			if not pa is Array or not pb is Array or pa.size() < 3 or pb.size() < 3:
+				continue
+			var a := Vector2(float(pa[0]), float(pa[1]))
+			var b := Vector2(float(pb[0]), float(pb[1]))
+			if a.distance_to(b) < 4.0:
+				continue
+			var source_y := (float(pa[2]) + float(pb[2])) * 0.5
+			if source_y > sea_y + 3.4:
+				continue
+			var mid := (a + b) * 0.5
+			var outward := (mid - centroid).normalized()
+			if outward.length() < 0.5:
+				continue
+			var near_a := a + outward * 0.8
+			var near_b := b + outward * 0.8
+			var far_a := a + outward * 1500.0
+			var far_b := b + outward * 1500.0
+			for p in [near_a, far_a, far_b, near_a, far_b, near_b]:
+				surface.set_normal(Vector3.UP)
+				surface.add_vertex(Vector3(p.x, sea_y + 0.02, p.y))
+			made += 1
+	if made == 0:
+		return 0
+	var mesh := surface.commit()
+	if mesh == null:
+		return 0
+	var water := MeshInstance3D.new()
+	water.name = "BeachEdgeWater"
+	water.mesh = mesh
+	water.material_override = sea_mat
+	water.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	water.visibility_range_end = 2200.0
+	water.set_meta("source_backed_identity", true)
+	water.set_meta("source_field", "osm:natural=beach")
+	parent.add_child(water)
+	return made
+
+
 func _add_identity_features(parent: Node3D, features: Array) -> Dictionary:
 	var counts := {"coast_segments": 0, "areas": 0, "rail_segments": 0}
 	counts["coast_segments"] = _add_coastline_sea(parent, features)
