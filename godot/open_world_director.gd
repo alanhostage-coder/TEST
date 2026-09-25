@@ -106,30 +106,55 @@ func _clear_root():
 
 func _build_parked_life(segments: Array):
 	var made := 0
+	var cap := 7 if projector_max_mode else (18 if mobile_mode else (12 if low_spec_mode else (72 if pc_max_mode else MAX_PARKED)))
+	var ordered: Array = []
+	var player2 := Vector2(car.global_position.x, car.global_position.z) if car else Vector2.ZERO
 	for i in range(segments.size()):
-		if made >= (7 if projector_max_mode else (12 if low_spec_mode else (72 if pc_max_mode else MAX_PARKED))):
-			break
-		if i % 4 != 1:
-			continue
 		var seg = segments[i]
-		if not seg is Array or seg.size() < 3:
+		if not seg is Array or seg.size() < 4:
 			continue
-		var a = Vector2(float(seg[0][0]), float(seg[0][1]))
-		var b = Vector2(float(seg[1][0]), float(seg[1][1]))
-		var d = b - a
-		if d.length() < 14.0:
+		var kind := str(seg[3]).to_lower()
+		if kind in ["motorway", "trunk", "track", "path", "footway", "cycleway", "service"]:
 			continue
-		var tangent = d.normalized()
-		var normal = Vector2(-tangent.y, tangent.x)
-		var side = -1.0 if i % 3 == 0 else 1.0
-		var road_width = float(seg[2])
-		var t = 0.28 + float((i * 37) % 44) / 100.0
-		var p = a.lerp(b, t) + normal * side * (road_width * 0.5 + 1.35)
-		var vehicle = _make_parked_vehicle(i)
-		vehicle.position = Vector3(p.x, _terrain_y(p) + 0.43, p.y)
-		vehicle.rotation.y = atan2(-tangent.x, -tangent.y) + (PI if side < 0.0 else 0.0)
-		root.add_child(vehicle)
-		made += 1
+		var a := Vector2(float(seg[0][0]), float(seg[0][1]))
+		var b := Vector2(float(seg[1][0]), float(seg[1][1]))
+		var d := b - a
+		if d.length() < 11.0:
+			continue
+		var name := str(seg[5]) if seg.size() > 5 else ""
+		var score := ((a + b) * 0.5).distance_squared_to(player2)
+		if mobile_mode and name.to_lower() == "pittville street":
+			score -= 250000.0
+		ordered.append({"index":i, "segment":seg, "score":score, "name":name})
+	ordered.sort_custom(func(a, b): return float(a["score"]) < float(b["score"]))
+
+	for item in ordered:
+		if made >= cap:
+			break
+		var i := int(item["index"])
+		var seg: Array = item["segment"]
+		var a := Vector2(float(seg[0][0]), float(seg[0][1]))
+		var b := Vector2(float(seg[1][0]), float(seg[1][1]))
+		var d := b - a
+		var length := d.length()
+		var tangent := d / length
+		var normal := Vector2(-tangent.y, tangent.x)
+		var road_width := float(seg[2])
+		var road_name := str(item["name"]).to_lower()
+		var placements := 2 if mobile_mode and road_name == "pittville street" and length > 22.0 else 1
+		for placement in range(placements):
+			if made >= cap:
+				break
+			var side := -1.0 if (i + placement) % 2 == 0 else 1.0
+			var t := 0.28 + float((i * 37 + placement * 29) % 44) / 100.0
+			var p := a.lerp(b, t) + normal * side * (road_width * 0.5 + 1.20)
+			if mobile_mode and p.distance_to(player2) > 170.0:
+				continue
+			var vehicle = _make_parked_vehicle(i * 3 + placement)
+			vehicle.position = Vector3(p.x, _terrain_y(p) + 0.43, p.y)
+			vehicle.rotation.y = atan2(-tangent.x, -tangent.y) + (PI if side < 0.0 else 0.0)
+			root.add_child(vehicle)
+			made += 1
 
 
 func _junction_key(p: Vector2) -> String:
