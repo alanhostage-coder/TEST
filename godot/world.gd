@@ -215,6 +215,15 @@ func _make_materials():
 		_mat(Color(0.10, 0.105, 0.11), 0.70, 0.0),
 		_mat(Color(0.19, 0.14, 0.055), 0.74, 0.0)
 	]
+	if mobile_mode:
+		# Android needs a little more local colour separation than the desktop grade.
+		# Keep the palette recognisably Edinburgh rather than turning everything beige.
+		sandstone_mat.albedo_color = Color(0.52, 0.47, 0.38)
+		sandstone_warm_mat.albedo_color = Color(0.47, 0.405, 0.315)
+		soot_stone_mat.albedo_color = Color(0.29, 0.30, 0.29)
+		sea_mat.albedo_color = Color(0.055, 0.23, 0.33)
+		beach_mat.albedo_color = Color(0.62, 0.54, 0.39)
+		tenement_sash_frame_mat.albedo_color = Color(0.88, 0.86, 0.78)
 
 func _tenement_texture_mat(path: String, tint: Color, roughness: float):
 	var material = _mat(tint, roughness, 0.0)
@@ -977,18 +986,22 @@ func _add_named_landmark_signature(body: Node3D, poly: PackedVector2Array, heigh
 		body.set_meta("landmark_signature", "st-marks-classical-dome-v3")
 
 func _add_hugh_dewar_memorial(parent: Node3D, point: Vector2, base_y: float):
-	# Polished-granite stepped drinking fountain with the distinctive open support
-	# course, tall four-sided taper and ball finial visible in period/current photos.
-	_visual_box(parent, Vector3(point.x, base_y + 0.18, point.y), Vector3(1.95, 0.36, 1.95), soot_stone_cool_mat)
-	_visual_box(parent, Vector3(point.x, base_y + 0.58, point.y), Vector3(1.58, 0.46, 1.58), soot_stone_mat)
-	_visual_box(parent, Vector3(point.x, base_y + 1.20, point.y), Vector3(1.28, 0.82, 1.28), sandstone_mat)
+	# Dr Hugh Dewar memorial: broad polished-granite drinking-fountain base,
+	# four visible support balls, tall stepped taper and a ball finial.
+	_visual_box(parent, Vector3(point.x, base_y + 0.18, point.y), Vector3(2.15, 0.36, 2.15), soot_stone_cool_mat)
+	_visual_box(parent, Vector3(point.x, base_y + 0.58, point.y), Vector3(1.82, 0.46, 1.82), soot_stone_mat)
+	_visual_box(parent, Vector3(point.x, base_y + 1.16, point.y), Vector3(1.52, 0.70, 1.52), sandstone_mat)
+	_visual_box(parent, Vector3(point.x, base_y + 1.62, point.y), Vector3(1.70, 0.20, 1.70), soot_stone_cool_mat)
 	for sx in [-1.0, 1.0]:
 		for sz in [-1.0, 1.0]:
-			_visual_sphere(parent, Vector3(point.x + float(sx) * 0.46, base_y + 1.83, point.y + float(sz) * 0.46), 0.18, 0.36, soot_stone_cool_mat, 320.0)
-	_visual_box(parent, Vector3(point.x, base_y + 2.02, point.y), Vector3(1.46, 0.22, 1.46), soot_stone_cool_mat)
-	_visual_cylinder(parent, Vector3(point.x, base_y + 3.25, point.y), 0.18, 0.82, 2.35, soot_stone_cool_mat, 4, 330.0)
-	_visual_cylinder(parent, Vector3(point.x, base_y + 4.30, point.y), 0.11, 0.24, 0.38, soot_stone_cool_mat, 8, 330.0)
-	_visual_sphere(parent, Vector3(point.x, base_y + 4.62, point.y), 0.22, 0.44, soot_stone_cool_mat, 330.0)
+			_visual_sphere(parent, Vector3(point.x + float(sx) * 0.52, base_y + 1.92, point.y + float(sz) * 0.52), 0.22, 0.44, soot_stone_cool_mat, 340.0)
+	_visual_box(parent, Vector3(point.x, base_y + 2.18, point.y), Vector3(1.62, 0.24, 1.62), soot_stone_cool_mat)
+	var taper_sizes := [1.42, 1.15, 0.86, 0.58]
+	for tier_index in range(taper_sizes.size()):
+		var tier_size := float(taper_sizes[tier_index])
+		_visual_box(parent, Vector3(point.x, base_y + 2.72 + float(tier_index) * 0.62, point.y), Vector3(tier_size, 0.66, tier_size), soot_stone_cool_mat)
+	_visual_cylinder(parent, Vector3(point.x, base_y + 4.95, point.y), 0.12, 0.20, 0.34, soot_stone_cool_mat, 8, 360.0)
+	_visual_sphere(parent, Vector3(point.x, base_y + 5.30, point.y), 0.24, 0.48, soot_stone_cool_mat, 360.0)
 
 func _road_micro_detail(parent: Node3D, a: Vector2, b: Vector2, width: float, seed: int, budget: int) -> int:
 	if budget <= 0:
@@ -1351,14 +1364,27 @@ func _add_mobile_osm_facade_detail(body: Node3D, poly: PackedVector2Array, heigh
 				var shop_name := str(shop_slots.get(slot, "")).to_lower()
 				var is_twelve_triangles := shop_name.contains("twelve triangles")
 				var shop_frame_mat = sign_blue_mat if is_twelve_triangles else tenement_sash_frame_mat
-				var shop_glass_mat = _mat(Color(0.72, 0.31, 0.07), 0.24, 0.02) if is_twelve_triangles else tenement_sash_glass_mat
+				var shop_glass_mat = _mat(Color(0.86, 0.43, 0.10), 0.20, 0.02) if is_twelve_triangles else tenement_sash_glass_mat
 				var recessed := p + inward * 0.11
-				_mobile_facade_box(body, Vector3(recessed.x, 1.18, recessed.y), Vector3(0.07, 2.16, minf(2.85, slot_width * 1.42)), shop_glass_mat, angle, 175.0)
-				_mobile_facade_box(body, Vector3(p.x, 2.42, p.y), Vector3(0.10, 0.46 if is_twelve_triangles else 0.38, minf(3.20, slot_width * 1.58)), shop_frame_mat, angle, 175.0)
-				for shop_side in [-1.0, 1.0]:
-					var shop_jamb: Vector2 = p + tangent * float(shop_side) * minf(1.45, slot_width * 0.72)
-					_mobile_facade_box(body, Vector3(shop_jamb.x, 1.20, shop_jamb.y), Vector3(0.10, 2.26, 0.13), shop_frame_mat, angle, 175.0)
-				detail_count += 4
+				if is_twelve_triangles:
+					# Portobello branch: navy-painted ground-floor frontage, broad
+					# warm display window and matching door. The exact unit position
+					# comes from the mapped Twelve Triangles POI.
+					var frontage_width := minf(4.8, maxf(3.4, slot_width * 1.92))
+					_mobile_facade_box(body, Vector3(p.x, 1.35, p.y), Vector3(0.12, 2.75, frontage_width), sign_blue_mat, angle, 190.0)
+					var window_p := p - tangent * frontage_width * 0.12 + inward * 0.13
+					_mobile_facade_box(body, Vector3(window_p.x, 1.30, window_p.y), Vector3(0.07, 2.05, frontage_width * 0.56), shop_glass_mat, angle, 190.0)
+					var door_p := p + tangent * frontage_width * 0.33 + inward * 0.12
+					_mobile_facade_box(body, Vector3(door_p.x, 1.18, door_p.y), Vector3(0.075, 2.20, frontage_width * 0.20), tenement_sash_glass_mat, angle, 190.0)
+					_mobile_facade_box(body, Vector3(p.x, 2.72, p.y), Vector3(0.13, 0.58, frontage_width), sign_blue_mat, angle, 195.0)
+					detail_count += 4
+				else:
+					_mobile_facade_box(body, Vector3(recessed.x, 1.18, recessed.y), Vector3(0.07, 2.16, minf(2.85, slot_width * 1.42)), shop_glass_mat, angle, 175.0)
+					_mobile_facade_box(body, Vector3(p.x, 2.42, p.y), Vector3(0.10, 0.38, minf(3.20, slot_width * 1.58)), shop_frame_mat, angle, 175.0)
+					for shop_side in [-1.0, 1.0]:
+						var shop_jamb: Vector2 = p + tangent * float(shop_side) * minf(1.45, slot_width * 0.72)
+						_mobile_facade_box(body, Vector3(shop_jamb.x, 1.20, shop_jamb.y), Vector3(0.10, 2.26, 0.13), shop_frame_mat, angle, 175.0)
+					detail_count += 4
 				shopfront_count += 1
 				continue
 			var frame_width := minf(1.42, slot_width + 0.18)
@@ -2440,7 +2466,9 @@ func _on_map_ready(map_data: Dictionary):
 				if marking_budget < marking_limit and length > 9.0 and width >= 5.8:
 					_live_road_markings(map_root, Vector3(mid.x, 0.035, mid.y), length, width, angle, kind)
 					marking_budget += 1
-			map_segments.append([[a.x, a.y], [b.x, b.y], width, kind, oneway])
+			var road_name := str(road.get("name", "")).strip_edges()
+			var road_ref := str(road.get("ref", "")).strip_edges()
+			map_segments.append([[a.x, a.y], [b.x, b.y], width, kind, oneway, road_name, road_ref])
 
 	var exact_building_count := 0
 	var mobile_visual_only_building_count := 0
