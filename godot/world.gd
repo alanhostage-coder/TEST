@@ -909,7 +909,7 @@ func _add_named_landmark_signature(body: Node3D, poly: PackedVector2Array, heigh
 		var tower_center := front_mid + inward * 3.0
 		_rotated_visual_box(body, Vector3(tower_center.x, height + 2.55, tower_center.y), Vector3(4.9, 5.1, 4.9), soot_stone_mat, angle, 380.0)
 		for face_angle in [0.0, PI * 0.5, PI, PI * 1.5]:
-			var face_offset := Vector2(sin(face_angle), cos(face_angle)) * 2.48
+			var face_offset: Vector2 = Vector2(sin(float(face_angle)), cos(float(face_angle))) * 2.48
 			_rotated_visual_box(body, Vector3(tower_center.x + face_offset.x, height + 3.0, tower_center.y + face_offset.y), Vector3(1.40, 1.40, 0.09), sign_white_mat, face_angle, 380.0)
 		_visual_cylinder(body, Vector3(tower_center.x, height + 6.15, tower_center.y), 1.85, 2.05, 2.2, soot_stone_cool_mat, 8, 390.0)
 		_visual_cylinder(body, Vector3(tower_center.x, height + 7.75, tower_center.y), 0.28, 2.05, 1.05, roof_mat, 8, 400.0)
@@ -920,7 +920,7 @@ func _add_named_landmark_signature(body: Node3D, poly: PackedVector2Array, heigh
 		var porch_center := front_mid + outward * 1.10
 		_visual_cylinder(body, Vector3(porch_center.x, 1.62, porch_center.y), 2.55, 2.55, 3.24, sandstone_mat, 18, 350.0)
 		for side in [-1.0, 1.0]:
-			var column_p := front_mid + tangent * side * 1.82 + outward * 2.18
+			var column_p: Vector2 = front_mid + tangent * float(side) * 1.82 + outward * 2.18
 			_visual_cylinder(body, Vector3(column_p.x, 1.52, column_p.y), 0.19, 0.23, 3.04, sandstone_warm_mat, 10, 350.0)
 		var dome_center := front_mid + inward * 1.00
 		_visual_cylinder(body, Vector3(dome_center.x, height + 0.30, dome_center.y), 2.35, 2.55, 0.60, roof_mat, 16, 375.0)
