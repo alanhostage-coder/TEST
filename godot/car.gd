@@ -370,11 +370,11 @@ func _update_camera(delta, speed_ratio):
 	rig.position.x = lerp(rig.position.x, lateral, 1.0 - exp(-delta * 3.0))
 	rig.position.y = lerp(rig.position.y, chase_height, 1.0 - exp(-delta * 2.2))
 	rig.position.z = lerp(rig.position.z, chase_distance, 1.0 - exp(-delta * 1.7))
-	var base_pitch_deg := -5.8 + speed_ratio * 0.5 if mobile_runtime else -4.8 + speed_ratio * 0.8
+	var base_pitch_deg: float = (-5.8 + speed_ratio * 0.5) if mobile_runtime else (-4.8 + speed_ratio * 0.8)
 	rig.rotation.x = lerp_angle(rig.rotation.x, deg_to_rad(base_pitch_deg) + camera_pitch + suspension_pitch, 1.0 - exp(-delta * 3.0))
 	rig.rotation.y = lerp_angle(rig.rotation.y, camera_yaw + camera_look_ahead - camera_lag.x * 0.025, 1.0 - exp(-delta * 3.1))
 	rig.rotation.z = lerp_angle(rig.rotation.z, -lateral_load * 0.006, 1.0 - exp(-delta * 4.8))
-	var target_fov := 71.0 + speed_ratio * 7.0 if mobile_runtime else 60.0 + speed_ratio * 13.0
+	var target_fov: float = (71.0 + speed_ratio * 7.0) if mobile_runtime else (60.0 + speed_ratio * 13.0)
 	$CameraRig/Camera3D.fov = lerp($CameraRig/Camera3D.fov, target_fov, 1.0 - exp(-delta * 1.65))
 
 func _save_state():
