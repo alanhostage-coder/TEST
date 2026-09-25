@@ -1779,15 +1779,24 @@ func _add_mobile_osm_footprint_visual(parent: Node3D, building: Dictionary, heig
 	for t in range(0, tris.size(), 3):
 		for j in range(3):
 			var p: Vector2 = poly[int(tris[t + j])]
+			st.set_uv(Vector2(p.x / 8.0, p.y / 8.0))
 			st.add_vertex(Vector3(p.x, height, p.y))
 	for i in range(poly.size()):
 		var p0: Vector2 = poly[i]
 		var p1: Vector2 = poly[(i + 1) % poly.size()]
+		var wall_u := maxf(0.2, p0.distance_to(p1) / 8.0)
+		var wall_v := maxf(1.0, height / 4.2)
+		st.set_uv(Vector2(0.0, wall_v))
 		st.add_vertex(Vector3(p0.x, 0.0, p0.y))
+		st.set_uv(Vector2(wall_u, wall_v))
 		st.add_vertex(Vector3(p1.x, 0.0, p1.y))
+		st.set_uv(Vector2(wall_u, 0.0))
 		st.add_vertex(Vector3(p1.x, height, p1.y))
+		st.set_uv(Vector2(0.0, wall_v))
 		st.add_vertex(Vector3(p0.x, 0.0, p0.y))
+		st.set_uv(Vector2(wall_u, 0.0))
 		st.add_vertex(Vector3(p1.x, height, p1.y))
+		st.set_uv(Vector2(0.0, 0.0))
 		st.add_vertex(Vector3(p0.x, height, p0.y))
 	st.generate_normals()
 	var mesh := st.commit()
