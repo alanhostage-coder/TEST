@@ -2109,8 +2109,8 @@ func _apply_weather_visuals():
 	weather_sun_energy = (lerp(1.12, 0.60, cloud) if xps_9530_mode else lerp(1.06, 0.58, cloud)) * lerp(1.0, 0.90, wetness)
 	if mobile_mode:
 		weather_sun_energy *= 0.94
-	var low_visibility := clamp((1800.0 - visibility) / 1800.0, 0.0, 1.0)
-	var headlight_energy := 0.12 + cloud * 0.26 + wetness * 0.32 + low_visibility * 1.10
+	var low_visibility: float = clampf((1800.0 - float(visibility)) / 1800.0, 0.0, 1.0)
+	var headlight_energy: float = 0.12 + float(cloud) * 0.26 + float(wetness) * 0.32 + low_visibility * 1.10
 	for headlight_path in ["Car/HeadlightL", "Car/HeadlightR"]:
 		var headlight = get_node_or_null(headlight_path)
 		if headlight:
