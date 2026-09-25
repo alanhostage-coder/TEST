@@ -712,6 +712,56 @@ func _add_mobile_identity_annotation(parent: Node3D, pos: Vector3, text_value: S
 	label.set_meta("source_field", "osm:name")
 	parent.add_child(label)
 
+func _nearest_drivable_road_frame(point: Vector2) -> Dictionary:
+	var best_distance := INF
+	var best_projection := point
+	var best_tangent := Vector2.RIGHT
+	for segment in map_segments:
+		if not segment is Array or segment.size() < 4:
+			continue
+		var kind := str(segment[3]).to_lower()
+		if kind in ["service", "track", "path", "footway", "cycleway"]:
+			continue
+		var a := Vector2(float(segment[0][0]), float(segment[0][1]))
+		var b := Vector2(float(segment[1][0]), float(segment[1][1]))
+		var delta := b - a
+		var length_sq := delta.length_squared()
+		if length_sq < 0.01:
+			continue
+		var t := clampf((point - a).dot(delta) / length_sq, 0.0, 1.0)
+		var projection := a + delta * t
+		var distance := projection.distance_to(point)
+		if distance < best_distance:
+			best_distance = distance
+			best_projection = projection
+			best_tangent = delta.normalized()
+	return {
+		"projection": best_projection,
+		"tangent": best_tangent,
+		"distance": best_distance
+	}
+
+func _add_twelve_triangles_frontage(parent: Node3D, point: Vector2, base_y: float):
+	var road_frame := _nearest_drivable_road_frame(point)
+	if road_frame.is_empty():
+		return
+	var road_projection: Vector2 = road_frame["projection"]
+	var tangent: Vector2 = road_frame["tangent"]
+	var toward_road := (road_projection - point).normalized()
+	if toward_road.length() < 0.5:
+		toward_road = Vector2(-tangent.y, tangent.x)
+	var frontage := point + toward_road * minf(5.4, maxf(2.8, float(road_frame["distance"]) * 0.48))
+	var angle := atan2(tangent.x, tangent.y)
+	var ground_y := _terrain_height(frontage) if mobile_mode else base_y
+	var navy = sign_blue_mat
+	var warm_glass = _mat(Color(0.92, 0.49, 0.13), 0.18, 0.02)
+	_rotated_visual_box(parent, Vector3(frontage.x, ground_y + 1.42, frontage.y), Vector3(0.14, 2.84, 4.9), navy, angle, 220.0)
+	var window_p := frontage - tangent * 0.62 + toward_road * 0.08
+	_rotated_visual_box(parent, Vector3(window_p.x, ground_y + 1.32, window_p.y), Vector3(0.08, 2.12, 2.72), warm_glass, angle, 225.0)
+	var door_p := frontage + tangent * 1.58 + toward_road * 0.07
+	_rotated_visual_box(parent, Vector3(door_p.x, ground_y + 1.18, door_p.y), Vector3(0.08, 2.18, 0.82), tenement_sash_glass_mat, angle, 225.0)
+	_rotated_visual_box(parent, Vector3(frontage.x, ground_y + 2.86, frontage.y), Vector3(0.15, 0.58, 4.95), navy, angle, 230.0)
+
 func _add_named_poi_markers(parent: Node3D, pois: Array):
 	var cap = 10 if mobile_mode else (22 if xps_9530_mode else (5 if projector_max_mode else (7 if low_spec_mode else (32 if pc_max_mode else 14))))
 	var distance_limit = 190.0 if mobile_mode else (120.0 if low_spec_mode else 300.0)
@@ -737,9 +787,9 @@ func _add_named_poi_markers(parent: Node3D, pois: Array):
 				bd = Vector2(float(bp[0]), float(bp[1])).distance_squared_to(reference)
 			var an := str(a.get("name", "")).to_lower()
 			var bn := str(b.get("name", "")).to_lower()
-			if an.contains("hugh dewar"):
+			if an.contains("hugh dewar") or an.contains("twelve triangles"):
 				ad -= 1000000.0
-			if bn.contains("hugh dewar"):
+			if bn.contains("hugh dewar") or bn.contains("twelve triangles"):
 				bd -= 1000000.0
 			return ad < bd
 		)
@@ -754,13 +804,18 @@ func _add_named_poi_markers(parent: Node3D, pois: Array):
 		if p.distance_to(reference) > distance_limit:
 			continue
 		var poi_y := float(poi.get("ground_y", _terrain_height(p))) if mobile_mode else 0.0
-		var is_hugh_dewar := str(poi.get("kind", "")).to_lower() == "memorial" and poi_name.to_lower().contains("hugh dewar")
+		var lower_name := poi_name.to_lower()
+		var is_hugh_dewar := str(poi.get("kind", "")).to_lower() == "memorial" and lower_name.contains("hugh dewar")
+		var is_twelve_triangles := lower_name.contains("twelve triangles")
 		if is_hugh_dewar:
 			_add_hugh_dewar_memorial(parent, p, poi_y)
 			if mobile_mode:
-				_add_mobile_identity_annotation(parent, Vector3(p.x, poi_y + 4.35, p.y), poi_name, Color(0.72, 0.90, 1.0, 0.96), label_range)
+				_add_mobile_identity_annotation(parent, Vector3(p.x, poi_y + 5.80, p.y), poi_name, Color(0.72, 0.90, 1.0, 0.96), label_range)
 			else:
-				_add_world_label(parent, Vector3(p.x, 4.35, p.y), poi_name, Color(0.98, 0.98, 0.96), label_size, label_range)
+				_add_world_label(parent, Vector3(p.x, 5.80, p.y), poi_name, Color(0.98, 0.98, 0.96), label_size, label_range)
+		elif is_twelve_triangles and mobile_mode:
+			_add_twelve_triangles_frontage(parent, p, poi_y)
+			_add_mobile_identity_annotation(parent, Vector3(p.x, poi_y + 3.15, p.y), poi_name, Color(0.78, 0.90, 1.0, 0.96), label_range)
 		elif mobile_mode:
 			_add_mobile_identity_annotation(parent, Vector3(p.x, poi_y + 3.0, p.y), poi_name, Color(0.72, 0.90, 1.0, 0.96), label_range)
 		else:
@@ -924,6 +979,38 @@ func _landmark_front_frame(poly: PackedVector2Array) -> Dictionary:
 		"outward": -inward,
 		"angle": atan2(tangent.x, tangent.y)
 	}
+
+func _add_named_landmark_body_visual(body: Node3D, poly: PackedVector2Array, height: float, building: Dictionary) -> bool:
+	if not mobile_mode:
+		return false
+	var lower := str(building.get("name", "")).strip_edges().to_lower()
+	if lower != "bellfield community hub" and lower != "st mark's church":
+		return false
+	var frame := _landmark_front_frame(poly)
+	if frame.is_empty():
+		return false
+	var centroid: Vector2 = frame["centroid"]
+	var front_mid: Vector2 = frame["mid"]
+	var inward: Vector2 = frame["inward"]
+	var angle: float = frame["angle"]
+	if lower == "bellfield community hub":
+		# Keep the exact OSM footprint for collision, but render the former Georgian
+		# church as several readable volumes rather than one 44x52m extrusion.
+		var front_block := front_mid + inward * 7.2
+		_rotated_visual_box(body, Vector3(front_block.x, 3.55, front_block.y), Vector3(14.0, 7.1, 26.0), sandstone_warm_mat, angle, 460.0)
+		var rear_block := front_mid + inward * 22.0
+		_rotated_visual_box(body, Vector3(rear_block.x, 3.10, rear_block.y), Vector3(22.0, 6.2, 22.0), sandstone_mat, angle, 430.0)
+		_rotated_visual_box(body, Vector3(front_block.x, 7.18, front_block.y), Vector3(14.3, 0.22, 26.3), roof_mat, angle, 440.0)
+		body.set_meta("landmark_body_visual", "bellfield-georgian-volumes-v1")
+	else:
+		# St Mark's is fundamentally a square villa-like church in its own grounds.
+		# A compact central body lets the Doric porch and dome read from the High St.
+		_rotated_visual_box(body, Vector3(centroid.x, 3.45, centroid.y), Vector3(17.8, 6.9, 18.8), sandstone_warm_mat, angle, 430.0)
+		_rotated_visual_box(body, Vector3(centroid.x, 6.98, centroid.y), Vector3(18.2, 0.22, 19.2), roof_mat, angle, 430.0)
+		var chancel := centroid + inward * 10.4
+		_rotated_visual_box(body, Vector3(chancel.x, 2.95, chancel.y), Vector3(7.2, 5.9, 8.8), sandstone_mat, angle, 400.0)
+		body.set_meta("landmark_body_visual", "st-marks-villa-volume-v1")
+	return true
 
 func _add_named_landmark_signature(body: Node3D, poly: PackedVector2Array, height: float, building: Dictionary):
 	var name := str(building.get("name", "")).strip_edges()
@@ -1703,10 +1790,13 @@ func _add_mobile_osm_footprint_visual(parent: Node3D, building: Dictionary, heig
 	visual.visibility_range_end = MOBILE_BUILDING_VISUAL_RADIUS
 	visual.set_meta("osm_footprint_visual_only", true)
 	visual.set_meta("osm_id", int(building.get("osm_id", 0)))
-	# Far mobile buildings are visual-only for physics, but they still need a
-	# street face. Reuse the same cheap facade pass so the 190-340m zone does not
-	# collapse into blank extruded polygons.
-	_add_mobile_osm_facade_detail(visual, poly, height, seed, building)
+	# Far mobile buildings are visual-only for physics, but named landmarks should
+	# not revert to a single enormous OSM extrusion.
+	var custom_landmark_visual := _add_named_landmark_body_visual(visual, poly, height, building)
+	if custom_landmark_visual:
+		visual.mesh = null
+	else:
+		_add_mobile_osm_facade_detail(visual, poly, height, seed, building)
 	_add_named_landmark_signature(visual, poly, height, building)
 	parent.add_child(visual)
 	return true
@@ -1847,7 +1937,11 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 	var collision = CollisionShape3D.new()
 	collision.shape = mesh.create_trimesh_shape()
 	body.add_child(collision)
-	_add_exact_osm_facade_detail(body, poly, height, seed, building)
+	var custom_landmark_visual := _add_named_landmark_body_visual(body, poly, height, building)
+	if custom_landmark_visual:
+		visual.visible = false
+	else:
+		_add_exact_osm_facade_detail(body, poly, height, seed, building)
 	_add_named_landmark_signature(body, poly, height, building)
 	parent.add_child(body)
 	return true
