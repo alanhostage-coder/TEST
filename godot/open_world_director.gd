@@ -26,11 +26,13 @@ var roaming_graph := {}
 var low_spec_mode := false
 var projector_max_mode := false
 var pc_max_mode := false
+var mobile_mode := false
 
 func _ready():
 	projector_max_mode = OS.has_feature("projector_max")
 	pc_max_mode = OS.has_feature("pc_max")
-	low_spec_mode = OS.has_feature("thinkpad_low") or projector_max_mode
+	mobile_mode = OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1"
+	low_spec_mode = OS.has_feature("thinkpad_low") or projector_max_mode or mobile_mode
 	call_deferred("_bind_scene")
 
 func _bind_scene():
@@ -58,13 +60,31 @@ func _process(delta):
 	_update_roaming_agents(delta)
 	_update_situations(delta)
 
+func _terrain_y(point: Vector2) -> float:
+	if not mobile_mode or not world:
+		return 0.0
+	var stream = world.get_node_or_null("MapStream")
+	if stream and stream.has_method("terrain_height_at"):
+		return float(stream.terrain_height_at(point))
+	return 0.0
+
 func _try_build_from_live_roads():
 	if not car.has_meta("map_road_segments"):
 		return
 	var segments = car.get_meta("map_road_segments", [])
 	if not segments is Array or segments.size() < 3:
 		return
-	var signature = "%s:%s" % [segments.size(), int(car.get_meta("pua_api_world_seed", 1))]
+	var stream = world.get_node_or_null("MapStream") if world else null
+	var tile_signature := str(stream.get("active_tile_signature")) if stream else ""
+	var first = segments[0]
+	var last = segments[segments.size() - 1]
+	var geometry_hint := ""
+	if first is Array and first.size() >= 2 and last is Array and last.size() >= 2:
+		geometry_hint = "%d:%d:%d:%d" % [
+			int(float(first[0][0]) * 0.1), int(float(first[0][1]) * 0.1),
+			int(float(last[1][0]) * 0.1), int(float(last[1][1]) * 0.1)
+		]
+	var signature = "%s:%s:%s:%s" % [segments.size(), int(car.get_meta("pua_api_world_seed", 1)), tile_signature, geometry_hint]
 	if signature == built_signature:
 		return
 	built_signature = signature
@@ -72,7 +92,7 @@ func _try_build_from_live_roads():
 	_build_parked_life(segments)
 	_build_roaming_life(segments)
 	_build_wet_ground_memory(segments)
-	if not projector_max_mode:
+	if not projector_max_mode and not mobile_mode:
 		_build_industrial_vapour(segments)
 	_build_situations(segments)
 	_build_road_clutter(segments)
@@ -106,7 +126,7 @@ func _build_parked_life(segments: Array):
 		var t = 0.28 + float((i * 37) % 44) / 100.0
 		var p = a.lerp(b, t) + normal * side * (road_width * 0.5 + 1.35)
 		var vehicle = _make_parked_vehicle(i)
-		vehicle.position = Vector3(p.x, 0.43, p.y)
+		vehicle.position = Vector3(p.x, _terrain_y(p) + 0.43, p.y)
 		vehicle.rotation.y = atan2(-tangent.x, -tangent.y) + (PI if side < 0.0 else 0.0)
 		root.add_child(vehicle)
 		made += 1
@@ -178,7 +198,7 @@ func _build_roaming_life(segments: Array):
 		vehicle.name = "Roamer_%02d" % made
 		root.add_child(vehicle)
 		var p = _lane_position(seg, target_end, progress)
-		vehicle.position = Vector3(p.x, 0.43, p.y)
+		vehicle.position = Vector3(p.x, _terrain_y(p) + 0.43, p.y)
 		roaming_agents.append({
 			"node": vehicle,
 			"segment": i,
@@ -227,6 +247,7 @@ func _update_roaming_agents(delta: float):
 			var desired = atan2(-dir.x, -dir.y)
 			node.rotation.y = lerp_angle(node.rotation.y, desired, clamp(delta * 6.0, 0.0, 1.0))
 		node.position.x = p.x
+		node.position.y = _terrain_y(p) + 0.43
 		node.position.z = p.y
 		agent["progress"] = progress
 
@@ -330,7 +351,7 @@ func _build_wet_ground_memory(segments: Array):
 		var pm = PlaneMesh.new()
 		pm.size = Vector2(1.4 + float(i % 4) * 0.8, 0.65 + float((i * 3) % 4) * 0.45)
 		puddle.mesh = pm
-		puddle.position = Vector3(p.x, 0.082, p.y)
+		puddle.position = Vector3(p.x, _terrain_y(p) + 0.082, p.y)
 		puddle.rotation.y = float(i * 47) * 0.0174533
 		puddle.material_override = _material(Color(0.09, 0.105, 0.11, 0.68), 0.08, 0.42, true)
 		root.add_child(puddle)
@@ -396,7 +417,7 @@ func _build_road_clutter(segments: Array):
 			var pm = PlaneMesh.new()
 			pm.size = Vector2(1.2 + float(i % 4) * 0.65, 2.1 + float((i + 2) % 5) * 0.7)
 			patch.mesh = pm
-			patch.position = Vector3(p.x, 0.086, p.y)
+			patch.position = Vector3(p.x, _terrain_y(p) + 0.086, p.y)
 			patch.rotation.y = atan2(tangent.x, tangent.y) + float((i % 3) - 1) * 0.08
 			patch.material_override = _material(Color(0.035, 0.039, 0.041), 0.43, 0.02)
 			root.add_child(patch)
@@ -407,7 +428,7 @@ func _build_road_clutter(segments: Array):
 			var dm = BoxMesh.new()
 			dm.size = Vector3(0.42, 0.025, 0.72)
 			drain.mesh = dm
-			drain.position = Vector3(edge.x, 0.095, edge.y)
+			drain.position = Vector3(edge.x, _terrain_y(edge) + 0.095, edge.y)
 			drain.rotation.y = atan2(tangent.x, tangent.y)
 			drain.material_override = _material(Color(0.055, 0.06, 0.06), 0.50, 0.55)
 			root.add_child(drain)
@@ -420,7 +441,7 @@ func _build_road_clutter(segments: Array):
 			bm.bottom_radius = 0.11
 			bm.height = 0.82
 			bollard.mesh = bm
-			bollard.position = Vector3(edge.x, 0.41, edge.y)
+			bollard.position = Vector3(edge.x, _terrain_y(edge) + 0.41, edge.y)
 			bollard.material_override = _material(Color(0.16, 0.17, 0.17), 0.62, 0.20)
 			root.add_child(bollard)
 		else:
@@ -431,7 +452,8 @@ func _build_road_clutter(segments: Array):
 				var qm = QuadMesh.new()
 				qm.size = Vector2(0.16 + j * 0.05, 0.30 + j * 0.09)
 				weed.mesh = qm
-				weed.position = Vector3(edge.x + normal.x * j * 0.12, 0.16, edge.y + normal.y * j * 0.12)
+				var weed_p := edge + normal * float(j) * 0.12
+				weed.position = Vector3(weed_p.x, _terrain_y(weed_p) + 0.16, weed_p.y)
 				weed.rotation.y = atan2(normal.x, normal.y) + j * 0.55
 				weed.material_override = _material(Color(0.12, 0.16, 0.075), 0.95, 0.0)
 				root.add_child(weed)
@@ -469,7 +491,7 @@ func _build_situations(segments: Array):
 		p += normal * side * (road_width * 0.5 + 3.6)
 		var node = Node3D.new()
 		node.name = "Situation_%02d" % n
-		node.position = Vector3(p.x, 0.0, p.y)
+		node.position = Vector3(p.x, _terrain_y(p), p.y)
 		node.rotation.y = atan2(-tangent.x, -tangent.y)
 		situation_root.add_child(node)
 		var kind = (seed + n * 5) % 4
