@@ -199,9 +199,12 @@ func _make_materials():
 	retail_zone_mat = _mat(Color(0.22, 0.225, 0.22), 0.94, 0.0)
 	industrial_zone_mat = _mat(Color(0.175, 0.18, 0.18), 0.96, 0.0)
 	commercial_zone_mat = _mat(Color(0.245, 0.24, 0.225), 0.94, 0.0)
-	tenement_weathered_mat = _tenement_texture_mat("res://assets/edinburgh_tenement/walls/edin_ten_wall_weathered_a_alb.png", Color(1.0, 0.975, 0.93), 0.93)
-	tenement_warm_mat = _tenement_texture_mat("res://assets/edinburgh_tenement/walls/edin_ten_wall_warm_a_alb.png", Color(1.0, 0.95, 0.86), 0.92)
-	tenement_soot_mat = _tenement_texture_mat("res://assets/edinburgh_tenement/walls/edin_ten_wall_weathered_a_alb.png", Color(0.68, 0.675, 0.63), 0.95)
+	var mobile_facade_texture := "res://assets/edinburgh_tenement/walls/edin_ten_facade_windows_v2.png"
+	var weathered_texture := mobile_facade_texture if mobile_mode else "res://assets/edinburgh_tenement/walls/edin_ten_wall_weathered_a_alb.png"
+	var warm_texture := mobile_facade_texture if mobile_mode else "res://assets/edinburgh_tenement/walls/edin_ten_wall_warm_a_alb.png"
+	tenement_weathered_mat = _tenement_texture_mat(weathered_texture, Color(1.0, 0.975, 0.93), 0.93)
+	tenement_warm_mat = _tenement_texture_mat(warm_texture, Color(1.0, 0.95, 0.86), 0.92)
+	tenement_soot_mat = _tenement_texture_mat(weathered_texture, Color(0.68, 0.675, 0.63), 0.95)
 	tenement_sash_frame_mat = _mat(Color(0.83, 0.81, 0.74), 0.78, 0.0)
 	tenement_sash_glass_mat = _mat(Color(0.035, 0.052, 0.060), 0.18, 0.22)
 	tenement_door_mats = [
