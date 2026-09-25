@@ -1158,6 +1158,62 @@ func _mobile_facade_box(body: Node3D, pos: Vector3, size: Vector3, material, ang
 		node.visibility_range_end = range_end
 		node.set_meta("mobile_facade_detail", true)
 
+func _add_mobile_secondary_facade_edges(body: Node3D, poly: PackedVector2Array, height: float, centroid: Vector2, primary_edge: int):
+	# One decorated face is not enough on Edinburgh streets: a corner tenement or
+	# long block can present a completely blank wall to the actual carriageway.
+	# Add restrained sash rhythm to up to two additional OSM edges that genuinely
+	# sit beside a drivable road. No invented doors, signs or shop names here.
+	var candidates: Array = []
+	for edge_index in range(poly.size()):
+		if edge_index == primary_edge:
+			continue
+		var p0: Vector2 = poly[edge_index]
+		var p1: Vector2 = poly[(edge_index + 1) % poly.size()]
+		var length := p0.distance_to(p1)
+		if length < 6.0:
+			continue
+		var edge_mid := (p0 + p1) * 0.5
+		var road_distance := _nearest_drivable_road_distance(edge_mid)
+		if road_distance > 13.5:
+			continue
+		candidates.append({"edge":edge_index, "score":road_distance, "length":length})
+	candidates.sort_custom(func(a, b): return float(a["score"]) < float(b["score"]))
+	var made := 0
+	for candidate in candidates:
+		if made >= 2:
+			break
+		var edge_index := int(candidate["edge"])
+		var p0: Vector2 = poly[edge_index]
+		var p1: Vector2 = poly[(edge_index + 1) % poly.size()]
+		var delta := p1 - p0
+		var length := delta.length()
+		if length < 6.0:
+			continue
+		var tangent := delta / length
+		var angle := atan2(tangent.x, tangent.y)
+		var edge_mid := (p0 + p1) * 0.5
+		var inward := (centroid - edge_mid).normalized()
+		if inward.length() < 0.5:
+			inward = Vector2(-tangent.y, tangent.x)
+		_mobile_facade_box(body, Vector3(edge_mid.x, 0.20, edge_mid.y), Vector3(0.07, 0.36, length * 0.97), roof_mat, angle, 185.0)
+		if height > 5.2:
+			_mobile_facade_box(body, Vector3(edge_mid.x, height - 0.15, edge_mid.y), Vector3(0.08, 0.22, length * 0.97), roof_mat, angle, 185.0)
+		var slots := clampi(int(floor(length / 3.5)), 2, 7)
+		var floors := clampi(int(floor(height / 3.0)), 1, 3)
+		for floor_index in range(floors):
+			var y := 1.65 + float(floor_index) * 2.75
+			if y > height - 0.55:
+				continue
+			for slot in range(slots):
+				var t := (float(slot) + 0.5) / float(slots)
+				var p := p0.lerp(p1, t)
+				var slot_width := maxf(1.0, length / float(slots) * 0.56)
+				var frame_width := minf(1.42, slot_width + 0.18)
+				_mobile_facade_box(body, Vector3(p.x, y, p.y), Vector3(0.07, 1.58, frame_width), tenement_sash_frame_mat, angle, 180.0)
+				var recessed := p + inward * 0.09
+				_mobile_facade_box(body, Vector3(recessed.x, y, recessed.y), Vector3(0.05, 1.25, minf(1.16, slot_width * 0.82)), tenement_sash_glass_mat, angle, 180.0)
+		made += 1
+
 func _add_mobile_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height: float, seed: int, building: Dictionary):
 	if not mobile_mode or poly.size() < 3 or height < 3.8:
 		return
@@ -1260,10 +1316,11 @@ func _add_mobile_osm_facade_detail(body: Node3D, poly: PackedVector2Array, heigh
 			_mobile_facade_box(body, Vector3(recessed_window.x, y, recessed_window.y), Vector3(0.055, 1.26, minf(1.18, slot_width * 0.82)), tenement_sash_glass_mat, angle, 150.0)
 			detail_count += 2
 
+	_add_mobile_secondary_facade_edges(body, poly, height, centroid, best_edge)
 	body.set_meta("mobile_facade_detail_count", detail_count)
 	body.set_meta("mobile_shopfront_count", shopfront_count)
 	body.set_meta("mobile_facade_edge", best_edge)
-	body.set_meta("mobile_facade_source", "osm_footprint+generic_visuals")
+	body.set_meta("mobile_facade_source", "osm_footprint+multi_edge_generic_visuals")
 
 func _add_exact_osm_facade_detail(body: Node3D, poly: PackedVector2Array, height: float, seed: int, building: Dictionary):
 	# Keep the mapped polygon authoritative. All facade treatment is generic visual
@@ -1559,6 +1616,10 @@ func _add_mobile_osm_footprint_visual(parent: Node3D, building: Dictionary, heig
 	visual.visibility_range_end = MOBILE_BUILDING_VISUAL_RADIUS
 	visual.set_meta("osm_footprint_visual_only", true)
 	visual.set_meta("osm_id", int(building.get("osm_id", 0)))
+	# Far mobile buildings are visual-only for physics, but they still need a
+	# street face. Reuse the same cheap facade pass so the 190-340m zone does not
+	# collapse into blank extruded polygons.
+	_add_mobile_osm_facade_detail(visual, poly, height, seed, building)
 	parent.add_child(visual)
 	return true
 

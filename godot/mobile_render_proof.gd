@@ -40,10 +40,10 @@ func run() -> void:
 
 	var targets := [
 		{"slug":"pitville-street", "point":Vector2(-0.679,62.829), "road_point":Vector2(3.8,52.5), "road_a":Vector2(-0.679,62.829), "road_b":Vector2(6.856,45.474), "focus":false},
-		{"slug":"hugh-dewar-fountain", "point":Vector2(56.157,65.189), "road_point":Vector2(48.031,83.938), "road_a":Vector2(39.497,80.239), "road_b":Vector2(98.907,105.988), "focus":true},
-		{"slug":"bellfield-community-hub", "point":Vector2(-91.668,-76.972), "road_point":Vector2(-61.955,-64.140), "road_a":Vector2(-77.872,-27.285), "road_b":Vector2(-35.483,-125.435), "focus":true},
-		{"slug":"st-marks-church", "point":Vector2(-110.398,90.453), "road_point":Vector2(-90.023,99.054), "road_a":Vector2(-65.244,40.354), "road_b":Vector2(-101.108,125.313), "focus":true},
-		{"slug":"twelve-triangles-high-street", "point":Vector2(-117.849,-2.438), "road_point":Vector2(-122.936,8.430), "road_a":Vector2(-120.279,9.674), "road_b":Vector2(-146.582,-2.638), "focus":true}
+		{"slug":"hugh-dewar-fountain", "point":Vector2(56.157,65.189), "road_point":Vector2(29.836,76.054), "road_a":Vector2(-0.679,62.829), "road_b":Vector2(39.497,80.239), "focus":true},
+		{"slug":"bellfield-community-hub", "point":Vector2(-91.668,-76.972), "road_point":Vector2(-72.0,-40.0), "road_a":Vector2(-77.872,-27.285), "road_b":Vector2(-35.483,-125.435), "focus":true},
+		{"slug":"st-marks-church", "point":Vector2(-110.398,90.453), "road_point":Vector2(-82.0,80.0), "road_a":Vector2(-65.244,40.354), "road_b":Vector2(-101.108,125.313), "focus":true},
+		{"slug":"twelve-triangles-high-street", "point":Vector2(-117.849,-2.438), "road_point":Vector2(-135.0,2.8), "road_a":Vector2(-146.582,-2.638), "road_b":Vector2(-120.279,9.674), "focus":true}
 	]
 	for target in targets:
 		var point: Vector2 = target["point"]
@@ -86,7 +86,7 @@ func run() -> void:
 			var focus_direction: Vector2 = (point - p).normalized()
 			if focus_direction.length() > 0.5:
 				var focus_heading: float = atan2(-focus_direction.x, -focus_direction.y)
-				car.camera_yaw = clampf(wrapf(focus_heading - car.rotation.y, -PI, PI), -0.72, 0.72)
+				car.camera_yaw = clampf(wrapf(focus_heading - car.rotation.y, -PI, PI), -1.05, 1.05)
 		car.camera_pitch = 0.0
 		car.camera_idle = 2.0
 		car.camera_lag = Vector3.ZERO
