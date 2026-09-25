@@ -27,7 +27,7 @@ const LOW_SPEC_EXACT_FOOTPRINT_RADIUS := 220.0
 const DRIVER_DETAIL_RADIUS := 38.0
 const MOBILE_BUILDING_VISUAL_RADIUS := 420.0
 const MOBILE_COLLIDING_BUILDING_RADIUS := 190.0
-const MOBILE_FACADE_RADIUS := 180.0
+const MOBILE_FACADE_RADIUS := 300.0
 const MOBILE_ROAD_VISUAL_RADIUS := 540.0
 const MOBILE_STREET_DETAIL_RADIUS := 235.0
 const XPS_LIGHT_GRADE := "edinburgh-side-light-v1"
@@ -560,27 +560,27 @@ func _add_mapped_point_features(parent: Node3D, features: Array):
 		if kind == "tree":
 			var trunk = MeshInstance3D.new()
 			var tm = CylinderMesh.new()
-			tm.top_radius = 0.12
-			tm.bottom_radius = 0.18
-			tm.height = 2.2
+			tm.top_radius = 0.09 if mobile_mode else 0.12
+			tm.bottom_radius = 0.14 if mobile_mode else 0.18
+			tm.height = 1.9 if mobile_mode else 2.2
 			tm.radial_segments = 10 if xps_9530_mode else 7
 			trunk.mesh = tm
-			trunk.position = p + Vector3(0, 1.1, 0)
+			trunk.position = p + Vector3(0, 0.95 if mobile_mode else 1.1, 0)
 			trunk.material_override = _mat(Color(0.16, 0.10, 0.055), 0.96, 0.0)
-			trunk.visibility_range_end = 240.0 if xps_9530_mode else (150.0 if not low_spec_mode else 90.0)
-			_apply_secondary_visual_budget(trunk, 90.0)
+			trunk.visibility_range_end = 240.0 if xps_9530_mode else (135.0 if mobile_mode else (150.0 if not low_spec_mode else 90.0))
+			_apply_secondary_visual_budget(trunk, 100.0)
 			parent.add_child(trunk)
 			var crown = MeshInstance3D.new()
 			var sm = SphereMesh.new()
-			sm.radius = 1.25
-			sm.height = 2.5
+			sm.radius = 0.88 if mobile_mode else 1.25
+			sm.height = 1.75 if mobile_mode else 2.5
 			sm.radial_segments = 12 if xps_9530_mode else (8 if not low_spec_mode else 6)
 			sm.rings = 7 if xps_9530_mode else (5 if not low_spec_mode else 3)
 			crown.mesh = sm
-			crown.position = p + Vector3(0, 3.0, 0)
+			crown.position = p + Vector3(0, 2.35 if mobile_mode else 3.0, 0)
 			crown.material_override = hedge_mat
-			crown.visibility_range_end = 260.0 if xps_9530_mode else (165.0 if not low_spec_mode else 95.0)
-			_apply_secondary_visual_budget(crown, 95.0)
+			crown.visibility_range_end = 260.0 if xps_9530_mode else (145.0 if mobile_mode else (165.0 if not low_spec_mode else 95.0))
+			_apply_secondary_visual_budget(crown, 110.0)
 			parent.add_child(crown)
 		elif kind == "traffic_signals":
 			_visual_box(parent, p + Vector3(0, 1.55, 0), Vector3(0.12, 3.1, 0.12), metal_mat)
@@ -1525,6 +1525,35 @@ func _add_mobile_osm_footprint_visual(parent: Node3D, building: Dictionary, heig
 	parent.add_child(visual)
 	return true
 
+func _footprint_hits_drivable_centerline(poly: PackedVector2Array) -> bool:
+	if not mobile_mode or poly.size() < 3:
+		return false
+	var centroid := Vector2.ZERO
+	for p in poly:
+		centroid += p
+	centroid /= float(poly.size())
+	var radius := 0.0
+	for p in poly:
+		radius = maxf(radius, centroid.distance_to(p))
+	for segment in map_segments:
+		if not segment is Array or segment.size() < 4:
+			continue
+		var kind := str(segment[3]).to_lower()
+		if kind in ["track", "path", "footway", "cycleway"]:
+			continue
+		var a := Vector2(float(segment[0][0]), float(segment[0][1]))
+		var b := Vector2(float(segment[1][0]), float(segment[1][1]))
+		if _point_segment_distance_2d(centroid, a, b) > radius + 1.5:
+			continue
+		if Geometry2D.is_point_in_polygon(a, poly) or Geometry2D.is_point_in_polygon(b, poly):
+			return true
+		for edge_index in range(poly.size()):
+			var p0: Vector2 = poly[edge_index]
+			var p1: Vector2 = poly[(edge_index + 1) % poly.size()]
+			if Geometry2D.segment_intersects_segment(a, b, p0, p1) != null:
+				return true
+	return false
+
 func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float, seed: int) -> bool:
 	var footprint = building.get("footprint", [])
 	if not footprint is Array or footprint.size() < 3:
@@ -1535,6 +1564,8 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 			continue
 		poly.append(Vector2(float(point[0]), float(point[1])))
 	if poly.size() < 3:
+		return false
+	if _footprint_hits_drivable_centerline(poly):
 		return false
 	var tris = Geometry2D.triangulate_polygon(poly)
 	if tris.size() < 3:
@@ -2075,27 +2106,36 @@ func _apply_weather_visuals():
 	pavement_mat.roughness = lerp(0.90, 0.58, wetness)
 	kerb_mat.roughness = lerp(0.94, 0.68, wetness)
 	concrete_mat.roughness = lerp(0.86, 0.62, wetness)
-	weather_sun_energy = (lerp(1.03, 0.58, cloud) if xps_9530_mode else lerp(0.95, 0.56, cloud)) * lerp(1.0, 0.90, wetness)
+	weather_sun_energy = (lerp(1.12, 0.60, cloud) if xps_9530_mode else lerp(1.06, 0.58, cloud)) * lerp(1.0, 0.90, wetness)
 	if mobile_mode:
-		weather_sun_energy *= 0.82
+		weather_sun_energy *= 0.94
+	var low_visibility := clamp((1800.0 - visibility) / 1800.0, 0.0, 1.0)
+	var headlight_energy := 0.12 + cloud * 0.26 + wetness * 0.32 + low_visibility * 1.10
+	for headlight_path in ["Car/HeadlightL", "Car/HeadlightR"]:
+		var headlight = get_node_or_null(headlight_path)
+		if headlight:
+			headlight.light_energy = headlight_energy
 	var env = $WorldEnvironment.environment
 	if env:
 		env.fog_enabled = true
 		var visibility_fog = clamp(1.0 - visibility / 22000.0, 0.0, 0.92)
-		env.fog_density = 0.0022 + visibility_fog * 0.008 + clamp(aqi / 150.0, 0.0, 1.0) * 0.002
-		env.fog_light_color = Color(0.46, 0.50, 0.51).lerp(Color(0.36, 0.40, 0.42), cloud)
+		# "CLEAR" used to look like a grey soup even at 16 km visibility. Keep the
+		# Scottish haze, but reserve dense fog for genuinely poor visibility.
+		env.fog_density = 0.00045 + visibility_fog * 0.0038 + clamp(aqi / 150.0, 0.0, 1.0) * 0.0008 + low_visibility * 0.009
+		env.fog_light_color = Color(0.64, 0.69, 0.70).lerp(Color(0.40, 0.45, 0.47), cloud)
+		env.background_color = Color(0.52, 0.62, 0.66).lerp(Color(0.31, 0.37, 0.40), cloud)
 		if mobile_mode:
-			env.ambient_light_energy = lerp(1.10, 0.88, cloud) * lerp(1.0, 0.96, wetness)
-			env.ambient_light_color = Color(0.62, 0.64, 0.64).lerp(Color(0.49, 0.53, 0.55), cloud)
-			env.tonemap_exposure = lerp(1.34, 1.18, cloud)
+			env.ambient_light_energy = lerp(1.16, 0.90, cloud) * lerp(1.0, 0.96, wetness)
+			env.ambient_light_color = Color(0.68, 0.69, 0.66).lerp(Color(0.50, 0.54, 0.56), cloud)
+			env.tonemap_exposure = lerp(1.28, 1.14, cloud)
 		elif xps_9530_mode:
-			env.ambient_light_energy = lerp(0.78, 0.63, cloud) * lerp(1.0, 0.94, wetness)
-			env.ambient_light_color = Color(0.53, 0.54, 0.54).lerp(Color(0.41, 0.45, 0.47), cloud)
-			env.tonemap_exposure = lerp(1.18, 1.06, cloud) * lerp(1.0, 0.98, wetness)
+			env.ambient_light_energy = lerp(0.94, 0.74, cloud) * lerp(1.0, 0.94, wetness)
+			env.ambient_light_color = Color(0.61, 0.61, 0.58).lerp(Color(0.44, 0.48, 0.50), cloud)
+			env.tonemap_exposure = lerp(1.22, 1.09, cloud) * lerp(1.0, 0.98, wetness)
 		else:
-			env.ambient_light_energy = lerp(0.88, 0.66, cloud) * lerp(1.0, 0.94, wetness)
-			env.ambient_light_color = Color(0.54, 0.57, 0.58).lerp(Color(0.42, 0.46, 0.48), cloud)
-			env.tonemap_exposure = lerp(1.24, 1.08, cloud) * lerp(1.0, 0.98, wetness)
+			env.ambient_light_energy = lerp(0.96, 0.72, cloud) * lerp(1.0, 0.94, wetness)
+			env.ambient_light_color = Color(0.60, 0.62, 0.61).lerp(Color(0.44, 0.48, 0.50), cloud)
+			env.tonemap_exposure = lerp(1.24, 1.09, cloud) * lerp(1.0, 0.98, wetness)
 
 
 func _bind_map_stream():
