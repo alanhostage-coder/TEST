@@ -338,6 +338,24 @@ func _update_visuals(delta, speed_ratio):
 		wheel.rotation.x = wheel_spin
 		wheel.rotation.z = PI * 0.5
 
+func _mobile_camera_clearance(lateral: float, height: float, distance: float) -> float:
+	var space_state = get_world_3d().direct_space_state
+	var ray_origin := global_position + Vector3(0.0, 1.30, 0.0)
+	var desired_world := to_global(Vector3(lateral, height, distance))
+	var query := PhysicsRayQueryParameters3D.create(ray_origin, desired_world)
+	query.exclude = [get_rid()]
+	query.collision_mask = 1
+	var hit := space_state.intersect_ray(query)
+	if hit.is_empty():
+		set_meta("mobile_camera_clearance_ratio", 1.0)
+		return distance
+	var hit_position: Vector3 = hit.get("position", desired_world)
+	var total_distance := maxf(0.01, ray_origin.distance_to(desired_world))
+	var clear_distance := maxf(0.0, ray_origin.distance_to(hit_position) - 0.55)
+	var ratio := clampf(clear_distance / total_distance, 0.34, 1.0)
+	set_meta("mobile_camera_clearance_ratio", ratio)
+	return maxf(2.85, distance * ratio)
+
 func _update_camera(delta, speed_ratio):
 	var rig = $CameraRig
 	var world_motion = (global_position - previous_position) / max(delta, 0.001)
@@ -365,16 +383,18 @@ func _update_camera(delta, speed_ratio):
 	var road_texture = sin(distance_driven * 0.72) * speed_camera_pulse * (0.018 if mobile_runtime else 0.035)
 	var chase_height = (2.45 + speed_ratio * 0.30) if mobile_runtime else (2.35 + speed_ratio * 0.62)
 	chase_height += shake + road_texture - suspension_heave
-	var chase_distance = (7.35 + speed_ratio * 1.95) if mobile_runtime else (7.7 + speed_ratio * 3.7)
+	var chase_distance = (6.25 + speed_ratio * 1.55) if mobile_runtime else (7.7 + speed_ratio * 3.7)
 	chase_distance += camera_lag.z
-	rig.position.x = lerp(rig.position.x, lateral, 1.0 - exp(-delta * 3.0))
-	rig.position.y = lerp(rig.position.y, chase_height, 1.0 - exp(-delta * 2.2))
-	rig.position.z = lerp(rig.position.z, chase_distance, 1.0 - exp(-delta * 1.7))
+	if mobile_runtime:
+		chase_distance = _mobile_camera_clearance(lateral, chase_height, chase_distance)
+	rig.position.x = lerp(rig.position.x, lateral, 1.0 - exp(-delta * 4.0 if mobile_runtime else delta * 3.0))
+	rig.position.y = lerp(rig.position.y, chase_height, 1.0 - exp(-delta * 3.2 if mobile_runtime else delta * 2.2))
+	rig.position.z = lerp(rig.position.z, chase_distance, 1.0 - exp(-delta * 5.5 if mobile_runtime else delta * 1.7))
 	var base_pitch_deg: float = (-3.45 + speed_ratio * 0.35) if mobile_runtime else (-4.8 + speed_ratio * 0.8)
 	rig.rotation.x = lerp_angle(rig.rotation.x, deg_to_rad(base_pitch_deg) + camera_pitch + suspension_pitch, 1.0 - exp(-delta * 3.0))
 	rig.rotation.y = lerp_angle(rig.rotation.y, camera_yaw + camera_look_ahead - camera_lag.x * 0.025, 1.0 - exp(-delta * 3.1))
 	rig.rotation.z = lerp_angle(rig.rotation.z, -lateral_load * 0.006, 1.0 - exp(-delta * 4.8))
-	var target_fov: float = (65.5 + speed_ratio * 5.5) if mobile_runtime else (60.0 + speed_ratio * 13.0)
+	var target_fov: float = (68.0 + speed_ratio * 4.5) if mobile_runtime else (60.0 + speed_ratio * 13.0)
 	$CameraRig/Camera3D.fov = lerp($CameraRig/Camera3D.fov, target_fov, 1.0 - exp(-delta * 1.65))
 
 func _save_state():
