@@ -31,9 +31,16 @@ jobs:
           osmium export /tmp/eh15.osm.pbf -f geojson -a type,id -o /tmp/eh15.geojson --overwrite
           test -s /tmp/eh15.geojson
           du -h /tmp/eh15.osm.pbf /tmp/eh15.geojson
+      - name: Download EH15 bare-earth terrain tile
+        run: |
+          wget -q --show-progress https://s3.amazonaws.com/elevation-tiles-prod/skadi/N55/N55W004.hgt.gz -O /tmp/N55W004.hgt.gz
+          test -s /tmp/N55W004.hgt.gz
+          gzip -dc /tmp/N55W004.hgt.gz > /tmp/N55W004.hgt
+          test "$(stat -c%s /tmp/N55W004.hgt)" -eq 25934402
       - name: Build tiled offline district
         env:
           EH15_GEOJSON: /tmp/eh15.geojson
+          EH15_HGT: /tmp/N55W004.hgt
         run: python3 tools/build_eh15_geofabrik.py
       - name: Verify inventory
         run: |
@@ -48,6 +55,13 @@ jobs:
           assert m.get('dedupe_policy','') == 'osm_id+kind per tile'
           assert m.get('road_conflict_policy','') == 'offline_nonservice_corridor_cull_v1'
           assert m.get('road_conflict_culled',-1) >= 0
+          terrain=m.get('terrain',{})
+          assert terrain.get('file') == 'elevation.json'
+          assert terrain.get('source_tile') == 'N55W004'
+          assert float(terrain.get('max_y_m',0))-float(terrain.get('min_y_m',0)) >= 4.0
+          e=json.load(open('eh15_full/elevation.json'))
+          assert e.get('cols',0) > 100 and e.get('rows',0) > 100
+          assert len(e.get('values_dm',[])) == e['cols']*e['rows']
           assert t.get('identity_features',0) >= 1
           assert m.get('identity_kind_totals',{}).get('coastline',0) >= 1
           assert m['destination_count'] >= 20
