@@ -370,9 +370,12 @@ func _add_identity_area(parent: Node3D, feature: Dictionary):
 	if not raw_points is Array or raw_points.size() < 3:
 		return
 	var poly := PackedVector2Array()
+	var terrain_heights: Array[float] = []
 	for raw_point in raw_points:
 		if raw_point is Array and raw_point.size() >= 2:
-			poly.append(Vector2(float(raw_point[0]), float(raw_point[1])))
+			var point2 := Vector2(float(raw_point[0]), float(raw_point[1]))
+			poly.append(point2)
+			terrain_heights.append(float(raw_point[2]) if mobile_mode and raw_point.size() >= 3 else _terrain_height(point2))
 	if poly.size() > 2 and poly[0].distance_squared_to(poly[poly.size() - 1]) < 0.01:
 		poly.resize(poly.size() - 1)
 	if poly.size() < 3:
@@ -382,10 +385,13 @@ func _add_identity_area(parent: Node3D, feature: Dictionary):
 		return
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
-	var y := -0.018 if kind == "water" else 0.009
 	for t in range(0, tris.size(), 3):
 		for j in range(3):
-			var p: Vector2 = poly[int(tris[t + j])]
+			var index := int(tris[t + j])
+			var p: Vector2 = poly[index]
+			var y := (-0.018 if kind == "water" else 0.009)
+			if mobile_mode:
+				y = (_terrain_sea_y() + 0.015) if kind == "water" else terrain_heights[index] + 0.015
 			surface.add_vertex(Vector3(p.x, y, p.y))
 	var mesh := surface.commit()
 	if mesh == null:
@@ -429,8 +435,9 @@ func _add_coastline_sea(parent: Node3D, features: Array) -> int:
 			var near_b := b + water_normal * 1.0
 			var far_a := a + water_normal * 1650.0
 			var far_b := b + water_normal * 1650.0
+			var sea_y := _terrain_sea_y() + 0.02 if mobile_mode else -0.055
 			for p in [near_a, far_a, far_b, near_a, far_b, near_b]:
-				surface.add_vertex(Vector3(p.x, -0.055, p.y))
+				surface.add_vertex(Vector3(p.x, sea_y, p.y))
 			segment_count += 1
 	if segment_count <= 0:
 		return 0
@@ -481,7 +488,10 @@ func _add_identity_features(parent: Node3D, features: Array) -> Dictionary:
 					continue
 				var mid := (a + b) * 0.5
 				var angle := atan2(delta.x, delta.y)
-				_road_rotated_material(parent, Vector3(mid.x, 0.016, mid.y), length + 0.4, 3.4, angle, gravel_mat)
+				if mobile_mode:
+					_mobile_terrain_strip(parent, a, b, 3.4, 0.0, 0.035, gravel_mat, "railway")
+				else:
+					_road_rotated_material(parent, Vector3(mid.x, 0.016, mid.y), length + 0.4, 3.4, angle, gravel_mat)
 				counts["rail_segments"] = int(counts["rail_segments"]) + 1
 	return counts
 
@@ -540,7 +550,8 @@ func _add_mapped_point_features(parent: Node3D, features: Array):
 		var point = feature.get("point", [])
 		if not point is Array or point.size() < 2:
 			continue
-		var p = Vector3(float(point[0]), 0.0, float(point[1]))
+		var p2 := Vector2(float(point[0]), float(point[1]))
+		var p = Vector3(p2.x, float(feature.get("ground_y", _terrain_height(p2))) if mobile_mode else 0.0, p2.y)
 		var kind = str(feature.get("kind", ""))
 		if kind == "tree":
 			var trunk = MeshInstance3D.new()
@@ -652,7 +663,7 @@ func _add_mapped_road_name_signs(parent: Node3D, roads: Array) -> int:
 		var label = Label3D.new()
 		label.name = "MappedRoadName_%d" % made
 		label.text = str(candidate["name"]).to_upper()
-		label.position = Vector3(chosen.x, 1.55 if mobile_mode else 1.05, chosen.y)
+		label.position = Vector3(chosen.x, _terrain_height(chosen) + 1.55 if mobile_mode else 1.05, chosen.y)
 		label.font_size = label_size
 		label.pixel_size = 0.0062 if mobile_mode else 0.0042
 		label.modulate = Color(0.94, 0.95, 0.92, 0.88)
@@ -704,7 +715,8 @@ func _add_named_poi_markers(parent: Node3D, pois: Array):
 		if p.distance_to(reference) > distance_limit:
 			continue
 		if mobile_mode:
-			_add_mobile_identity_annotation(parent, Vector3(p.x, 3.0, p.y), poi_name, Color(0.72, 0.90, 1.0, 0.96), label_range)
+			var poi_y := float(poi.get("ground_y", _terrain_height(p)))
+			_add_mobile_identity_annotation(parent, Vector3(p.x, poi_y + 3.0, p.y), poi_name, Color(0.72, 0.90, 1.0, 0.96), label_range)
 		else:
 			_visual_box(parent, Vector3(p.x, 1.35, p.y), Vector3(0.08, 2.70, 0.08), metal_mat)
 			_visual_box(parent, Vector3(p.x, 2.55, p.y), Vector3(0.92, 0.40, 0.08), sign_blue_mat)
@@ -723,7 +735,8 @@ func _add_named_building_marker(parent: Node3D, building: Dictionary):
 	if p.distance_to(reference) > distance_limit:
 		return
 	if mobile_mode:
-		_add_mobile_identity_annotation(parent, Vector3(p.x, 3.4, p.y), name, Color(1.0, 0.86, 0.58, 0.96), 155.0)
+		var building_y := float(building.get("ground_y", _terrain_height(p)))
+		_add_mobile_identity_annotation(parent, Vector3(p.x, building_y + 3.4, p.y), name, Color(1.0, 0.86, 0.58, 0.96), 155.0)
 	else:
 		_add_world_label(parent, Vector3(p.x, 3.2, p.y), name, Color(0.95, 0.93, 0.86), 25 if low_spec_mode else 34, 105.0 if low_spec_mode else 170.0)
 
@@ -748,7 +761,8 @@ func _add_opening_anchor_annotation(parent: Node3D, car: Node, pois: Array, buil
 		var label = Label3D.new()
 		label.name = "MappedOpeningAnchor"
 		label.text = anchor_name
-		label.position = Vector3(float(coordinate[0]), 3.05, float(coordinate[1]))
+		var anchor_point := Vector2(float(coordinate[0]), float(coordinate[1]))
+		label.position = Vector3(anchor_point.x, _terrain_height(anchor_point) + 3.05 if mobile_mode else 3.05, anchor_point.y)
 		label.font_size = 27 if low_spec_mode else 34
 		# Slightly larger than ordinary world labels because this one is the single
 		# verified first-impression cue. At the selected EH15 opening distance this
@@ -1365,6 +1379,11 @@ func _add_mobile_osm_footprint_visual(parent: Node3D, building: Dictionary, heig
 
 	var visual := MeshInstance3D.new()
 	visual.name = "OSMFootprintVisual_%d" % seed
+	var centroid := Vector2.ZERO
+	for footprint_point in poly:
+		centroid += footprint_point
+	centroid /= float(poly.size())
+	visual.position.y = float(building.get("ground_y", _terrain_height(centroid)))
 	visual.mesh = mesh
 	visual.material_override = _osm_building_material(building, seed)
 	visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -1423,6 +1442,14 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 		return false
 	var body = StaticBody3D.new()
 	body.name = "OSMFootprint_%d" % seed
+	var footprint_centre := Vector2.ZERO
+	for footprint_point in poly:
+		footprint_centre += footprint_point
+	footprint_centre /= float(poly.size())
+	var base_y := float(building.get("ground_y", _terrain_height(footprint_centre))) if mobile_mode else 0.0
+	body.position.y = base_y
+	body.name = "OSMFootprint_%d" % seed
+	body.set_meta("terrain_base_y", base_y)
 	body.set_meta("osm_id", int(building.get("osm_id", 0)))
 	body.set_meta("osm_kind", str(building.get("kind", "")))
 	var visual = MeshInstance3D.new()
@@ -2076,7 +2103,7 @@ func _on_map_ready(map_data: Dictionary):
 			# Desktop/legacy fallback remains unchanged. Mobile only reaches this for
 			# malformed footprints that cannot be triangulated; keep those rare cases
 			# visible but outside the normal exact-footprint path.
-			_add_edinburgh_building(map_root, Vector3(cx, 0.0, cz), Vector3(sx, h, sz), seed, kind)
+			_add_edinburgh_building(map_root, Vector3(cx, _terrain_height(Vector2(cx, cz)) if mobile_mode else 0.0, cz), Vector3(sx, h, sz), seed, kind)
 			fallback_building_count += 1
 		_add_named_building_marker(map_root, building)
 
