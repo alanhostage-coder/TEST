@@ -77,6 +77,19 @@ jobs:
           grep -q 'MOBILE_FACADE_OK' /tmp/mobile-facade.log
           ! grep -E 'SCRIPT ERROR|Parse Error|MOBILE_FACADE_FAIL' /tmp/mobile-facade.log
 
+      - name: EH15 terrain data regression
+        run: |
+          set -o pipefail
+          timeout 45s godot --headless --path godot --script res://mobile_terrain_test.gd 2>&1 | tee /tmp/mobile-terrain.log
+          grep -q 'MOBILE_TERRAIN_OK' /tmp/mobile-terrain.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|MOBILE_TERRAIN_FAIL' /tmp/mobile-terrain.log
+      - name: Forced mobile terrain scene regression
+        run: |
+          set -o pipefail
+          timeout 60s godot --headless --path godot --script res://mobile_terrain_scene_test.gd 2>&1 | tee /tmp/mobile-terrain-scene.log
+          grep -q 'MOBILE_TERRAIN_SCENE_OK' /tmp/mobile-terrain-scene.log
+          ! grep -E 'SCRIPT ERROR|Parse Error|MOBILE_TERRAIN_SCENE_FAIL' /tmp/mobile-terrain-scene.log
+
       - name: Greybeard invariants
         run: |
           grep -q 'renderer/rendering_method="mobile"' godot/project.godot
