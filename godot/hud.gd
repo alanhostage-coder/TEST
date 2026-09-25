@@ -223,63 +223,45 @@ func _draw():
 		var destination_name := str(car.get_meta("eh15_destination_name", "")).strip_edges()
 		var destination_point = car.get_meta("eh15_destination_point", [])
 		var destination_distance := float(car.get_meta("eh15_destination_distance_m", 0.0))
+		var road_name := str(car.get_meta("mobile_road_name", "")).strip_edges()
+		var road_distance := float(car.get_meta("mobile_road_distance_m", INF))
+		var place_name := str(car.get_meta("mobile_place_name", "")).strip_edges()
+		var panel_width := minf(viewport_size.x - 24.0, 390.0)
+		var panel_x: float = (float(viewport_size.x) - panel_width) * 0.5
+		draw_rect(Rect2(panel_x, 10.0, panel_width, 66.0), Color(0.010, 0.014, 0.018, 0.78), true)
+		draw_line(Vector2(panel_x, 10.0), Vector2(panel_x + panel_width, 10.0), Color(0.88, 0.49, 0.20, 0.90), 2.0)
+		var area_label := place_name.to_upper() if place_name != "" else "EH15"
+		if area_label.length() > 24:
+			area_label = area_label.substr(0, 21) + "..."
+		draw_string(font, Vector2(panel_x + 12.0, 26.0), area_label, HORIZONTAL_ALIGNMENT_LEFT, panel_width - 24.0, 9, Color(0.40, 0.84, 0.96, 0.96))
+		var road_label := road_name.to_upper()
+		if road_label == "":
+			road_label = "EH15"
+		elif road_distance > 22.0:
+			road_label = "NEAR " + road_label
+		if road_label.length() > 34:
+			road_label = road_label.substr(0, 31) + "..."
+		draw_string(font, Vector2(panel_x + 12.0, 46.0), road_label, HORIZONTAL_ALIGNMENT_LEFT, panel_width - 24.0, 15, Color(0.97, 0.96, 0.90, 0.98))
 		if destination_name != "" and destination_point is Array and destination_point.size() >= 2:
-			var panel_width := minf(viewport_size.x - 24.0, 360.0)
-			var panel_x: float = (float(viewport_size.x) - panel_width) * 0.5
-			draw_rect(Rect2(panel_x, 10.0, panel_width, 44.0), Color(0.012, 0.016, 0.020, 0.78), true)
-			draw_line(Vector2(panel_x, 10.0), Vector2(panel_x + panel_width, 10.0), Color(0.88, 0.49, 0.20, 0.88), 2.0)
-			var label := destination_name
-			if label.length() > 34:
-				label = label.substr(0, 31) + "..."
-			draw_string(font, Vector2(panel_x + 42.0, 29.0), "EH15 · NEXT  " + label, HORIZONTAL_ALIGNMENT_LEFT, panel_width - 54.0, 11, Color(0.94, 0.91, 0.82, 0.96))
-			draw_string(font, Vector2(panel_x + 42.0, 46.0), "%d m" % int(round(destination_distance)), HORIZONTAL_ALIGNMENT_LEFT, panel_width - 54.0, 9, Color(0.72, 0.78, 0.78, 0.88))
+			var next_label := destination_name
+			if next_label.length() > 27:
+				next_label = next_label.substr(0, 24) + "..."
+			draw_string(font, Vector2(panel_x + 12.0, 64.0), "NEXT  %s  ·  %dm" % [next_label, int(round(destination_distance))], HORIZONTAL_ALIGNMENT_LEFT, panel_width - 50.0, 9, Color(0.94, 0.75, 0.42, 0.94))
 			var target_world := Vector3(float(destination_point[0]), car.global_position.y, float(destination_point[1]))
 			var local_target: Vector3 = car.to_local(target_world)
 			var arrow_angle := atan2(local_target.x, -local_target.z)
-			var arrow_centre := Vector2(panel_x + 22.0, 33.0)
+			var arrow_centre := Vector2(panel_x + panel_width - 22.0, 54.0)
 			var arrow_dir := Vector2(sin(arrow_angle), -cos(arrow_angle))
-			draw_line(arrow_centre - arrow_dir * 7.0, arrow_centre + arrow_dir * 10.0, Color(1.0, 0.78, 0.42, 0.96), 3.0)
+			draw_line(arrow_centre - arrow_dir * 5.0, arrow_centre + arrow_dir * 8.0, Color(1.0, 0.78, 0.42, 0.96), 2.5)
 			var wing := arrow_dir.rotated(2.45)
 			var wing2 := arrow_dir.rotated(-2.45)
-			draw_line(arrow_centre + arrow_dir * 10.0, arrow_centre + arrow_dir * 10.0 + wing * 7.0, Color(1.0, 0.78, 0.42, 0.96), 2.0)
-			draw_line(arrow_centre + arrow_dir * 10.0, arrow_centre + arrow_dir * 10.0 + wing2 * 7.0, Color(1.0, 0.78, 0.42, 0.96), 2.0)
-
-		var road_name := str(car.get_meta("mobile_road_name", "")).strip_edges()
-		var road_distance := float(car.get_meta("mobile_road_distance_m", INF))
-		var near_road_name := str(car.get_meta("mobile_near_road_name", "")).strip_edges()
-		var near_road_distance := float(car.get_meta("mobile_near_road_distance_m", INF))
-		var place_name := str(car.get_meta("mobile_place_name", "")).strip_edges()
-		var landmark_name := str(car.get_meta("mobile_landmark_name", "")).strip_edges()
-		var landmark_distance := float(car.get_meta("mobile_landmark_distance_m", INF))
-		if road_name != "" or place_name != "" or landmark_name != "":
-			var identity_width := minf(viewport_size.x - 24.0, 360.0)
-			var identity_x: float = (float(viewport_size.x) - identity_width) * 0.5
-			draw_rect(Rect2(identity_x, 58.0, identity_width, 52.0), Color(0.010, 0.014, 0.018, 0.82), true)
-			draw_line(Vector2(identity_x, 58.0), Vector2(identity_x + identity_width, 58.0), Color(0.28, 0.78, 0.92, 0.92), 2.0)
-			var area_label := place_name.to_upper() if place_name != "" else "EH15"
-			if area_label.length() > 30:
-				area_label = area_label.substr(0, 27) + "..."
-			draw_string(font, Vector2(identity_x + 10.0, 74.0), area_label, HORIZONTAL_ALIGNMENT_LEFT, identity_width - 20.0, 9, Color(0.40, 0.84, 0.96, 0.96))
-			var road_label := road_name
-			if road_label.length() > 34:
-				road_label = road_label.substr(0, 31) + "..."
-			if road_label != "":
-				var road_prefix := "" if road_distance <= 22.0 else "NEAR "
-				draw_string(font, Vector2(identity_x + 10.0, 92.0), road_prefix + road_label.to_upper(), HORIZONTAL_ALIGNMENT_LEFT, identity_width - 20.0, 14, Color(0.97, 0.96, 0.90, 0.98))
-			var context := ""
-			if near_road_name != "" and near_road_distance <= 180.0:
-				context = "NEAR " + near_road_name
-			if landmark_name != "" and landmark_distance <= 550.0:
-				var landmark_piece := "%s  %dm" % [landmark_name, int(round(landmark_distance))]
-				context = landmark_piece if context == "" else context + "  ·  " + landmark_piece
-			if context.length() > 52:
-				context = context.substr(0, 49) + "..."
-			if context != "":
-				draw_string(font, Vector2(identity_x + 10.0, 105.0), context, HORIZONTAL_ALIGNMENT_LEFT, identity_width - 24.0, 10, Color(0.72, 0.78, 0.78, 0.90))
+			draw_line(arrow_centre + arrow_dir * 8.0, arrow_centre + arrow_dir * 8.0 + wing * 5.5, Color(1.0, 0.78, 0.42, 0.96), 2.0)
+			draw_line(arrow_centre + arrow_dir * 8.0, arrow_centre + arrow_dir * 8.0 + wing2 * 5.5, Color(1.0, 0.78, 0.42, 0.96), 2.0)
 		if not bool(car.get("on_road")) and abs(float(car.get("speed"))) < 4.0:
 			draw_rect(Rect2(18.0, 42.0, 118.0, 46.0), Color(0.06, 0.075, 0.08, 0.84), true)
 			draw_line(Vector2(18.0, 42.0), Vector2(136.0, 42.0), Color(0.88, 0.49, 0.20, 0.92), 2.0)
 			draw_string(font, Vector2(33.0, 71.0), "RECOVER ROAD", HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(0.96, 0.92, 0.82, 0.96))
+
 	if not OS.has_feature("mobile") and (not _projector_driving_view_active() or projector_hint_alpha > 0.01):
 		var map_control = "   M  MAP" if OS.has_feature("pc_max") or OS.has_feature("projector_max") else ""
 		var hint_alpha := projector_hint_alpha if _projector_driving_view_active() else 1.0
