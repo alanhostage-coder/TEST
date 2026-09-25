@@ -542,6 +542,8 @@ func _add_beach_edge_water(parent: Node3D, features: Array) -> int:
 func _add_identity_features(parent: Node3D, features: Array) -> Dictionary:
 	var counts := {"coast_segments": 0, "areas": 0, "rail_segments": 0}
 	counts["coast_segments"] = _add_coastline_sea(parent, features)
+	if int(counts["coast_segments"]) == 0:
+		counts["coast_segments"] = _add_beach_edge_water(parent, features)
 	var area_budget := 90 if mobile_mode else 140
 	var rail_budget := 90 if mobile_mode else 160
 	for feature in features:
