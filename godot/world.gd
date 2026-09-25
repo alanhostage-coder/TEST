@@ -972,7 +972,7 @@ func _add_named_landmark_signature(body: Node3D, poly: PackedVector2Array, heigh
 			_rotated_visual_box(body, Vector3(glass_p.x, 2.55, glass_p.y), Vector3(0.055, 2.95, 0.94), tenement_sash_glass_mat, angle, 395.0)
 		var dome_center := centroid
 		_visual_cylinder(body, Vector3(dome_center.x, height + 0.28, dome_center.y), 1.75, 1.90, 0.56, sandstone_warm_mat, 18, 415.0)
-		_visual_sphere(body, Vector3(dome_center.x, height + 0.82, dome_center.y), 1.62, 1.16, roof_mat, 18, 415.0)
+		_visual_sphere(body, Vector3(dome_center.x, height + 0.82, dome_center.y), 1.62, 1.16, roof_mat, 415.0)
 		_visual_cylinder(body, Vector3(dome_center.x, height + 1.52, dome_center.y), 0.24, 0.38, 0.52, soot_stone_cool_mat, 10, 425.0)
 		body.set_meta("landmark_signature", "st-marks-classical-dome-v3")
 
