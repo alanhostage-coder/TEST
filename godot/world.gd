@@ -36,6 +36,8 @@ var projector_max_mode := false
 var pc_max_mode := false
 var xps_9530_mode := false
 var mobile_mode := false
+var thinkpad_mode := false
+var source_terrain_mode := false
 var mobile_destination_index := -1
 var mobile_destination_point := Vector2.ZERO
 var mobile_destination_name := ""
@@ -102,11 +104,14 @@ var commercial_zone_mat
 func _ready():
 	var force_xps_proof := bool(get_meta("force_xps_proof", false))
 	var force_mobile_proof := bool(get_meta("force_mobile_proof", false))
+	var force_thinkpad_proof := bool(get_meta("force_thinkpad_proof", false))
 	projector_max_mode = OS.has_feature("projector_max") or force_xps_proof
 	pc_max_mode = OS.has_feature("pc_max") or force_xps_proof
 	xps_9530_mode = OS.has_feature("xps_9530") or force_xps_proof
 	mobile_mode = OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1" or force_mobile_proof
-	low_spec_mode = OS.has_feature("thinkpad_low") or (projector_max_mode and not xps_9530_mode) or mobile_mode
+	thinkpad_mode = (OS.has_feature("thinkpad_low") and not projector_max_mode) or force_thinkpad_proof
+	source_terrain_mode = mobile_mode or thinkpad_mode
+	low_spec_mode = thinkpad_mode or (projector_max_mode and not xps_9530_mode) or mobile_mode
 	if xps_9530_mode:
 		# Final reference-machine grade: slightly lower, more lateral light makes the
 		# sandstone relief and recessed sash/close geometry readable from the driver seat.
@@ -1999,7 +2004,7 @@ func _add_mobile_osm_footprint_visual(parent: Node3D, building: Dictionary, heig
 	return true
 
 func _footprint_hits_drivable_centerline(poly: PackedVector2Array) -> bool:
-	if not mobile_mode or poly.size() < 3:
+	if not source_terrain_mode or poly.size() < 3:
 		return false
 	var centroid := Vector2.ZERO
 	for p in poly:
@@ -2050,7 +2055,7 @@ func _building_hits_drivable_centerline(building: Dictionary) -> bool:
 	return _footprint_hits_drivable_centerline(poly)
 
 func _mobile_visual_height(building: Dictionary, base_height: float, building_distance: float, has_commercial_frontage: bool) -> float:
-	if not mobile_mode:
+	if not source_terrain_mode:
 		return base_height
 	var source := str(building.get("height_source", "")).to_lower()
 	if not source.contains("estimated"):
@@ -2110,7 +2115,7 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 	for footprint_point in poly:
 		mesh_centroid += footprint_point
 	mesh_centroid /= float(poly.size())
-	var foundation := _mobile_foundation_frame(poly, mesh_centroid) if mobile_mode else {"base_y": 0.0, "height_lift": 0.0}
+	var foundation := _mobile_foundation_frame(poly, mesh_centroid) if source_terrain_mode else {"base_y": 0.0, "height_lift": 0.0}
 	var effective_height := height + float(foundation.get("height_lift", 0.0))
 
 	var st = SurfaceTool.new()
@@ -2124,13 +2129,17 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 	var mesh = st.commit()
 	if mesh == null:
 		return false
-	var body = StaticBody3D.new()
+	var body: Node3D
+	if thinkpad_mode:
+		body = Node3D.new()
+	else:
+		body = StaticBody3D.new()
 	body.name = "OSMFootprint_%d" % seed
 	var footprint_centre := Vector2.ZERO
 	for footprint_point in poly:
 		footprint_centre += footprint_point
 	footprint_centre /= float(poly.size())
-	var base_y := float(foundation.get("base_y", 0.0)) if mobile_mode else 0.0
+	var base_y := float(foundation.get("base_y", 0.0)) if source_terrain_mode else 0.0
 	body.position.y = base_y
 	body.name = "OSMFootprint_%d" % seed
 	body.set_meta("terrain_base_y", base_y)
@@ -2145,9 +2154,10 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 		body.set_meta("facade_visual_source", "generic_edinburgh_tenement_kit_v1")
 	visual.visibility_range_end = 520.0 if xps_9530_mode else (360.0 if not low_spec_mode else 220.0)
 	body.add_child(visual)
-	var collision = CollisionShape3D.new()
-	collision.shape = mesh.create_trimesh_shape()
-	body.add_child(collision)
+	if not thinkpad_mode:
+		var collision = CollisionShape3D.new()
+		collision.shape = mesh.create_trimesh_shape()
+		body.add_child(collision)
 	var custom_landmark_visual := _add_named_landmark_body_visual(body, poly, effective_height, building)
 	if custom_landmark_visual:
 		visual.visible = false
@@ -2279,15 +2289,14 @@ func _make_ground():
 	ground.position = Vector3(0, -0.24, 0)
 	ground.add_child(mesh)
 	ground.add_child(col)
-	if mobile_mode:
-		# Android uses the source-backed EH15 height field. The legacy flat slab
-		# would otherwise cut through downhill roads and cover coastal relief.
+	if source_terrain_mode:
+		# Terrain-backed builds never collide with the legacy flat slab.
 		ground.visible = false
 		col.disabled = true
 	add_child(ground)
 
 func _terrain_height(local_position: Vector2) -> float:
-	if not mobile_mode:
+	if not source_terrain_mode:
 		return 0.0
 	var stream = get_node_or_null("MapStream")
 	if stream and stream.has_method("terrain_height_at"):
@@ -2301,24 +2310,24 @@ func _terrain_sea_y() -> float:
 	return 0.0
 
 func _add_mobile_terrain_surface(parent: Node3D, centre: Vector2):
-	if not mobile_mode:
+	if not source_terrain_mode:
 		return
 	var stream = get_node_or_null("MapStream")
 	if stream == null or not stream.has_method("terrain_available") or not bool(stream.terrain_available()):
 		return
-	const STEP := 12.5
-	const RADIUS := 500.0
-	var cols := int(floor((RADIUS * 2.0) / STEP)) + 1
+	var step := 20.0 if thinkpad_mode else 12.5
+	var radius := 420.0 if thinkpad_mode else 500.0
+	var cols := int(floor((radius * 2.0) / step)) + 1
 	var rows := cols
-	var start := centre - Vector2(RADIUS, RADIUS)
+	var start := centre - Vector2(radius, radius)
 	var surface := SurfaceTool.new()
 	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for z_index in range(rows - 1):
 		for x_index in range(cols - 1):
-			var x0 := start.x + float(x_index) * STEP
-			var x1 := x0 + STEP
-			var z0 := start.y + float(z_index) * STEP
-			var z1 := z0 + STEP
+			var x0 := start.x + float(x_index) * step
+			var x1 := x0 + step
+			var z0 := start.y + float(z_index) * step
+			var z1 := z0 + step
 			var p00 := Vector2(x0, z0)
 			var p10 := Vector2(x1, z0)
 			var p01 := Vector2(x0, z1)
@@ -2391,7 +2400,8 @@ func _add_mobile_road_segment(parent: Node3D, a: Vector2, b: Vector2, width: flo
 	var car = get_node_or_null("Car")
 	var midpoint := (a + b) * 0.5
 	var driver2 := Vector2(car.global_position.x, car.global_position.z) if car else Vector2.ZERO
-	var close_detail := midpoint.distance_to(driver2) <= MOBILE_STREET_DETAIL_RADIUS
+	var detail_radius := 180.0 if thinkpad_mode else MOBILE_STREET_DETAIL_RADIUS
+	var close_detail := midpoint.distance_to(driver2) <= detail_radius
 	if close_detail and kind not in ["motorway", "trunk", "track"] and sidewalk not in ["no", "none"]:
 		var pavement_offset := width * 0.5 + 0.72
 		_mobile_terrain_strip(parent, a, b, 1.28, -pavement_offset, 0.115, pavement_mat, "pavement")
@@ -2725,7 +2735,7 @@ func _on_map_ready(map_data: Dictionary):
 			if p is Array and p.size() >= 2: bd = min(bd, Vector2(float(p[0]), float(p[1])).distance_squared_to(detail_origin))
 		return ad < bd
 	)
-	if mobile_mode:
+	if source_terrain_mode:
 		_add_mobile_terrain_surface(map_root, detail_origin)
 	var identity_counts := _add_identity_features(map_root, identity_features)
 	var street_edge_budget := 0
@@ -2756,10 +2766,11 @@ func _on_map_ready(map_data: Dictionary):
 			if length < 2.0:
 				continue
 			var mid = (a + b) * 0.5
-			if mobile_mode and mid.distance_to(detail_origin) > MOBILE_ROAD_VISUAL_RADIUS + length * 0.5:
+			var road_visual_radius := 430.0 if thinkpad_mode else MOBILE_ROAD_VISUAL_RADIUS
+			if source_terrain_mode and mid.distance_to(detail_origin) > road_visual_radius + length * 0.5:
 				continue
 			var angle = atan2(road_delta.x, road_delta.y)
-			if mobile_mode:
+			if source_terrain_mode:
 				_add_mobile_road_segment(map_root, a, b, width, kind, road_material, sidewalk)
 			else:
 				_road_rotated_material(map_root, Vector3(mid.x, 0.035, mid.y), length + 1.0, width, angle, road_material)
@@ -2800,39 +2811,40 @@ func _on_map_ready(map_data: Dictionary):
 		var sz = max(2.0, float(size[1]))
 		var cx = float(center[0])
 		var cz = float(center[1])
-		if mobile_mode and Vector2(cx, cz).distance_to(detail_origin) > MOBILE_BUILDING_VISUAL_RADIUS:
+		var building_visual_radius := 360.0 if thinkpad_mode else MOBILE_BUILDING_VISUAL_RADIUS
+		if source_terrain_mode and Vector2(cx, cz).distance_to(detail_origin) > building_visual_radius:
 			continue
 		var seed = int(abs(cx * 17.0 + cz * 31.0 + sx * 11.0 + sz * 7.0))
 		var kind = str(building.get("kind", "yes"))
-		var exact_detail_origin := detail_origin if mobile_mode else Vector2.ZERO
+		var exact_detail_origin := detail_origin if source_terrain_mode else Vector2.ZERO
 		var building_distance := Vector2(cx, cz).distance_to(exact_detail_origin)
 		# Rendering and physics share one road corridor rule. If an OSM footprint
 		# overlaps the actual carriageway, omit it at every mobile distance rather
 		# than allowing a distant block to become a building in the road.
-		if mobile_mode and _building_hits_drivable_centerline(building):
+		if source_terrain_mode and _building_hits_drivable_centerline(building):
 			runtime_road_conflict_culled += 1
 			continue
-		if mobile_mode:
+		if source_terrain_mode:
 			mobile_collision_buildings.append(building)
 		var visual_building: Dictionary = building
 		var commercial_pois: Array = []
-		if (pc_max_mode and not low_spec_mode) or (mobile_mode and building_distance <= MOBILE_FACADE_RADIUS):
+		if (pc_max_mode and not low_spec_mode) or (source_terrain_mode and building_distance <= (240.0 if thinkpad_mode else MOBILE_FACADE_RADIUS)):
 			commercial_pois = _mapped_commercial_pois_inside_building(building, poi_features)
 			if not commercial_pois.is_empty():
 				visual_building = building.duplicate(true)
 				visual_building["_mapped_commercial_pois"] = commercial_pois
 		h = _mobile_visual_height(visual_building, h, building_distance, not commercial_pois.is_empty())
-		var exact_radius = MOBILE_COLLIDING_BUILDING_RADIUS if mobile_mode else (LOW_SPEC_EXACT_FOOTPRINT_RADIUS if low_spec_mode else (620.0 if pc_max_mode else 260.0))
+		var exact_radius = (165.0 if thinkpad_mode else MOBILE_COLLIDING_BUILDING_RADIUS) if source_terrain_mode else (LOW_SPEC_EXACT_FOOTPRINT_RADIUS if low_spec_mode else (620.0 if pc_max_mode else 260.0))
 		var exact = building_distance <= exact_radius and _add_exact_osm_building(map_root, visual_building, h, seed)
 		if exact:
 			exact_building_count += 1
-		elif mobile_mode and _add_mobile_osm_footprint_visual(map_root, visual_building, h, seed):
+		elif source_terrain_mode and _add_mobile_osm_footprint_visual(map_root, visual_building, h, seed):
 			mobile_visual_only_building_count += 1
 		else:
 			# Desktop/legacy fallback remains unchanged. Mobile only reaches this for
 			# malformed footprints that cannot be triangulated; keep those rare cases
 			# visible but outside the normal exact-footprint path.
-			_add_edinburgh_building(map_root, Vector3(cx, _terrain_height(Vector2(cx, cz)) if mobile_mode else 0.0, cz), Vector3(sx, h, sz), seed, kind)
+			_add_edinburgh_building(map_root, Vector3(cx, _terrain_height(Vector2(cx, cz)) if source_terrain_mode else 0.0, cz), Vector3(sx, h, sz), seed, kind)
 			fallback_building_count += 1
 		_add_named_building_marker(map_root, building)
 
@@ -2877,7 +2889,7 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_rail_segment_count", int(identity_counts.get("rail_segments", 0)))
 		car.set_meta("map_road_annotation_count", mapped_road_annotation_count)
 		car.set_meta("map_road_segments", map_segments)
-		if mobile_mode and car.has_method("set_mobile_collision_geometry"):
+		if source_terrain_mode and car.has_method("set_mobile_collision_geometry"):
 			car.set_mobile_collision_geometry(mobile_collision_buildings)
 		if not map_opening_placed:
 			_place_car_for_first_impression(car, roads, buildings, poi_features, point_features)
@@ -3162,11 +3174,11 @@ func _place_car_for_first_impression(car, roads: Array, buildings: Array, poi_fe
 		best_junction = fallback
 		best_spawn = fallback
 		best_approach = 0.0
-	car.global_position = Vector3(best_spawn.x, _terrain_height(best_spawn) + 0.58 if mobile_mode else max(car.global_position.y, 0.58), best_spawn.y)
+	car.global_position = Vector3(best_spawn.x, _terrain_height(best_spawn) + 0.58 if source_terrain_mode else 0.58, best_spawn.y)
 	car.rotation.y = atan2(-best_heading.x, -best_heading.y)
 	car.set_meta("map_spawn_junction", [best_junction.x, best_junction.y])
 	car.set_meta("map_spawn_heading", [best_heading.x, best_heading.y])
-	car.set_meta("map_opening_policy", "terrain-aware-first-impression-v2" if mobile_mode else "verified-first-impression-v1")
+	car.set_meta("map_opening_policy", "terrain-aware-thinkpad-v1" if thinkpad_mode else ("terrain-aware-first-impression-v2" if mobile_mode else "verified-first-impression-v1"))
 	car.set_meta("map_opening_hook_score", best_score)
 	car.set_meta("map_opening_branch_count", best_branch_count)
 	car.set_meta("map_opening_approach_m", best_approach)
