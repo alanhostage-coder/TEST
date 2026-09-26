@@ -37,6 +37,24 @@ func run() -> void:
 		_finish(2)
 		return
 
+	var near_terrain = world.map_root.get_node_or_null("ThinkPadNearTerrain")
+	var far_terrain = world.map_root.get_node_or_null("ThinkPadFarTerrain")
+	if near_terrain == null or far_terrain == null:
+		push_error("PUA_THINKPAD_RENDER_FAIL terrain grids missing")
+		_finish(2)
+		return
+	for terrain_node in [near_terrain, far_terrain]:
+		var arrays = terrain_node.mesh.surface_get_arrays(0)
+		var normals = arrays[Mesh.ARRAY_NORMAL]
+		var normal_y_sum := 0.0
+		for normal in normals:
+			normal_y_sum += float(normal.y)
+		var average_normal_y := normal_y_sum / maxf(1.0, float(normals.size()))
+		if average_normal_y <= 0.20:
+			push_error("PUA_THINKPAD_RENDER_FAIL terrain normals inverted %.3f" % average_normal_y)
+			_finish(2)
+			return
+
 	var world_state = world.get_node("WorldState")
 	world_state.set_weather_mode("CLEAR")
 	world.atmosphere_wetness = world.atmosphere_target_wetness
@@ -44,15 +62,25 @@ func run() -> void:
 	world.atmosphere_visibility = world.atmosphere_target_visibility
 	world.atmosphere_aqi = world.atmosphere_target_aqi
 	world._apply_weather_visuals()
-	world.get_node("BayProjection")._set_mode(0)
+	var bay = world.get_node("BayProjection")
+	bay._set_mode(0)
+	bay.visible = false
 	var hud = world.get_node("HUD")
 	hud.visible = true
+	hud.credit_clock = 999.0
+	hud._update_parkview_credit(0.0)
 
 	for _settle in range(12):
 		await physics_frame
 		await process_frame
 	if absf(car.global_position.y) > 120.0:
 		push_error("PUA_THINKPAD_RENDER_FAIL opening car Y runaway %.2f" % car.global_position.y)
+		_finish(2)
+		return
+	var opening_point := Vector2(car.global_position.x, car.global_position.z)
+	var expected_opening_y := car._mobile_drive_surface_height(opening_point) + 0.58
+	if absf(car.global_position.y - expected_opening_y) > 0.08:
+		push_error("PUA_THINKPAD_RENDER_FAIL opening surface mismatch car=%.3f expected=%.3f" % [car.global_position.y, expected_opening_y])
 		_finish(2)
 		return
 	_capture("opening")
