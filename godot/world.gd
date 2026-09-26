@@ -11,6 +11,8 @@ var map_opening_placed := false
 var weather_sun_energy := 0.68
 var map_root: Node3D
 var map_segments: Array = []
+const SOURCE_ROAD_CELL := 48.0
+var source_road_cells := {}
 var map_agents: Array = []
 var map_lamps: Array = []
 var api_traffic_factor := 0.85
@@ -141,15 +143,21 @@ func _ready():
 		$Sun.directional_shadow_max_distance = 180.0
 	_make_materials()
 	_make_ground()
-	_make_landmarks()
-	_spawn_traffic()
-	_spawn_patrol()
+	if source_terrain_mode:
+		var legacy_road_collision = get_node_or_null("Road/CollisionShape3D")
+		if legacy_road_collision:
+			legacy_road_collision.disabled = true
+	if not thinkpad_mode:
+		_make_landmarks()
+		_spawn_traffic()
+		_spawn_patrol()
 	_bind_world_state()
 	_bind_map_stream()
 	_bind_pua_api()
-	for x in range(-1, 2):
-		for y in range(-2, 1):
-			_build_cell(Vector2i(x, y))
+	if not thinkpad_mode:
+		for x in range(-1, 2):
+			for y in range(-2, 1):
+				_build_cell(Vector2i(x, y))
 
 func _process(delta):
 	var car = $Car
@@ -247,19 +255,19 @@ func _make_materials():
 		sea_mat.albedo_color = Color(0.055, 0.23, 0.33)
 		beach_mat.albedo_color = Color(0.62, 0.54, 0.39)
 		tenement_sash_frame_mat.albedo_color = Color(0.88, 0.86, 0.78)
-		# OSM footprints can arrive with either winding direction. Building shells
-		# must therefore remain opaque from both sides on Android; otherwise far-side
-		# window/detail boxes become visible through a culled wall and appear to float.
+		for stone_material in [sandstone_mat, sandstone_warm_mat, soot_stone_mat]:
+			stone_material.emission_enabled = true
+			stone_material.emission = stone_material.albedo_color
+			stone_material.emission_energy_multiplier = 0.10
+	# OSM polygon winding is not guaranteed. Source-backed builds render the street
+	# wall from either side so a reversed footprint cannot make half a terrace vanish.
+	if source_terrain_mode:
 		for shell_material in [
 			sandstone_mat, sandstone_warm_mat, soot_stone_mat, soot_stone_cool_mat,
 			brick_mat, render_mat, concrete_mat, roof_mat,
 			tenement_weathered_mat, tenement_warm_mat, tenement_soot_mat
 		]:
 			shell_material.cull_mode = BaseMaterial3D.CULL_DISABLED
-		for stone_material in [sandstone_mat, sandstone_warm_mat, soot_stone_mat]:
-			stone_material.emission_enabled = true
-			stone_material.emission = stone_material.albedo_color
-			stone_material.emission_energy_multiplier = 0.10
 
 func _tenement_texture_mat(path: String, tint: Color, roughness: float):
 	var material = _mat(tint, roughness, 0.0)
@@ -1383,7 +1391,7 @@ func _osm_building_material(building: Dictionary, seed: int):
 	# Android gets the window-bearing facade tile on ordinary residential stock,
 	# not only the narrower tenement heuristic. The exact OSM footprint remains
 	# authoritative; this is generic Edinburgh visual treatment.
-	if mobile_mode and named == "" and kind in ["house", "apartments", "residential", "detached", "terrace", "yes", "semidetached_house"]:
+	if source_terrain_mode and named == "" and kind in ["house", "apartments", "residential", "detached", "terrace", "yes", "semidetached_house"]:
 		match abs(seed) % 10:
 			0, 1:
 				return tenement_warm_mat
@@ -2174,7 +2182,7 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 	var custom_landmark_visual := _add_named_landmark_body_visual(body, poly, effective_height, building)
 	if custom_landmark_visual:
 		visual.visible = false
-	else:
+	elif not thinkpad_mode:
 		_add_exact_osm_facade_detail(body, poly, effective_height, seed, building)
 	_add_named_landmark_signature(body, poly, effective_height, building)
 	parent.add_child(body)
@@ -2322,14 +2330,82 @@ func _terrain_sea_y() -> float:
 		return float(stream.terrain_sea_level_y())
 	return 0.0
 
-func _add_mobile_terrain_surface(parent: Node3D, centre: Vector2):
-	if not source_terrain_mode:
-		return
-	var stream = get_node_or_null("MapStream")
-	if stream == null or not stream.has_method("terrain_available") or not bool(stream.terrain_available()):
-		return
-	var step := 24.0 if thinkpad_mode else 12.5
-	var radius := 540.0 if thinkpad_mode else 500.0
+func _rebuild_source_road_cells():
+	source_road_cells.clear()
+	for segment_index in range(map_segments.size()):
+		var segment = map_segments[segment_index]
+		if not segment is Array or segment.size() < 4:
+			continue
+		var kind := str(segment[3]).to_lower()
+		if kind in ["track", "path", "footway", "cycleway"]:
+			continue
+		var a := Vector2(float(segment[0][0]), float(segment[0][1]))
+		var b := Vector2(float(segment[1][0]), float(segment[1][1]))
+		var margin := maxf(10.0, float(segment[2]) * 0.5 + 9.0)
+		var min_cell := Vector2i(floori((minf(a.x, b.x) - margin) / SOURCE_ROAD_CELL), floori((minf(a.y, b.y) - margin) / SOURCE_ROAD_CELL))
+		var max_cell := Vector2i(floori((maxf(a.x, b.x) + margin) / SOURCE_ROAD_CELL), floori((maxf(a.y, b.y) + margin) / SOURCE_ROAD_CELL))
+		for cx in range(min_cell.x, max_cell.x + 1):
+			for cz in range(min_cell.y, max_cell.y + 1):
+				var key := Vector2i(cx, cz)
+				if not source_road_cells.has(key):
+					source_road_cells[key] = []
+				source_road_cells[key].append(segment_index)
+
+func _source_segments_near(point: Vector2) -> Array:
+	if source_road_cells.is_empty():
+		return map_segments
+	var cell := Vector2i(floori(point.x / SOURCE_ROAD_CELL), floori(point.y / SOURCE_ROAD_CELL))
+	var result: Array = []
+	var seen := {}
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			for segment_index in source_road_cells.get(cell + Vector2i(dx, dz), []):
+				if seen.has(segment_index):
+					continue
+				seen[segment_index] = true
+				result.append(map_segments[int(segment_index)])
+	return result
+
+func _terrain_render_height(point: Vector2) -> float:
+	var terrain_y := _terrain_height(point)
+	if not source_terrain_mode or map_segments.is_empty():
+		return terrain_y
+	var best_distance := INF
+	var best_projection := point
+	var best_half_width := 0.0
+	for segment in _source_segments_near(point):
+		if not segment is Array or segment.size() < 4:
+			continue
+		var kind := str(segment[3]).to_lower()
+		if kind in ["track", "path", "footway", "cycleway"]:
+			continue
+		var a := Vector2(float(segment[0][0]), float(segment[0][1]))
+		var b := Vector2(float(segment[1][0]), float(segment[1][1]))
+		var ab := b - a
+		var denom := ab.length_squared()
+		if denom < 0.001:
+			continue
+		var t := clampf((point - a).dot(ab) / denom, 0.0, 1.0)
+		var projection := a + ab * t
+		var distance := point.distance_to(projection)
+		if distance < best_distance:
+			best_distance = distance
+			best_projection = projection
+			best_half_width = maxf(1.7, float(segment[2]) * 0.5)
+	if best_distance == INF:
+		return terrain_y
+	var road_y := _terrain_height(best_projection)
+	var flat_edge := best_half_width + 1.25
+	var blend_edge := flat_edge + (8.0 if thinkpad_mode else 6.0)
+	if best_distance <= flat_edge:
+		return road_y - 0.12
+	if best_distance < blend_edge:
+		var t := clampf((best_distance - flat_edge) / maxf(0.1, blend_edge - flat_edge), 0.0, 1.0)
+		var smooth := t * t * (3.0 - 2.0 * t)
+		return lerpf(road_y - 0.12, terrain_y, smooth)
+	return terrain_y
+
+func _add_source_terrain_grid(parent: Node3D, centre: Vector2, radius: float, step: float, sink: float, label: String, range_end: float):
 	var cols := int(floor((radius * 2.0) / step)) + 1
 	var rows := cols
 	var start := centre - Vector2(radius, radius)
@@ -2345,24 +2421,41 @@ func _add_mobile_terrain_surface(parent: Node3D, centre: Vector2):
 			var p10 := Vector2(x1, z0)
 			var p01 := Vector2(x0, z1)
 			var p11 := Vector2(x1, z1)
-			var v00 := Vector3(x0, _terrain_height(p00) - 0.08, z0)
-			var v10 := Vector3(x1, _terrain_height(p10) - 0.08, z0)
-			var v01 := Vector3(x0, _terrain_height(p01) - 0.08, z1)
-			var v11 := Vector3(x1, _terrain_height(p11) - 0.08, z1)
-			for v in [v00, v10, v11, v00, v11, v01]:
+			var v00 := Vector3(x0, _terrain_render_height(p00) - sink, z0)
+			var v10 := Vector3(x1, _terrain_render_height(p10) - sink, z0)
+			var v01 := Vector3(x0, _terrain_render_height(p01) - sink, z1)
+			var v11 := Vector3(x1, _terrain_render_height(p11) - sink, z1)
+			# Counter-clockwise from above. The previous order generated DOWN normals,
+			# which is exactly why the ThinkPad screenshot showed terrain as a ceiling.
+			for v in [v00, v01, v11, v00, v11, v10]:
 				surface.add_vertex(v)
 	surface.generate_normals()
 	var terrain_mesh := surface.commit()
 	if terrain_mesh == null:
 		return
 	var visual := MeshInstance3D.new()
-	visual.name = "MobileEHTerrain"
+	visual.name = label
 	visual.mesh = terrain_mesh
 	visual.material_override = ground_mat
 	visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	visual.visibility_range_end = 900.0
+	visual.visibility_range_end = range_end
 	visual.set_meta("terrain_source_backed", true)
+	visual.set_meta("terrain_grid_step_m", step)
 	parent.add_child(visual)
+
+func _add_mobile_terrain_surface(parent: Node3D, centre: Vector2):
+	if not source_terrain_mode:
+		return
+	var stream = get_node_or_null("MapStream")
+	if stream == null or not stream.has_method("terrain_available") or not bool(stream.terrain_available()):
+		return
+	if thinkpad_mode:
+		# Same idea as Slow Roads' coarse far grid + fine road corridor, but our
+		# centreline is the real OSM network and our heights are real Edinburgh DEM.
+		_add_source_terrain_grid(parent, centre, 560.0, 24.0, 0.48, "ThinkPadFarTerrain", 900.0)
+		_add_source_terrain_grid(parent, centre, 180.0, 6.0, 0.08, "ThinkPadNearTerrain", 260.0)
+	else:
+		_add_source_terrain_grid(parent, centre, 500.0, 12.5, 0.08, "MobileEHTerrain", 900.0)
 
 func _mobile_terrain_strip(parent: Node3D, a: Vector2, b: Vector2, width: float, lateral_offset: float, y_offset: float, material, label: String):
 	var delta := b - a
@@ -2714,7 +2807,10 @@ func _on_map_ready(map_data: Dictionary):
 	for legacy_name in ["DockEdge", "GarageCourt", "Transmitter"]:
 		var legacy = get_node_or_null(legacy_name)
 		if legacy:
-			legacy.visible = false
+			if source_terrain_mode:
+				legacy.queue_free()
+			else:
+				legacy.visible = false
 	for t in traffic:
 		if t.has("node") and is_instance_valid(t["node"]):
 			t["node"].visible = false
@@ -2731,6 +2827,7 @@ func _on_map_ready(map_data: Dictionary):
 	map_root.name = "OpenMapWorld"
 	add_child(map_root)
 	map_segments.clear()
+	source_road_cells.clear()
 	map_lamps.clear()
 	# Near-to-far ordering makes the fixed low-spec budgets perceptual rather than
 	# source-order dependent: the roads around the driver's seat receive kerbs,
@@ -2754,6 +2851,26 @@ func _on_map_ready(map_data: Dictionary):
 		return ad < bd
 	)
 	if source_terrain_mode:
+		for source_road in detail_roads:
+			if not source_road is Dictionary:
+				continue
+			var source_points = source_road.get("points", [])
+			var source_width = float(source_road.get("width", 5.0))
+			var source_kind = str(source_road.get("kind", "road"))
+			var source_oneway = str(source_road.get("oneway", "no")).to_lower()
+			var source_name := str(source_road.get("name", "")).strip_edges()
+			var source_ref := str(source_road.get("ref", "")).strip_edges()
+			for source_i in range(source_points.size() - 1):
+				if not source_points[source_i] is Array or not source_points[source_i + 1] is Array:
+					continue
+				if source_points[source_i].size() < 2 or source_points[source_i + 1].size() < 2:
+					continue
+				var source_a := Vector2(float(source_points[source_i][0]), float(source_points[source_i][1]))
+				var source_b := Vector2(float(source_points[source_i + 1][0]), float(source_points[source_i + 1][1]))
+				if source_a.distance_squared_to(source_b) < 4.0:
+					continue
+				map_segments.append([[source_a.x, source_a.y], [source_b.x, source_b.y], source_width, source_kind, source_oneway, source_name, source_ref])
+		_rebuild_source_road_cells()
 		_add_mobile_terrain_surface(map_root, detail_origin)
 	var identity_counts := _add_identity_features(map_root, identity_features)
 	var street_edge_budget := 0
@@ -2800,9 +2917,10 @@ func _on_map_ready(map_data: Dictionary):
 				if marking_budget < marking_limit and length > 9.0 and width >= 5.8:
 					_live_road_markings(map_root, Vector3(mid.x, 0.035, mid.y), length, width, angle, kind)
 					marking_budget += 1
-			var road_name := str(road.get("name", "")).strip_edges()
-			var road_ref := str(road.get("ref", "")).strip_edges()
-			map_segments.append([[a.x, a.y], [b.x, b.y], width, kind, oneway, road_name, road_ref])
+			if not source_terrain_mode:
+				var road_name := str(road.get("name", "")).strip_edges()
+				var road_ref := str(road.get("ref", "")).strip_edges()
+				map_segments.append([[a.x, a.y], [b.x, b.y], width, kind, oneway, road_name, road_ref])
 
 	var exact_building_count := 0
 	var mobile_collision_buildings: Array = []
