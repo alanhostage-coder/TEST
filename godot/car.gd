@@ -99,10 +99,10 @@ func _candidate_mobile_polygons(from: Vector2, to: Vector2) -> Array:
 		for cz in range(min_cell.y, max_cell.y + 1):
 			var key := Vector2i(cx, cz)
 			for poly in mobile_building_cells.get(key, []):
-				var id := poly.hash()
-				if seen.has(id):
+				var poly_id: int = hash(poly)
+				if seen.has(poly_id):
 					continue
-				seen[id] = true
+				seen[poly_id] = true
 				found.append(poly)
 	return found
 
