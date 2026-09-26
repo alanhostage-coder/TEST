@@ -38,12 +38,88 @@ var steering_velocity := 0.0
 var lateral_load := 0.0
 var terrain_pitch := 0.0
 const MOBILE_RECOVER_RECT := Rect2(18.0, 42.0, 118.0, 46.0)
+const MOBILE_BUILDING_CELL := 36.0
+const MOBILE_CAR_RADIUS := 1.05
+var mobile_building_cells := {}
+var mobile_collision_footprint_count := 0
 
 
 func _ready():
 	_build_visual_shell()
 	_load_state()
 	previous_position = global_position
+
+func set_mobile_collision_geometry(buildings: Array):
+	mobile_building_cells.clear()
+	mobile_collision_footprint_count = 0
+	for building in buildings:
+		if not building is Dictionary:
+			continue
+		var footprint = building.get("footprint", [])
+		if not footprint is Array or footprint.size() < 3:
+			continue
+		var poly := PackedVector2Array()
+		var min_p := Vector2(INF, INF)
+		var max_p := Vector2(-INF, -INF)
+		for raw in footprint:
+			if raw is Array and raw.size() >= 2:
+				var p := Vector2(float(raw[0]), float(raw[1]))
+				poly.append(p)
+				min_p.x = minf(min_p.x, p.x)
+				min_p.y = minf(min_p.y, p.y)
+				max_p.x = maxf(max_p.x, p.x)
+				max_p.y = maxf(max_p.y, p.y)
+		if poly.size() < 3:
+			continue
+		if poly[0].distance_squared_to(poly[poly.size() - 1]) < 0.01:
+			poly.resize(poly.size() - 1)
+		if poly.size() < 3:
+			continue
+		var min_cell := Vector2i(floori((min_p.x - MOBILE_CAR_RADIUS) / MOBILE_BUILDING_CELL), floori((min_p.y - MOBILE_CAR_RADIUS) / MOBILE_BUILDING_CELL))
+		var max_cell := Vector2i(floori((max_p.x + MOBILE_CAR_RADIUS) / MOBILE_BUILDING_CELL), floori((max_p.y + MOBILE_CAR_RADIUS) / MOBILE_BUILDING_CELL))
+		for cx in range(min_cell.x, max_cell.x + 1):
+			for cz in range(min_cell.y, max_cell.y + 1):
+				var key := Vector2i(cx, cz)
+				if not mobile_building_cells.has(key):
+					mobile_building_cells[key] = []
+				mobile_building_cells[key].append(poly)
+		mobile_collision_footprint_count += 1
+	set_meta("mobile_collision_footprint_count", mobile_collision_footprint_count)
+
+func _candidate_mobile_polygons(from: Vector2, to: Vector2) -> Array:
+	var min_x := minf(from.x, to.x) - MOBILE_CAR_RADIUS
+	var max_x := maxf(from.x, to.x) + MOBILE_CAR_RADIUS
+	var min_z := minf(from.y, to.y) - MOBILE_CAR_RADIUS
+	var max_z := maxf(from.y, to.y) + MOBILE_CAR_RADIUS
+	var min_cell := Vector2i(floori(min_x / MOBILE_BUILDING_CELL), floori(min_z / MOBILE_BUILDING_CELL))
+	var max_cell := Vector2i(floori(max_x / MOBILE_BUILDING_CELL), floori(max_z / MOBILE_BUILDING_CELL))
+	var found: Array = []
+	var seen := {}
+	for cx in range(min_cell.x, max_cell.x + 1):
+		for cz in range(min_cell.y, max_cell.y + 1):
+			var key := Vector2i(cx, cz)
+			for poly in mobile_building_cells.get(key, []):
+				var id := poly.hash()
+				if seen.has(id):
+					continue
+				seen[id] = true
+				found.append(poly)
+	return found
+
+func _mobile_motion_hits_building(from: Vector2, to: Vector2) -> bool:
+	if mobile_building_cells.is_empty():
+		return false
+	for poly in _candidate_mobile_polygons(from, to):
+		if Geometry2D.is_point_in_polygon(to, poly):
+			return true
+		for i in range(poly.size()):
+			var a: Vector2 = poly[i]
+			var b: Vector2 = poly[(i + 1) % poly.size()]
+			if Geometry2D.segment_intersects_segment(from, to, a, b) != null:
+				return true
+			if _point_segment_distance(to, a, b) <= MOBILE_CAR_RADIUS:
+				return true
+	return false
 
 func _build_visual_shell():
 	# Player car keeps primitive collision but gets a stronger silhouette and proper
@@ -219,6 +295,18 @@ func _physics_process(delta):
 	velocity = velocity.lerp(desired_velocity, 1.0 - exp(-delta * grip))
 	var before = global_position
 	move_and_slide()
+	if OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1":
+		var before2 := Vector2(before.x, before.z)
+		var after2 := Vector2(global_position.x, global_position.z)
+		if _mobile_motion_hits_building(before2, after2):
+			# Building collision is authoritative in plan view. A sloping foundation
+			# can no longer become a tunnel just because its 3D mesh sits above the car.
+			global_position.x = before.x
+			global_position.z = before.z
+			velocity.x = 0.0
+			velocity.z = 0.0
+			speed *= 0.12
+			impact_kick = min(1.0, impact_kick + 0.35)
 	_follow_mobile_terrain(delta)
 	distance_driven += Vector2(before.x, before.z).distance_to(Vector2(global_position.x, global_position.z))
 	if is_on_wall():
@@ -253,23 +341,60 @@ func _mobile_terrain_height(point: Vector2) -> float:
 		return float(stream.terrain_height_at(point))
 	return 0.0
 
+func _mobile_drive_surface_height(point: Vector2) -> float:
+	var terrain_y := _mobile_terrain_height(point)
+	var segments = get_meta("map_road_segments", [])
+	if not segments is Array or segments.is_empty():
+		return terrain_y
+	var best_distance := INF
+	var best_projection := point
+	var best_half_width := 0.0
+	for segment in segments:
+		if not segment is Array or segment.size() < 4:
+			continue
+		var kind := str(segment[3]).to_lower()
+		if kind in ["track", "path", "footway", "cycleway"]:
+			continue
+		var a := Vector2(float(segment[0][0]), float(segment[0][1]))
+		var b := Vector2(float(segment[1][0]), float(segment[1][1]))
+		var ab := b - a
+		var denom := ab.length_squared()
+		if denom < 0.001:
+			continue
+		var t := clampf((point - a).dot(ab) / denom, 0.0, 1.0)
+		var projection := a + ab * t
+		var distance := point.distance_to(projection)
+		if distance < best_distance:
+			best_distance = distance
+			best_projection = projection
+			best_half_width = maxf(1.5, float(segment[2]) * 0.5)
+	if best_distance <= best_half_width + 0.70:
+		# The rendered road ribbon is sampled on its centreline. Use the same height
+		# for the car so terrain cross-slope cannot put the chassis underneath it.
+		return _mobile_terrain_height(best_projection)
+	return terrain_y
+
 func _follow_mobile_terrain(delta: float):
 	if not (OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1"):
 		terrain_pitch = lerp(terrain_pitch, 0.0, 1.0 - exp(-delta * 4.0))
 		return
 	var p := Vector2(global_position.x, global_position.z)
-	var ground_y := _mobile_terrain_height(p)
-	global_position.y = lerpf(global_position.y, ground_y + 0.58, 1.0 - exp(-delta * 14.0))
+	var ground_y := _mobile_drive_surface_height(p)
+	# 2.5D mobile physics: X/Z is driving and obstacle collision; Y is the single
+	# authoritative road/terrain surface. No interpolation lag that can put the car
+	# underground on a steep descent.
+	global_position.y = ground_y + 0.58
 	var forward := -global_transform.basis.z
 	var forward2 := Vector2(forward.x, forward.z).normalized()
 	if forward2.length() < 0.5:
 		return
-	var ahead_y := _mobile_terrain_height(p + forward2 * 5.0)
-	var behind_y := _mobile_terrain_height(p - forward2 * 5.0)
+	var ahead_y := _mobile_drive_surface_height(p + forward2 * 5.0)
+	var behind_y := _mobile_drive_surface_height(p - forward2 * 5.0)
 	var target_pitch := atan2(ahead_y - behind_y, 10.0)
 	terrain_pitch = lerp(terrain_pitch, target_pitch, 1.0 - exp(-delta * 5.0))
 	set_meta("terrain_ground_y", ground_y)
 	set_meta("terrain_pitch_deg", rad_to_deg(terrain_pitch))
+	set_meta("mobile_surface_model", "2.5d_osm_corridor_v1")
 
 func _is_near_road() -> bool:
 	var segments = get_meta("map_road_segments", [])
