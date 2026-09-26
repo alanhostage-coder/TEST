@@ -450,7 +450,7 @@ func _is_near_road() -> bool:
 			var a = Vector2(float(segment[0][0]), float(segment[0][1]))
 			var b = Vector2(float(segment[1][0]), float(segment[1][1]))
 			var width = float(segment[2])
-			var road_margin := 0.65 if OS.has_feature("mobile") else 2.4
+			var road_margin := 0.75 if _source_terrain_enabled() else 2.4
 			if _point_segment_distance(p, a, b) < width * 0.5 + road_margin:
 				return true
 		return false
@@ -551,7 +551,7 @@ func _update_camera(delta, speed_ratio):
 	# response. The eye gets cornering load from a few millimetres of roll and a
 	# stable horizon instead of the old exaggerated side-to-side chase-camera slide.
 	var lateral = lateral_load * 0.72 + camera_lag.x * 0.55
-	var mobile_runtime := OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1"
+	var mobile_runtime := _source_terrain_enabled()
 	var road_texture = sin(distance_driven * 0.72) * speed_camera_pulse * (0.018 if mobile_runtime else 0.035)
 	var chase_height = (2.45 + speed_ratio * 0.30) if mobile_runtime else (2.35 + speed_ratio * 0.62)
 	chase_height += shake + road_texture - suspension_heave
