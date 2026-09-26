@@ -2889,6 +2889,8 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_rail_segment_count", int(identity_counts.get("rail_segments", 0)))
 		car.set_meta("map_road_annotation_count", mapped_road_annotation_count)
 		car.set_meta("map_road_segments", map_segments)
+		if source_terrain_mode and car.has_method("set_drive_surface_segments"):
+			car.set_drive_surface_segments(map_segments)
 		if source_terrain_mode and car.has_method("set_mobile_collision_geometry"):
 			car.set_mobile_collision_geometry(mobile_collision_buildings)
 		if not map_opening_placed:
