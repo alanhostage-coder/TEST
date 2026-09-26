@@ -101,6 +101,14 @@ func _ready():
 		set_process(false)
 		set_process_input(false)
 		return
+	if OS.has_feature("thinkpad_low") and not OS.has_feature("projector_max") and OS.get_environment("PUA_FORCE_THINKPAD_TEST") != "1":
+		# The normal ThinkPad build is now the clean driving client. Calibration,
+		# five-window controls and extra SubViewports belong only in Projector Max.
+		visible = false
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		set_process(false)
+		set_process_input(false)
+		return
 	projector_max_mode = OS.has_feature("projector_max")
 	pc_max_mode = OS.has_feature("pc_max")
 	xps_9530_mode = OS.has_feature("xps_9530")
