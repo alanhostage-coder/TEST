@@ -339,7 +339,15 @@ func _physics_process(delta):
 	var grip = (lerp(10.5, 7.2, wetness)) if on_road else lerp(5.4, 4.1, wetness)
 	velocity = velocity.lerp(desired_velocity, 1.0 - exp(-delta * grip))
 	var before = global_position
-	move_and_slide()
+	if _source_terrain_enabled():
+		# Source-backed driving is deliberately 2.5D. X/Z follows our own road model;
+		# Y is resolved from the same terrain/road source after movement. This removes
+		# the hidden 3D depenetration impulses that were throwing the ThinkPad car
+		# into the air when legacy collision geometry overlapped the OSM world.
+		velocity.y = 0.0
+		global_position += velocity * delta
+	else:
+		move_and_slide()
 	if _source_terrain_enabled():
 		var before2 := Vector2(before.x, before.z)
 		var after2 := Vector2(global_position.x, global_position.z)
@@ -354,7 +362,7 @@ func _physics_process(delta):
 			impact_kick = min(1.0, impact_kick + 0.35)
 	_follow_mobile_terrain(delta)
 	distance_driven += Vector2(before.x, before.z).distance_to(Vector2(global_position.x, global_position.z))
-	if is_on_wall():
+	if not _source_terrain_enabled() and is_on_wall():
 		impact_kick = min(1.0, impact_kick + abs(speed) / 22.0)
 		speed *= 0.24
 		velocity *= 0.30
@@ -509,9 +517,31 @@ func _update_visuals(delta, speed_ratio):
 		wheel.rotation.z = PI * 0.5
 
 func _mobile_camera_clearance(lateral: float, height: float, distance: float) -> float:
-	var space_state = get_world_3d().direct_space_state
 	var ray_origin := global_position + Vector3(0.0, 1.30, 0.0)
 	var desired_world := to_global(Vector3(lateral, height, distance))
+	if _source_terrain_enabled() and not mobile_building_cells.is_empty():
+		# ThinkPad building shells are visual-only. Use the same exact OSM footprint
+		# polygons as vehicle collision to keep the chase camera out of street walls.
+		var from2 := Vector2(ray_origin.x, ray_origin.z)
+		var to2 := Vector2(desired_world.x, desired_world.z)
+		var total2 := maxf(0.01, from2.distance_to(to2))
+		var nearest_hit := total2
+		for poly in _candidate_mobile_polygons(from2, to2):
+			if not poly is PackedVector2Array or poly.size() < 3:
+				continue
+			for i in range(poly.size()):
+				var a: Vector2 = poly[i]
+				var b: Vector2 = poly[(i + 1) % poly.size()]
+				var hit2 = Geometry2D.segment_intersects_segment(from2, to2, a, b)
+				if hit2 != null:
+					nearest_hit = minf(nearest_hit, from2.distance_to(hit2))
+		if nearest_hit < total2:
+			var ratio2 := clampf((nearest_hit - 0.55) / total2, 0.10, 1.0)
+			set_meta("mobile_camera_clearance_ratio", ratio2)
+			return maxf(1.15, distance * ratio2)
+		set_meta("mobile_camera_clearance_ratio", 1.0)
+		return distance
+	var space_state = get_world_3d().direct_space_state
 	var query := PhysicsRayQueryParameters3D.create(ray_origin, desired_world)
 	query.exclude = [get_rid()]
 	query.collision_mask = 1
@@ -522,8 +552,6 @@ func _mobile_camera_clearance(lateral: float, height: float, distance: float) ->
 	var hit_position: Vector3 = hit.get("position", desired_world)
 	var total_distance := maxf(0.01, ray_origin.distance_to(desired_world))
 	var clear_distance := maxf(0.0, ray_origin.distance_to(hit_position) - 0.42)
-	# Do not enforce a large minimum here. If a wall is closer than the minimum,
-	# forcing the camera back through that wall defeats the collision test.
 	var ratio := clampf(clear_distance / total_distance, 0.05, 1.0)
 	set_meta("mobile_camera_clearance_ratio", ratio)
 	return maxf(0.85, distance * ratio)
@@ -553,9 +581,10 @@ func _update_camera(delta, speed_ratio):
 	var lateral = lateral_load * 0.72 + camera_lag.x * 0.55
 	var mobile_runtime := _source_terrain_enabled()
 	var road_texture = sin(distance_driven * 0.72) * speed_camera_pulse * (0.018 if mobile_runtime else 0.035)
-	var chase_height = (2.45 + speed_ratio * 0.30) if mobile_runtime else (2.35 + speed_ratio * 0.62)
+	var thinkpad_runtime := OS.has_feature("thinkpad_low") and not OS.has_feature("projector_max")
+	var chase_height = ((2.70 + speed_ratio * 0.22) if thinkpad_runtime else (2.45 + speed_ratio * 0.30)) if mobile_runtime else (2.35 + speed_ratio * 0.62)
 	chase_height += shake + road_texture - suspension_heave
-	var chase_distance = (6.25 + speed_ratio * 1.55) if mobile_runtime else (7.7 + speed_ratio * 3.7)
+	var chase_distance = ((7.2 + speed_ratio * 1.25) if thinkpad_runtime else (6.25 + speed_ratio * 1.55)) if mobile_runtime else (7.7 + speed_ratio * 3.7)
 	chase_distance += camera_lag.z
 	var camera_clearance_ratio := 1.0
 	if mobile_runtime:
@@ -568,11 +597,11 @@ func _update_camera(delta, speed_ratio):
 	rig.position.x = lerp(rig.position.x, lateral, 1.0 - exp(-delta * 4.0 if mobile_runtime else delta * 3.0))
 	rig.position.y = lerp(rig.position.y, chase_height, 1.0 - exp(-delta * 3.2 if mobile_runtime else delta * 2.2))
 	rig.position.z = lerp(rig.position.z, chase_distance, 1.0 - exp(-delta * 5.5 if mobile_runtime else delta * 1.7))
-	var base_pitch_deg: float = (-3.45 + speed_ratio * 0.35) if mobile_runtime else (-4.8 + speed_ratio * 0.8)
+	var base_pitch_deg: float = ((-5.2 + speed_ratio * 0.25) if thinkpad_runtime else (-3.45 + speed_ratio * 0.35)) if mobile_runtime else (-4.8 + speed_ratio * 0.8)
 	rig.rotation.x = lerp_angle(rig.rotation.x, deg_to_rad(base_pitch_deg) + camera_pitch + suspension_pitch, 1.0 - exp(-delta * 3.0))
 	rig.rotation.y = lerp_angle(rig.rotation.y, camera_yaw + camera_look_ahead - camera_lag.x * 0.025, 1.0 - exp(-delta * 3.1))
 	rig.rotation.z = lerp_angle(rig.rotation.z, -lateral_load * 0.006, 1.0 - exp(-delta * 4.8))
-	var target_fov: float = (68.0 + speed_ratio * 4.5) if mobile_runtime else (60.0 + speed_ratio * 13.0)
+	var target_fov: float = ((64.0 + speed_ratio * 3.0) if thinkpad_runtime else (68.0 + speed_ratio * 4.5)) if mobile_runtime else (60.0 + speed_ratio * 13.0)
 	if mobile_runtime and camera_clearance_ratio < 0.58:
 		target_fov += (0.58 - camera_clearance_ratio) * 8.0
 	$CameraRig/Camera3D.fov = lerp($CameraRig/Camera3D.fov, target_fov, 1.0 - exp(-delta * 1.65))
