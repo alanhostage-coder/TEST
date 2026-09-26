@@ -1957,17 +1957,19 @@ func _add_mobile_osm_footprint_visual(parent: Node3D, building: Dictionary, heig
 	for footprint_point in poly:
 		mesh_centroid += footprint_point
 	mesh_centroid /= float(poly.size())
+	var foundation := _mobile_foundation_frame(poly, mesh_centroid)
+	var effective_height := height + float(foundation.get("height_lift", 0.0))
 
 	var st := SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for t in range(0, tris.size(), 3):
 		for j in range(3):
 			var p: Vector2 = poly[int(tris[t + j])]
-			_osm_surface_roof_vertex(st, p, height)
+			_osm_surface_roof_vertex(st, p, effective_height)
 	for i in range(poly.size()):
 		var p0: Vector2 = poly[i]
 		var p1: Vector2 = poly[(i + 1) % poly.size()]
-		_osm_surface_wall_edge(st, p0, p1, height, mesh_centroid)
+		_osm_surface_wall_edge(st, p0, p1, effective_height, mesh_centroid)
 	var mesh := st.commit()
 	if mesh == null:
 		return false
@@ -1978,7 +1980,7 @@ func _add_mobile_osm_footprint_visual(parent: Node3D, building: Dictionary, heig
 	for footprint_point in poly:
 		centroid += footprint_point
 	centroid /= float(poly.size())
-	visual.position.y = float(building.get("ground_y", _terrain_height(centroid)))
+	visual.position.y = float(foundation.get("base_y", _terrain_height(centroid)))
 	visual.mesh = mesh
 	visual.material_override = _osm_building_material(building, seed)
 	visual.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -1987,12 +1989,12 @@ func _add_mobile_osm_footprint_visual(parent: Node3D, building: Dictionary, heig
 	visual.set_meta("osm_id", int(building.get("osm_id", 0)))
 	# Far mobile buildings are visual-only for physics, but named landmarks should
 	# not revert to a single enormous OSM extrusion.
-	var custom_landmark_visual := _add_named_landmark_body_visual(visual, poly, height, building)
+	var custom_landmark_visual := _add_named_landmark_body_visual(visual, poly, effective_height, building)
 	if custom_landmark_visual:
 		visual.mesh = null
 	else:
-		_add_mobile_osm_facade_detail(visual, poly, height, seed, building)
-	_add_named_landmark_signature(visual, poly, height, building)
+		_add_mobile_osm_facade_detail(visual, poly, effective_height, seed, building)
+	_add_named_landmark_signature(visual, poly, effective_height, building)
 	parent.add_child(visual)
 	return true
 
@@ -2014,16 +2016,26 @@ func _footprint_hits_drivable_centerline(poly: PackedVector2Array) -> bool:
 			continue
 		var a := Vector2(float(segment[0][0]), float(segment[0][1]))
 		var b := Vector2(float(segment[1][0]), float(segment[1][1]))
-		if _point_segment_distance_2d(centroid, a, b) > radius + 1.5:
+		var road_half_width := maxf(1.5, float(segment[2]) * 0.5)
+		var clearance := road_half_width + 0.35
+		if _point_segment_distance_2d(centroid, a, b) > radius + clearance:
 			continue
 		if Geometry2D.is_point_in_polygon(a, poly) or Geometry2D.is_point_in_polygon(b, poly):
 			return true
 		for edge_index in range(poly.size()):
 			var p0: Vector2 = poly[edge_index]
 			var p1: Vector2 = poly[(edge_index + 1) % poly.size()]
-			if Geometry2D.segment_intersects_segment(a, b, p0, p1) != null:
+			if _segment_segment_distance_2d(a, b, p0, p1) <= clearance:
 				return true
 	return false
+
+func _segment_segment_distance_2d(a0: Vector2, a1: Vector2, b0: Vector2, b1: Vector2) -> float:
+	if Geometry2D.segment_intersects_segment(a0, a1, b0, b1) != null:
+		return 0.0
+	return minf(
+		minf(_point_segment_distance_2d(a0, b0, b1), _point_segment_distance_2d(a1, b0, b1)),
+		minf(_point_segment_distance_2d(b0, a0, a1), _point_segment_distance_2d(b1, a0, a1))
+	)
 
 func _building_hits_drivable_centerline(building: Dictionary) -> bool:
 	var footprint = building.get("footprint", [])
@@ -2061,6 +2073,25 @@ func _mobile_visual_height(building: Dictionary, base_height: float, building_di
 			return maxf(base_height, 8.4)
 	return base_height
 
+func _mobile_foundation_frame(poly: PackedVector2Array, fallback: Vector2) -> Dictionary:
+	var reference_y := _terrain_height(fallback)
+	var min_y := reference_y
+	var max_y := reference_y
+	for p in poly:
+		var y := _terrain_height(p)
+		min_y = minf(min_y, y)
+		max_y = maxf(max_y, y)
+	# Sink the shell below the lowest sampled corner. The visible roof remains at
+	# roughly the mapped height while the collision can never float above downhill
+	# asphalt and form an accidental tunnel.
+	var base_y := min_y - 0.55
+	return {
+		"base_y": base_y,
+		"reference_y": reference_y,
+		"height_lift": maxf(0.0, reference_y - base_y),
+		"terrain_span": max_y - min_y
+	}
+
 func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float, seed: int) -> bool:
 	var footprint = building.get("footprint", [])
 	if not footprint is Array or footprint.size() < 3:
@@ -2079,15 +2110,17 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 	for footprint_point in poly:
 		mesh_centroid += footprint_point
 	mesh_centroid /= float(poly.size())
+	var foundation := _mobile_foundation_frame(poly, mesh_centroid) if mobile_mode else {"base_y": 0.0, "height_lift": 0.0}
+	var effective_height := height + float(foundation.get("height_lift", 0.0))
 
 	var st = SurfaceTool.new()
 	st.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for t in range(0, tris.size(), 3):
-		_osm_surface_roof_vertex(st, poly[int(tris[t])], height)
-		_osm_surface_roof_vertex(st, poly[int(tris[t + 1])], height)
-		_osm_surface_roof_vertex(st, poly[int(tris[t + 2])], height)
+		_osm_surface_roof_vertex(st, poly[int(tris[t])], effective_height)
+		_osm_surface_roof_vertex(st, poly[int(tris[t + 1])], effective_height)
+		_osm_surface_roof_vertex(st, poly[int(tris[t + 2])], effective_height)
 	for i in range(poly.size()):
-		_osm_surface_wall_edge(st, poly[i], poly[(i + 1) % poly.size()], height, mesh_centroid)
+		_osm_surface_wall_edge(st, poly[i], poly[(i + 1) % poly.size()], effective_height, mesh_centroid)
 	var mesh = st.commit()
 	if mesh == null:
 		return false
@@ -2097,7 +2130,7 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 	for footprint_point in poly:
 		footprint_centre += footprint_point
 	footprint_centre /= float(poly.size())
-	var base_y := float(building.get("ground_y", _terrain_height(footprint_centre))) if mobile_mode else 0.0
+	var base_y := float(foundation.get("base_y", 0.0)) if mobile_mode else 0.0
 	body.position.y = base_y
 	body.name = "OSMFootprint_%d" % seed
 	body.set_meta("terrain_base_y", base_y)
@@ -2115,12 +2148,12 @@ func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float
 	var collision = CollisionShape3D.new()
 	collision.shape = mesh.create_trimesh_shape()
 	body.add_child(collision)
-	var custom_landmark_visual := _add_named_landmark_body_visual(body, poly, height, building)
+	var custom_landmark_visual := _add_named_landmark_body_visual(body, poly, effective_height, building)
 	if custom_landmark_visual:
 		visual.visible = false
 	else:
-		_add_exact_osm_facade_detail(body, poly, height, seed, building)
-	_add_named_landmark_signature(body, poly, height, building)
+		_add_exact_osm_facade_detail(body, poly, effective_height, seed, building)
+	_add_named_landmark_signature(body, poly, effective_height, building)
 	parent.add_child(body)
 	return true
 
@@ -2743,6 +2776,7 @@ func _on_map_ready(map_data: Dictionary):
 			map_segments.append([[a.x, a.y], [b.x, b.y], width, kind, oneway, road_name, road_ref])
 
 	var exact_building_count := 0
+	var mobile_collision_buildings: Array = []
 	var mobile_visual_only_building_count := 0
 	var fallback_building_count := 0
 	var runtime_road_conflict_culled := 0
@@ -2772,9 +2806,14 @@ func _on_map_ready(map_data: Dictionary):
 		var kind = str(building.get("kind", "yes"))
 		var exact_detail_origin := detail_origin if mobile_mode else Vector2.ZERO
 		var building_distance := Vector2(cx, cz).distance_to(exact_detail_origin)
-		if mobile_mode and building_distance <= 240.0 and _building_hits_drivable_centerline(building):
+		# Rendering and physics share one road corridor rule. If an OSM footprint
+		# overlaps the actual carriageway, omit it at every mobile distance rather
+		# than allowing a distant block to become a building in the road.
+		if mobile_mode and _building_hits_drivable_centerline(building):
 			runtime_road_conflict_culled += 1
 			continue
+		if mobile_mode:
+			mobile_collision_buildings.append(building)
 		var visual_building: Dictionary = building
 		var commercial_pois: Array = []
 		if (pc_max_mode and not low_spec_mode) or (mobile_mode and building_distance <= MOBILE_FACADE_RADIUS):
@@ -2838,6 +2877,8 @@ func _on_map_ready(map_data: Dictionary):
 		car.set_meta("map_rail_segment_count", int(identity_counts.get("rail_segments", 0)))
 		car.set_meta("map_road_annotation_count", mapped_road_annotation_count)
 		car.set_meta("map_road_segments", map_segments)
+		if mobile_mode and car.has_method("set_mobile_collision_geometry"):
+			car.set_mobile_collision_geometry(mobile_collision_buildings)
 		if not map_opening_placed:
 			_place_car_for_first_impression(car, roads, buildings, poi_features, point_features)
 			map_opening_placed = true
