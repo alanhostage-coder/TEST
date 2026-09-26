@@ -1070,6 +1070,32 @@ func _landmark_front_frame(poly: PackedVector2Array) -> Dictionary:
 		"angle": atan2(tangent.x, tangent.y)
 	}
 
+func _decorate_landmark_box(body: Node3D, center: Vector2, depth: float, length: float, height: float, tangent: Vector2, inward: Vector2, angle: float, front_slots: int, side_slots: int):
+	# The landmark body volumes are deliberately simplified for Android, but they
+	# still need architectural rhythm from every approach. Add cheap window bays
+	# to all four faces so a side/rear view never degenerates into a blank slab.
+	var window_y := minf(height - 0.9, maxf(1.9, height * 0.48))
+	var window_h := minf(2.45, maxf(1.55, height * 0.42))
+	var front_step := minf(3.1, length / maxf(2.0, float(front_slots)))
+	var side_step := minf(3.0, depth / maxf(2.0, float(side_slots)))
+	for face_sign in [-1.0, 1.0]:
+		var face_center := center + inward * float(face_sign) * (depth * 0.5 + 0.05)
+		for slot in range(front_slots):
+			var offset := (float(slot) - float(front_slots - 1) * 0.5) * front_step
+			var p := face_center + tangent * offset
+			_mobile_facade_box(body, Vector3(p.x, window_y, p.y), Vector3(0.075, window_h + 0.18, 1.28), tenement_sash_frame_mat, angle, 430.0)
+			var recessed := p - inward * float(face_sign) * 0.065
+			_mobile_facade_box(body, Vector3(recessed.x, window_y, recessed.y), Vector3(0.05, window_h, 1.02), tenement_sash_glass_mat, angle, 430.0)
+	for side_sign in [-1.0, 1.0]:
+		var face_center := center + tangent * float(side_sign) * (length * 0.5 + 0.05)
+		for slot in range(side_slots):
+			var offset := (float(slot) - float(side_slots - 1) * 0.5) * side_step
+			var p := face_center + inward * offset
+			_mobile_facade_box(body, Vector3(p.x, window_y, p.y), Vector3(0.075, window_h + 0.18, 1.28), tenement_sash_frame_mat, angle + PI * 0.5, 430.0)
+			var recessed := p - tangent * float(side_sign) * 0.065
+			_mobile_facade_box(body, Vector3(recessed.x, window_y, recessed.y), Vector3(0.05, window_h, 1.02), tenement_sash_glass_mat, angle + PI * 0.5, 430.0)
+
+
 func _add_named_landmark_body_visual(body: Node3D, poly: PackedVector2Array, height: float, building: Dictionary) -> bool:
 	if not mobile_mode:
 		return false
@@ -1081,6 +1107,7 @@ func _add_named_landmark_body_visual(body: Node3D, poly: PackedVector2Array, hei
 		return false
 	var centroid: Vector2 = frame["centroid"]
 	var front_mid: Vector2 = frame["mid"]
+	var tangent: Vector2 = frame["tangent"]
 	var inward: Vector2 = frame["inward"]
 	var angle: float = frame["angle"]
 	if lower == "bellfield community hub":
@@ -1091,7 +1118,9 @@ func _add_named_landmark_body_visual(body: Node3D, poly: PackedVector2Array, hei
 		var rear_block := front_mid + inward * 22.0
 		_rotated_visual_box(body, Vector3(rear_block.x, 3.10, rear_block.y), Vector3(22.0, 6.2, 22.0), sandstone_mat, angle, 430.0)
 		_rotated_visual_box(body, Vector3(front_block.x, 7.18, front_block.y), Vector3(14.3, 0.22, 26.3), roof_mat, angle, 440.0)
-		body.set_meta("landmark_body_visual", "bellfield-georgian-volumes-v1")
+		_decorate_landmark_box(body, front_block, 14.0, 26.0, 7.1, tangent, inward, angle, 6, 3)
+		_decorate_landmark_box(body, rear_block, 22.0, 22.0, 6.2, tangent, inward, angle, 5, 4)
+		body.set_meta("landmark_body_visual", "bellfield-georgian-volumes-v2")
 	else:
 		# St Mark's is fundamentally a square villa-like church in its own grounds.
 		# A compact central body lets the Doric porch and dome read from the High St.
@@ -1099,7 +1128,9 @@ func _add_named_landmark_body_visual(body: Node3D, poly: PackedVector2Array, hei
 		_rotated_visual_box(body, Vector3(centroid.x, 6.98, centroid.y), Vector3(18.2, 0.22, 19.2), roof_mat, angle, 430.0)
 		var chancel := centroid + inward * 10.4
 		_rotated_visual_box(body, Vector3(chancel.x, 2.95, chancel.y), Vector3(7.2, 5.9, 8.8), sandstone_mat, angle, 400.0)
-		body.set_meta("landmark_body_visual", "st-marks-villa-volume-v1")
+		_decorate_landmark_box(body, centroid, 17.8, 18.8, 6.9, tangent, inward, angle, 4, 4)
+		_decorate_landmark_box(body, chancel, 7.2, 8.8, 5.9, tangent, inward, angle, 2, 2)
+		body.set_meta("landmark_body_visual", "st-marks-villa-volume-v2")
 	return true
 
 func _add_named_landmark_signature(body: Node3D, poly: PackedVector2Array, height: float, building: Dictionary):
@@ -1500,6 +1531,21 @@ func _add_mobile_osm_facade_detail(body: Node3D, poly: PackedVector2Array, heigh
 		if road_distance <= 18.0 and score < best_score:
 			best_score = score
 			best_edge = edge_index
+	if best_edge < 0 and centroid.distance_to(car2) <= 125.0:
+		# A set-back building can be close to the driver without any edge sitting
+		# within the road-distance threshold. In that case decorate the wall the
+		# driver can actually see rather than leaving a giant blank side elevation.
+		var nearest_car_edge_score := INF
+		for edge_index in range(poly.size()):
+			var ep0: Vector2 = poly[edge_index]
+			var ep1: Vector2 = poly[(edge_index + 1) % poly.size()]
+			if ep0.distance_to(ep1) < 5.0:
+				continue
+			var candidate_mid := (ep0 + ep1) * 0.5
+			var candidate_score := candidate_mid.distance_squared_to(car2)
+			if candidate_score < nearest_car_edge_score:
+				nearest_car_edge_score = candidate_score
+				best_edge = edge_index
 	if best_edge < 0:
 		return
 

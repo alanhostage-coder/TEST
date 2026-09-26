@@ -92,7 +92,7 @@ func run() -> void:
 			var focus_direction: Vector2 = (point - p).normalized()
 			if focus_direction.length() > 0.5:
 				var focus_heading: float = atan2(-focus_direction.x, -focus_direction.y)
-				car.camera_yaw = clampf(wrapf(focus_heading - car.rotation.y, -PI, PI), -1.45, 1.45)
+				car.camera_yaw = clampf(wrapf(focus_heading - car.rotation.y, -PI, PI), -2.80, 2.80)
 				car.look_touching = true
 		car.camera_pitch = 0.0
 		car.camera_idle = 0.0
