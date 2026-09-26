@@ -276,13 +276,13 @@ func _tenement_texture_mat(path: String, tint: Color, roughness: float):
 		material.albedo_texture = texture
 		material.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS_ANISOTROPIC
 		material.texture_repeat = true
-		if mobile_mode:
-			# A tiny texture-matched emission term keeps sash/stone detail visible on
-			# walls facing away from the sun without flattening the daytime lighting.
+		if source_terrain_mode:
+			# Low-cost ambient facade fill. This keeps the Edinburgh street wall
+			# readable on the shaded side without needing expensive extra lights.
 			material.emission_enabled = true
-			material.emission = Color(0.18, 0.17, 0.15)
+			material.emission = Color(0.16, 0.15, 0.135)
 			material.emission_texture = texture
-			material.emission_energy_multiplier = 0.32
+			material.emission_energy_multiplier = 0.18 if thinkpad_mode else 0.32
 	return material
 
 func _mat(color: Color, roughness: float, metallic: float):
@@ -2089,9 +2089,19 @@ func _mobile_visual_height(building: Dictionary, base_height: float, building_di
 	var kind := str(building.get("kind", "yes")).to_lower()
 	if kind in ["garage", "garages", "shed", "roof", "industrial", "warehouse"]:
 		return base_height
+	var size = building.get("size", [])
+	if thinkpad_mode and building_distance <= 260.0:
+		# EH15 is dominated by two-to-four-storey stone street walls. OSM often
+		# omits height/storeys, so keep the source footprint exact but use a restrained
+		# local typology estimate instead of defaulting half the district to 6 m boxes.
+		if kind in ["apartments", "residential", "terrace", "yes"]:
+			if size is Array and size.size() >= 2 and maxf(float(size[0]), float(size[1])) >= 14.0:
+				return maxf(base_height, 10.4)
+			return maxf(base_height, 8.8)
+		if kind in ["house", "detached", "semidetached_house"]:
+			return maxf(base_height, 6.7)
 	if has_commercial_frontage and building_distance <= 380.0:
 		return maxf(base_height, 9.2)
-	var size = building.get("size", [])
 	if building_distance <= 380.0 and size is Array and size.size() >= 2:
 		var sx := float(size[0])
 		var sz := float(size[1])
@@ -2118,7 +2128,75 @@ func _mobile_foundation_frame(poly: PackedVector2Array, fallback: Vector2) -> Di
 		"terrain_span": max_y - min_y
 	}
 
+func _add_thinkpad_osm_building(parent: Node3D, building: Dictionary, height: float, seed: int) -> bool:
+	var footprint = building.get("footprint", [])
+	if not footprint is Array or footprint.size() < 3:
+		return false
+	var poly := PackedVector2Array()
+	for point in footprint:
+		if point is Array and point.size() >= 2:
+			poly.append(Vector2(float(point[0]), float(point[1])))
+	if poly.size() > 2 and poly[0].distance_squared_to(poly[poly.size() - 1]) < 0.01:
+		poly.resize(poly.size() - 1)
+	if poly.size() < 3:
+		return false
+	var tris := Geometry2D.triangulate_polygon(poly)
+	if tris.size() < 3:
+		return false
+	var centroid := Vector2.ZERO
+	for p in poly:
+		centroid += p
+	centroid /= float(poly.size())
+	var foundation := _mobile_foundation_frame(poly, centroid)
+	var effective_height := height + float(foundation.get("height_lift", 0.0))
+	var body := Node3D.new()
+	body.name = "ThinkPadOSM_%d" % seed
+	body.position.y = float(foundation.get("base_y", _terrain_height(centroid)))
+	body.set_meta("osm_id", int(building.get("osm_id", 0)))
+	body.set_meta("osm_kind", str(building.get("kind", "")))
+	body.set_meta("terrain_base_y", body.position.y)
+
+	var custom_landmark_visual := _add_named_landmark_body_visual(body, poly, effective_height, building)
+	if not custom_landmark_visual:
+		var wall_surface := SurfaceTool.new()
+		wall_surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for i in range(poly.size()):
+			_osm_surface_wall_edge(wall_surface, poly[i], poly[(i + 1) % poly.size()], effective_height, centroid)
+		var wall_mesh := wall_surface.commit()
+		if wall_mesh:
+			var walls := MeshInstance3D.new()
+			walls.name = "StreetWalls"
+			walls.mesh = wall_mesh
+			walls.material_override = _osm_building_material(building, seed)
+			walls.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			walls.visibility_range_end = 230.0
+			body.add_child(walls)
+
+		var roof_surface := SurfaceTool.new()
+		roof_surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+		for t in range(0, tris.size(), 3):
+			# Triangulator winding varies; roof material is two-sided in source mode.
+			_osm_surface_roof_vertex(roof_surface, poly[int(tris[t])], effective_height)
+			_osm_surface_roof_vertex(roof_surface, poly[int(tris[t + 1])], effective_height)
+			_osm_surface_roof_vertex(roof_surface, poly[int(tris[t + 2])], effective_height)
+		var roof_mesh := roof_surface.commit()
+		if roof_mesh:
+			var roof := MeshInstance3D.new()
+			roof.name = "Roof"
+			roof.mesh = roof_mesh
+			roof.material_override = roof_mat
+			roof.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			roof.visibility_range_end = 230.0
+			body.add_child(roof)
+		if _uses_generic_edinburgh_tenement_texture(building):
+			generic_tenement_facade_count += 1
+	_add_named_landmark_signature(body, poly, effective_height, building)
+	parent.add_child(body)
+	return true
+
 func _add_exact_osm_building(parent: Node3D, building: Dictionary, height: float, seed: int) -> bool:
+	if thinkpad_mode:
+		return _add_thinkpad_osm_building(parent, building, height, seed)
 	var footprint = building.get("footprint", [])
 	if not footprint is Array or footprint.size() < 3:
 		return false
