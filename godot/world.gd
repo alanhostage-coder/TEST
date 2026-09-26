@@ -206,6 +206,19 @@ func _make_materials():
 	retail_zone_mat = _mat(Color(0.22, 0.225, 0.22), 0.94, 0.0)
 	industrial_zone_mat = _mat(Color(0.175, 0.18, 0.18), 0.96, 0.0)
 	commercial_zone_mat = _mat(Color(0.245, 0.24, 0.225), 0.94, 0.0)
+	if thinkpad_mode:
+		# Deliberately restrained, readable palette: road and terrain carry the scene,
+		# while Edinburgh sandstone stays warm enough to read without becoming a wall
+		# of identical beige blocks.
+		asphalt_mat.albedo_color = Color(0.075, 0.080, 0.082)
+		ground_mat.albedo_color = Color(0.205, 0.245, 0.185)
+		sandstone_mat.albedo_color = Color(0.50, 0.455, 0.37)
+		sandstone_warm_mat.albedo_color = Color(0.46, 0.395, 0.30)
+		soot_stone_mat.albedo_color = Color(0.29, 0.30, 0.285)
+		pavement_mat.albedo_color = Color(0.31, 0.315, 0.30)
+		kerb_mat.albedo_color = Color(0.43, 0.43, 0.40)
+		sea_mat.albedo_color = Color(0.095, 0.245, 0.31)
+		beach_mat.albedo_color = Color(0.58, 0.52, 0.40)
 	var mobile_facade_texture := "res://assets/edinburgh_tenement/walls/edin_ten_facade_windows_v2.png"
 	var weathered_texture := mobile_facade_texture if mobile_mode else "res://assets/edinburgh_tenement/walls/edin_ten_wall_weathered_a_alb.png"
 	var warm_texture := mobile_facade_texture if mobile_mode else "res://assets/edinburgh_tenement/walls/edin_ten_wall_warm_a_alb.png"
@@ -2315,8 +2328,8 @@ func _add_mobile_terrain_surface(parent: Node3D, centre: Vector2):
 	var stream = get_node_or_null("MapStream")
 	if stream == null or not stream.has_method("terrain_available") or not bool(stream.terrain_available()):
 		return
-	var step := 20.0 if thinkpad_mode else 12.5
-	var radius := 420.0 if thinkpad_mode else 500.0
+	var step := 24.0 if thinkpad_mode else 12.5
+	var radius := 540.0 if thinkpad_mode else 500.0
 	var cols := int(floor((radius * 2.0) / step)) + 1
 	var rows := cols
 	var start := centre - Vector2(radius, radius)
@@ -2665,6 +2678,11 @@ func _apply_weather_visuals():
 			env.ambient_light_energy = lerp(1.46, 1.08, cloud) * lerp(1.0, 0.96, wetness)
 			env.ambient_light_color = Color(0.76, 0.74, 0.69).lerp(Color(0.56, 0.59, 0.60), cloud)
 			env.tonemap_exposure = lerp(1.38, 1.22, cloud)
+		elif thinkpad_mode:
+			env.ambient_light_energy = lerp(1.16, 0.92, cloud)
+			env.ambient_light_color = Color(0.70, 0.70, 0.65).lerp(Color(0.53, 0.57, 0.58), cloud)
+			env.tonemap_exposure = lerp(1.30, 1.16, cloud)
+			env.fog_density *= 0.78
 		elif xps_9530_mode:
 			env.ambient_light_energy = lerp(0.94, 0.74, cloud) * lerp(1.0, 0.94, wetness)
 			env.ambient_light_color = Color(0.61, 0.61, 0.58).lerp(Color(0.44, 0.48, 0.50), cloud)
@@ -2811,7 +2829,7 @@ func _on_map_ready(map_data: Dictionary):
 		var sz = max(2.0, float(size[1]))
 		var cx = float(center[0])
 		var cz = float(center[1])
-		var building_visual_radius := 360.0 if thinkpad_mode else MOBILE_BUILDING_VISUAL_RADIUS
+		var building_visual_radius := 220.0 if thinkpad_mode else MOBILE_BUILDING_VISUAL_RADIUS
 		if source_terrain_mode and Vector2(cx, cz).distance_to(detail_origin) > building_visual_radius:
 			continue
 		var seed = int(abs(cx * 17.0 + cz * 31.0 + sx * 11.0 + sz * 7.0))
@@ -2834,7 +2852,7 @@ func _on_map_ready(map_data: Dictionary):
 				visual_building = building.duplicate(true)
 				visual_building["_mapped_commercial_pois"] = commercial_pois
 		h = _mobile_visual_height(visual_building, h, building_distance, not commercial_pois.is_empty())
-		var exact_radius = (165.0 if thinkpad_mode else MOBILE_COLLIDING_BUILDING_RADIUS) if source_terrain_mode else (LOW_SPEC_EXACT_FOOTPRINT_RADIUS if low_spec_mode else (620.0 if pc_max_mode else 260.0))
+		var exact_radius = (135.0 if thinkpad_mode else MOBILE_COLLIDING_BUILDING_RADIUS) if source_terrain_mode else (LOW_SPEC_EXACT_FOOTPRINT_RADIUS if low_spec_mode else (620.0 if pc_max_mode else 260.0))
 		var exact = building_distance <= exact_radius and _add_exact_osm_building(map_root, visual_building, h, seed)
 		if exact:
 			exact_building_count += 1
