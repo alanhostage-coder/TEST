@@ -30,6 +30,8 @@ jobs:
           if [ -d /root/.local/share/godot/export_templates/4.5.1.stable ]; then
             cp -a /root/.local/share/godot/export_templates/4.5.1.stable "$HOME/.local/share/godot/export_templates/"
           fi
+          apt-get update -qq
+          DEBIAN_FRONTEND=noninteractive apt-get install -y -qq xvfb xauth libfontconfig1 libxcursor1 libxinerama1 libxi6 libxrandr2 libxkbcommon-x11-0 libgl1 libegl1
           godot --version
           test -d "$HOME/.local/share/godot/export_templates/4.5.1.stable"
 
@@ -62,27 +64,53 @@ jobs:
           grep -q 'const START_POSTCODE := "EH15 2BZ"' godot/map_stream.gd
           grep -q 'const MAX_SURFACES := 5' godot/bay_projection.gd
 
+      - name: ThinkPad 960x540 render proof
+        run: |
+          mkdir -p build/thinkpad-proof
+          set +e
+          timeout 90s xvfb-run -a godot --path godot --display-driver x11 --resolution 960x540 --script res://thinkpad_render_proof.gd > /tmp/pua-thinkpad-proof.log 2>&1
+          status=$?
+          set -e
+          cat /tmp/pua-thinkpad-proof.log
+          test "$status" -eq 0
+          grep -q 'PUA_THINKPAD_RENDER_OK' /tmp/pua-thinkpad-proof.log
+          test -s /tmp/pua-thinkpad-proof/opening.png
+          test -s /tmp/pua-thinkpad-proof/pitville-street.png
+          test -s /tmp/pua-thinkpad-proof/hugh-dewar-fountain.png
+          test -s /tmp/pua-thinkpad-proof/bellfield-community-hub.png
+          test -s /tmp/pua-thinkpad-proof/st-marks-church.png
+          cp /tmp/pua-thinkpad-proof/*.png build/thinkpad-proof/
+          cp /tmp/pua-thinkpad-proof.log build/thinkpad-proof/
+
+      - name: Upload ThinkPad render proof
+        uses: actions/upload-artifact@v4
+        with:
+          name: PUA-0.80-THINKPAD-RENDER
+          path: build/thinkpad-proof/
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Export portable Windows x64
         run: |
           mkdir -p build/thinkpad
           EXPORT_DIR="$(readlink -f build/thinkpad)"
-          godot --headless --verbose --path godot --export-release "Windows Desktop" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_THINKPAD.exe"
+          godot --headless --verbose --path godot --export-release "Windows Desktop" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_80_THINKPAD.exe"
           godot --headless --verbose --path godot --export-release "Windows Projector Max" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_PROJECTOR_MAX.exe"
           godot --headless --verbose --path godot --export-release "Windows PC Max" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe"
-          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_THINKPAD.exe"
+          test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_80_THINKPAD.exe"
           test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_PROJECTOR_MAX.exe"
           test -s "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe"
-          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_THINKPAD.exe" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_PROJECTOR_MAX.exe" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe"
+          ls -lh "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_80_THINKPAD.exe" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_PROJECTOR_MAX.exe" "$EXPORT_DIR/PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe"
           cd "$EXPORT_DIR"
           cat > PLAY_PUA_THINKPAD.cmd <<'EOF'
           @echo off
           cd /d "%~dp0"
-          PROCEED_UNTIL_APPREHENDED_0_76_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 960x540
+          PROCEED_UNTIL_APPREHENDED_0_80_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 960x540
           EOF
           cat > PLAY_PUA_POTATO.cmd <<'EOF'
           @echo off
           cd /d "%~dp0"
-          PROCEED_UNTIL_APPREHENDED_0_76_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 800x450
+          PROCEED_UNTIL_APPREHENDED_0_80_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 800x450
           EOF
           cat > PLAY_PUA_PROJECTOR_MAX.cmd <<'EOF'
           @echo off
@@ -100,9 +128,9 @@ jobs:
           PROCEED_UNTIL_APPREHENDED_0_76_PROJECTOR_MAX.exe --rendering-method gl_compatibility --rendering-driver opengl3 --fullscreen
           EOF
           cat > README-THINKPAD.txt <<'EOF'
-          PROCEED UNTIL APPREHENDED 0.76 - THINKPAD LOW SPEC
+          PROCEED UNTIL APPREHENDED 0.80 - THINKPAD FOCUSED BUILD
 
-          PLAY_PUA_THINKPAD.cmd = normal low-spec game.
+          PLAY_PUA_THINKPAD.cmd = normal ThinkPad-focused game.
           PLAY_PUA_POTATO.cmd = emergency 800x450 fallback.
           Source-dated EH15 2BZ OSM patch, five/three-surface calibration and controller support.
           EOF
@@ -138,24 +166,24 @@ jobs:
           Use BAY WINDOW in-game, then LAYOUT to switch between five and three views.
           The OSM panel names the nearest mapped road and source date; M toggles it.
           EOF
-          sha256sum PROCEED_UNTIL_APPREHENDED_0_76_THINKPAD.exe > SHA256-THINKPAD.txt
+          sha256sum PROCEED_UNTIL_APPREHENDED_0_80_THINKPAD.exe > SHA256-THINKPAD.txt
           sha256sum PROCEED_UNTIL_APPREHENDED_0_76_PROJECTOR_MAX.exe > SHA256-PROJECTOR-MAX.txt
           sha256sum PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe > SHA256-PC-MAX.txt
-          zip -9 PUA-0.76-THINKPAD.zip PROCEED_UNTIL_APPREHENDED_0_76_THINKPAD.exe PLAY_PUA_THINKPAD.cmd PLAY_PUA_POTATO.cmd README-THINKPAD.txt SHA256-THINKPAD.txt
+          zip -9 PUA-0.80-THINKPAD.zip PROCEED_UNTIL_APPREHENDED_0_80_THINKPAD.exe PLAY_PUA_THINKPAD.cmd PLAY_PUA_POTATO.cmd README-THINKPAD.txt SHA256-THINKPAD.txt
           zip -9 PUA-0.76-PROJECTOR-MAX.zip PROCEED_UNTIL_APPREHENDED_0_76_PROJECTOR_MAX.exe PLAY_PUA_PROJECTOR_MAX.cmd PLAY_PUA_PROJECTOR_SAFE.cmd PLAY_PUA_PROJECTOR_FULLSCREEN.cmd README-PROJECTOR-MAX.txt SHA256-PROJECTOR-MAX.txt
           zip -9 PUA-0.76-PC-MAX.zip PROCEED_UNTIL_APPREHENDED_0_76_PC_MAX.exe PLAY_PUA_PC_MAX.cmd README-PC-MAX.txt SHA256-PC-MAX.txt
 
       - name: Upload portable ThinkPad build
         uses: actions/upload-artifact@v4
         with:
-          name: PUA-0.76-THINKPAD
+          name: PUA-0.80-THINKPAD
           path: |
-            build/thinkpad/PROCEED_UNTIL_APPREHENDED_0_76_THINKPAD.exe
+            build/thinkpad/PROCEED_UNTIL_APPREHENDED_0_80_THINKPAD.exe
             build/thinkpad/PLAY_PUA_THINKPAD.cmd
             build/thinkpad/PLAY_PUA_POTATO.cmd
             build/thinkpad/README-THINKPAD.txt
             build/thinkpad/SHA256-THINKPAD.txt
-            build/thinkpad/PUA-0.76-THINKPAD.zip
+            build/thinkpad/PUA-0.80-THINKPAD.zip
           if-no-files-found: error
           retention-days: 30
 
