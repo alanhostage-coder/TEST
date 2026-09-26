@@ -53,7 +53,7 @@ func _ready():
 	previous_position = global_position
 
 func _source_terrain_enabled() -> bool:
-	return OS.has_feature("mobile") 		or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1" 		or OS.has_feature("thinkpad_low") 		or OS.get_environment("PUA_FORCE_THINKPAD_TEST") == "1"
+	return OS.has_feature("mobile") 		or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1" 		or (OS.has_feature("thinkpad_low") and not OS.has_feature("projector_max")) 		or OS.get_environment("PUA_FORCE_THINKPAD_TEST") == "1"
 
 func set_drive_surface_segments(segments: Array):
 	drive_road_cells.clear()
