@@ -105,7 +105,7 @@ jobs:
           cat > PLAY_PUA_THINKPAD.cmd <<'EOF'
           @echo off
           cd /d "%~dp0"
-          PROCEED_UNTIL_APPREHENDED_0_80_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 960x540
+          PROCEED_UNTIL_APPREHENDED_0_80_THINKPAD.exe --rendering-method gl_compatibility --rendering-driver opengl3 --resolution 1280x720
           EOF
           cat > PLAY_PUA_POTATO.cmd <<'EOF'
           @echo off
@@ -130,7 +130,7 @@ jobs:
           cat > README-THINKPAD.txt <<'EOF'
           PROCEED UNTIL APPREHENDED 0.80 - THINKPAD FOCUSED BUILD
 
-          PLAY_PUA_THINKPAD.cmd = normal ThinkPad-focused game.
+          PLAY_PUA_THINKPAD.cmd = normal ThinkPad-focused game at 1280x720.
           PLAY_PUA_POTATO.cmd = emergency 800x450 fallback.
           Source-dated EH15 2BZ OSM patch, five/three-surface calibration and controller support.
           EOF
