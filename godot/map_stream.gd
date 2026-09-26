@@ -66,10 +66,16 @@ func _ready():
 		location_ready.emit(center_lat, center_lon, resolved_postcode)
 		map_ready.emit(data)
 		return
-	# ThinkPad gets the packaged EH15 elevation field without turning on the much
-	# heavier full-EH15 mobile tile streamer.
-	if OS.has_feature("thinkpad_low") or forced_thinkpad:
-		_load_full_eh15_elevation()
+	var thinkpad_stream := (OS.has_feature("thinkpad_low") and not OS.has_feature("projector_max")) or forced_thinkpad
+	if thinkpad_stream and _load_full_eh15_manifest():
+		# Slow-Roads-style strategy: only the local Edinburgh neighbourhood is live.
+		# The real OSM graph can cover all EH15 without drawing the whole postcode.
+		_load_district_destinations()
+		_load_full_eh15_window(Vector2.ZERO, false)
+		_rebuild_named_road_index()
+		location_ready.emit(center_lat, center_lon, resolved_postcode)
+		map_ready.emit(data)
+		return
 	var cache_fresh = _load_cache()
 	if not cache_fresh:
 		_load_packaged_patch()
@@ -225,9 +231,12 @@ func _load_full_eh15_window(local_position: Vector2, emit_change: bool) -> bool:
 			ranked.append({"tile": raw_tile, "d2": _distance_sq_to_tile(raw_tile, local_position)})
 	ranked.sort_custom(func(a, b): return float(a["d2"]) < float(b["d2"]))
 	var chosen: Array = []
-	var radius_sq := MOBILE_STREAM_RADIUS_METERS * MOBILE_STREAM_RADIUS_METERS
+	var thinkpad_stream := (OS.has_feature("thinkpad_low") and not OS.has_feature("projector_max")) or OS.get_environment("PUA_FORCE_THINKPAD_TEST") == "1"
+	var stream_radius := 380.0 if thinkpad_stream else MOBILE_STREAM_RADIUS_METERS
+	var max_active_tiles := 2 if thinkpad_stream else MOBILE_MAX_ACTIVE_TILES
+	var radius_sq := stream_radius * stream_radius
 	for item in ranked:
-		if chosen.size() >= MOBILE_MAX_ACTIVE_TILES:
+		if chosen.size() >= max_active_tiles:
 			break
 		if float(item["d2"]) <= radius_sq or chosen.is_empty():
 			chosen.append(item["tile"])
