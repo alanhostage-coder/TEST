@@ -2503,9 +2503,9 @@ func _add_source_terrain_grid(parent: Node3D, centre: Vector2, radius: float, st
 			var v10 := Vector3(x1, _terrain_render_height(p10) - sink, z0)
 			var v01 := Vector3(x0, _terrain_render_height(p01) - sink, z1)
 			var v11 := Vector3(x1, _terrain_render_height(p11) - sink, z1)
-			# Counter-clockwise from above. The previous order generated DOWN normals,
-			# which is exactly why the ThinkPad screenshot showed terrain as a ceiling.
-			for v in [v00, v01, v11, v00, v11, v10]:
+			# Godot's SurfaceTool front-face winding in this project expects this
+			# order for an upward-facing terrain normal. The visual gate asserts it.
+			for v in [v00, v10, v11, v00, v11, v01]:
 				surface.add_vertex(v)
 	surface.generate_normals()
 	var terrain_mesh := surface.commit()
