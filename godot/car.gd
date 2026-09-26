@@ -40,14 +40,59 @@ var terrain_pitch := 0.0
 const MOBILE_RECOVER_RECT := Rect2(18.0, 42.0, 118.0, 46.0)
 const MOBILE_BUILDING_CELL := 36.0
 const MOBILE_CAR_RADIUS := 1.05
+const DRIVE_ROAD_CELL := 48.0
 var mobile_building_cells := {}
 var mobile_collision_footprint_count := 0
+var drive_road_cells := {}
+var drive_road_segments: Array = []
 
 
 func _ready():
 	_build_visual_shell()
 	_load_state()
 	previous_position = global_position
+
+func _source_terrain_enabled() -> bool:
+	return OS.has_feature("mobile") 		or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1" 		or OS.has_feature("thinkpad_low") 		or OS.get_environment("PUA_FORCE_THINKPAD_TEST") == "1"
+
+func set_drive_surface_segments(segments: Array):
+	drive_road_cells.clear()
+	drive_road_segments = segments.duplicate(true)
+	for segment_index in range(drive_road_segments.size()):
+		var segment = drive_road_segments[segment_index]
+		if not segment is Array or segment.size() < 4:
+			continue
+		var kind := str(segment[3]).to_lower()
+		if kind in ["track", "path", "footway", "cycleway"]:
+			continue
+		var a := Vector2(float(segment[0][0]), float(segment[0][1]))
+		var b := Vector2(float(segment[1][0]), float(segment[1][1]))
+		var margin := maxf(2.0, float(segment[2]) * 0.5 + 1.5)
+		var min_cell := Vector2i(floori((minf(a.x, b.x) - margin) / DRIVE_ROAD_CELL), floori((minf(a.y, b.y) - margin) / DRIVE_ROAD_CELL))
+		var max_cell := Vector2i(floori((maxf(a.x, b.x) + margin) / DRIVE_ROAD_CELL), floori((maxf(a.y, b.y) + margin) / DRIVE_ROAD_CELL))
+		for cx in range(min_cell.x, max_cell.x + 1):
+			for cz in range(min_cell.y, max_cell.y + 1):
+				var key := Vector2i(cx, cz)
+				if not drive_road_cells.has(key):
+					drive_road_cells[key] = []
+				drive_road_cells[key].append(segment_index)
+	set_meta("drive_surface_segment_count", drive_road_segments.size())
+	set_meta("drive_surface_cell_count", drive_road_cells.size())
+
+func _drive_segments_near(point: Vector2) -> Array:
+	if drive_road_cells.is_empty():
+		return drive_road_segments if not drive_road_segments.is_empty() else get_meta("map_road_segments", [])
+	var cell := Vector2i(floori(point.x / DRIVE_ROAD_CELL), floori(point.y / DRIVE_ROAD_CELL))
+	var result: Array = []
+	var seen := {}
+	for dx in range(-1, 2):
+		for dz in range(-1, 2):
+			for segment_index in drive_road_cells.get(cell + Vector2i(dx, dz), []):
+				if seen.has(segment_index):
+					continue
+				seen[segment_index] = true
+				result.append(drive_road_segments[int(segment_index)])
+	return result
 
 func set_mobile_collision_geometry(buildings: Array):
 	mobile_building_cells.clear()
@@ -295,7 +340,7 @@ func _physics_process(delta):
 	velocity = velocity.lerp(desired_velocity, 1.0 - exp(-delta * grip))
 	var before = global_position
 	move_and_slide()
-	if OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1":
+	if _source_terrain_enabled():
 		var before2 := Vector2(before.x, before.z)
 		var after2 := Vector2(global_position.x, global_position.z)
 		if _mobile_motion_hits_building(before2, after2):
@@ -334,7 +379,7 @@ func _physics_process(delta):
 
 
 func _mobile_terrain_height(point: Vector2) -> float:
-	if not (OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1"):
+	if not _source_terrain_enabled():
 		return 0.0
 	var stream = get_node_or_null("../MapStream")
 	if stream and stream.has_method("terrain_height_at"):
@@ -343,7 +388,7 @@ func _mobile_terrain_height(point: Vector2) -> float:
 
 func _mobile_drive_surface_height(point: Vector2) -> float:
 	var terrain_y := _mobile_terrain_height(point)
-	var segments = get_meta("map_road_segments", [])
+	var segments = _drive_segments_near(point)
 	if not segments is Array or segments.is_empty():
 		return terrain_y
 	var best_distance := INF
@@ -375,7 +420,7 @@ func _mobile_drive_surface_height(point: Vector2) -> float:
 	return terrain_y
 
 func _follow_mobile_terrain(delta: float):
-	if not (OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1"):
+	if not _source_terrain_enabled():
 		terrain_pitch = lerp(terrain_pitch, 0.0, 1.0 - exp(-delta * 4.0))
 		return
 	var p := Vector2(global_position.x, global_position.z)
@@ -397,9 +442,9 @@ func _follow_mobile_terrain(delta: float):
 	set_meta("mobile_surface_model", "2.5d_osm_corridor_v1")
 
 func _is_near_road() -> bool:
-	var segments = get_meta("map_road_segments", [])
+	var p = Vector2(global_position.x, global_position.z)
+	var segments = _drive_segments_near(p)
 	if segments is Array and not segments.is_empty():
-		var p = Vector2(global_position.x, global_position.z)
 		for segment in segments:
 			if not segment is Array or segment.size() < 3: continue
 			var a = Vector2(float(segment[0][0]), float(segment[0][1]))
@@ -431,7 +476,7 @@ func recover_to_road():
 			best = point.distance_squared_to(p)
 			target = point
 			heading = atan2(-d.x, -d.y)
-	global_position = Vector3(target.x, _mobile_terrain_height(target) + 0.58 if (OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1") else 0.58, target.y)
+	global_position = Vector3(target.x, _mobile_drive_surface_height(target) + 0.58 if _source_terrain_enabled() else 0.58, target.y)
 	rotation.y = heading
 	speed = 0.0
 	velocity = Vector3.ZERO
@@ -543,7 +588,11 @@ func _load_state():
 	var cfg = ConfigFile.new()
 	if cfg.load("user://pua_state.cfg") != OK: return
 	var saved_position = cfg.get_value("car", "position", global_position)
-	if saved_position is Vector3: global_position = saved_position
+	if saved_position is Vector3:
+		global_position = saved_position
+		if _source_terrain_enabled():
+			# X/Z may persist, but Y belongs to the current source-backed surface.
+			global_position.y = 0.58
 	rotation.y = float(cfg.get_value("car", "rotation_y", rotation.y))
 	distance_driven = float(cfg.get_value("car", "distance", 0.0))
 
