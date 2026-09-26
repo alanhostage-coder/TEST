@@ -78,7 +78,7 @@ func run() -> void:
 		_finish(2)
 		return
 	var opening_point := Vector2(car.global_position.x, car.global_position.z)
-	var expected_opening_y := car._mobile_drive_surface_height(opening_point) + 0.58
+	var expected_opening_y: float = float(car._mobile_drive_surface_height(opening_point)) + 0.58
 	if absf(car.global_position.y - expected_opening_y) > 0.08:
 		push_error("PUA_THINKPAD_RENDER_FAIL opening surface mismatch car=%.3f expected=%.3f" % [car.global_position.y, expected_opening_y])
 		_finish(2)
