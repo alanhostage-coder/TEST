@@ -57,13 +57,19 @@ var district_destinations: Array = []
 var terrain_profile: Dictionary = {}
 
 func _ready():
-	if (OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1") and _load_full_eh15_manifest():
+	var forced_mobile := OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1"
+	var forced_thinkpad := OS.get_environment("PUA_FORCE_THINKPAD_TEST") == "1"
+	if (OS.has_feature("mobile") or forced_mobile) and _load_full_eh15_manifest():
 		_load_district_destinations()
 		_load_full_eh15_window(Vector2.ZERO, false)
 		_rebuild_named_road_index()
 		location_ready.emit(center_lat, center_lon, resolved_postcode)
 		map_ready.emit(data)
 		return
+	# ThinkPad gets the packaged EH15 elevation field without turning on the much
+	# heavier full-EH15 mobile tile streamer.
+	if OS.has_feature("thinkpad_low") or forced_thinkpad:
+		_load_full_eh15_elevation()
 	var cache_fresh = _load_cache()
 	if not cache_fresh:
 		_load_packaged_patch()
