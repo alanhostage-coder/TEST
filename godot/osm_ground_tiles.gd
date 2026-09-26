@@ -75,6 +75,16 @@ func _on_location_ready(latitude: float, longitude: float, _postcode: String = "
 		_overlay_title.text = "OSM · %s  [M]" % _last_postcode
 	if abs(_center_lat) < 0.001 and abs(_center_lon) < 0.001:
 		return
+	# Android uses source-backed vector geometry plus terrain. Never place a flat
+	# slippy-map plane into the 3D world: once the car descends below that fixed Y,
+	# the two-sided raster becomes an enormous ceiling and can black out the sky.
+	if OS.has_feature("mobile") or OS.get_environment("PUA_FORCE_MOBILE_TEST") == "1":
+		_clear_tiles()
+		var mobile_car = get_node_or_null("../Car")
+		if mobile_car:
+			mobile_car.set_meta("osm_ground_tiles_loaded", 0)
+			mobile_car.set_meta("osm_ground_mode", "vector_terrain_only")
+		return
 	var sig = "%.6f:%.6f:%d" % [_center_lat, _center_lon, TILE_ZOOM]
 	if sig == _signature:
 		return
