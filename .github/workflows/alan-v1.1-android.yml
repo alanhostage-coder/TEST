@@ -1,8 +1,8 @@
-name: Build ALAN v1.1 APK
+name: Build ALAN v2 APK
 
 on:
   push:
-    branches: [ "alan-v1.1" ]
+    branches: [ "alan-v2-clean" ]
   workflow_dispatch:
 
 jobs:
@@ -21,6 +21,6 @@ jobs:
         run: gradle :app:assembleDebug --stacktrace
       - uses: actions/upload-artifact@v4
         with:
-          name: ALAN-v1.1-apk
+          name: ALAN-v2-apk
           path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
