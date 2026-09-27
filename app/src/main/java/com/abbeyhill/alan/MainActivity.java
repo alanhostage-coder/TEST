@@ -3,33 +3,44 @@ package com.abbeyhill.alan;
 import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
+import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.provider.Settings;
 import android.view.View;
 import android.view.WindowInsets;
 import android.view.WindowInsetsController;
+import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.widget.Toast;
 
 import androidx.webkit.WebViewAssetLoader;
+
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 
 public class MainActivity extends Activity {
     private static final int FILE_CHOOSER_REQUEST = 51;
     private static final int AUDIO_PERMISSION_REQUEST = 52;
+    private static final int SAVE_SONG_REQUEST = 53;
 
     private WebView webView;
     private ValueCallback<Uri[]> filePathCallback;
     private PermissionRequest pendingAudioRequest;
+    private String pendingSaveText;
+    private String pendingSaveName = "ALAN-song.alan";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        setRequestedOrientation(ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE);
         getWindow().getDecorView().setKeepScreenOn(true);
         hideSystemUi();
 
@@ -42,6 +53,8 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(true);
+
+        webView.addJavascriptInterface(new AlanBridge(), "AlanNative");
 
         WebViewAssetLoader assetLoader = new WebViewAssetLoader.Builder()
                 .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
@@ -58,11 +71,11 @@ public class MainActivity extends Activity {
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public boolean onShowFileChooser(WebView webView,
-                                             ValueCallback<Uri[]> filePathCallbackParam,
-                                             FileChooserParams fileChooserParams) {
+                                             ValueCallback<Uri[]> callback,
+                                             FileChooserParams params) {
                 if (filePathCallback != null) filePathCallback.onReceiveValue(null);
-                filePathCallback = filePathCallbackParam;
-                Intent intent = fileChooserParams.createIntent();
+                filePathCallback = callback;
+                Intent intent = params.createIntent();
                 try {
                     startActivityForResult(intent, FILE_CHOOSER_REQUEST);
                     return true;
@@ -100,6 +113,28 @@ public class MainActivity extends Activity {
         webView.loadUrl("https://appassets.androidplatform.net/assets/index.html");
     }
 
+    public final class AlanBridge {
+        @JavascriptInterface
+        public void saveSong(String json, String filename) {
+            runOnUiThread(() -> {
+                pendingSaveText = json;
+                pendingSaveName = (filename == null || filename.trim().isEmpty())
+                        ? "ALAN-song.alan"
+                        : filename.replaceAll("[^A-Za-z0-9._ -]", "_");
+                Intent intent = new Intent(Intent.ACTION_CREATE_DOCUMENT);
+                intent.addCategory(Intent.CATEGORY_OPENABLE);
+                intent.setType("application/json");
+                intent.putExtra(Intent.EXTRA_TITLE, pendingSaveName);
+                startActivityForResult(intent, SAVE_SONG_REQUEST);
+            });
+        }
+
+        @JavascriptInterface
+        public void toast(String message) {
+            runOnUiThread(() -> Toast.makeText(MainActivity.this, message, Toast.LENGTH_SHORT).show());
+        }
+    }
+
     private void hideSystemUi() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             WindowInsetsController controller = getWindow().getInsetsController();
@@ -122,6 +157,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+
         if (requestCode == FILE_CHOOSER_REQUEST && filePathCallback != null) {
             Uri[] results = null;
             if (resultCode == RESULT_OK && data != null) {
@@ -137,6 +173,22 @@ public class MainActivity extends Activity {
             }
             filePathCallback.onReceiveValue(results);
             filePathCallback = null;
+            return;
+        }
+
+        if (requestCode == SAVE_SONG_REQUEST) {
+            if (resultCode == RESULT_OK && data != null && data.getData() != null && pendingSaveText != null) {
+                try (OutputStream out = getContentResolver().openOutputStream(data.getData())) {
+                    if (out != null) {
+                        out.write(pendingSaveText.getBytes(StandardCharsets.UTF_8));
+                        out.flush();
+                        Toast.makeText(this, "ALAN song saved", Toast.LENGTH_SHORT).show();
+                    }
+                } catch (Exception e) {
+                    Toast.makeText(this, "Couldn't save song", Toast.LENGTH_LONG).show();
+                }
+            }
+            pendingSaveText = null;
         }
     }
 
@@ -161,7 +213,10 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        if (webView != null) webView.destroy();
+        if (webView != null) {
+            webView.stopLoading();
+            webView.destroy();
+        }
         super.onDestroy();
     }
 }
