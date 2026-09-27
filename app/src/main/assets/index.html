@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+  <meta name="theme-color" content="#ece8d8" />
+  <title>ALAN</title>
+  <link rel="stylesheet" href="app.css" />
+</head>
+<body>
+  <main class="machine" id="machine">
+    <header class="topbar">
+      <div class="brandblock">
+        <div class="brand">ALAN</div>
+        <div class="subbrand">SAMPLER / COMPOSER <span class="ver">V1.1</span></div>
+      </div>
+      <div class="speaker" aria-hidden="true"></div>
+    </header>
+
+    <section class="display" aria-live="polite">
+      <div class="display-left">
+        <span class="tiny">BANK</span>
+        <span id="bankDisplay" class="big">A 909</span>
+      </div>
+      <div class="display-centre">
+        <span id="modeDisplay" class="mode">READY</span>
+        <span id="statusDisplay" class="status">EMPTY PATTERN</span>
+      </div>
+      <div class="display-right">
+        <span class="tiny">BPM</span>
+        <span id="bpmDisplay" class="big">132</span>
+      </div>
+    </section>
+
+    <section class="bankstrip" id="bankStrip" aria-label="Sound banks"></section>
+
+    <section class="transport panel">
+      <button class="key primary" id="playBtn">PLY</button>
+      <button class="key" id="stopBtn">STP</button>
+      <button class="key orange" id="randomBtn">RND</button>
+      <button class="key" id="clearBtn">CLR</button>
+      <div class="control-pair">
+        <button class="mini" id="bpmDown">−</button>
+        <span class="control-label">BPM</span>
+        <button class="mini" id="bpmUp">+</button>
+      </div>
+      <div class="density-wrap">
+        <label for="density">DENS</label>
+        <input id="density" type="range" min="1" max="9" value="5" step="1" />
+      </div>
+      <button class="key dark" id="loadBtn">LOD</button>
+      <button class="key dark" id="recordBtn">REC</button>
+      <input id="fileInput" type="file" accept="audio/*" hidden />
+    </section>
+
+    <section class="padrow panel">
+      <div class="section-name">SOUND</div>
+      <div class="pads" id="pads"></div>
+    </section>
+
+    <section class="sequencer panel">
+      <div class="seq-head">
+        <span class="section-name">PATTERN</span>
+        <div class="legend"><span>1</span><span>5</span><span>9</span><span>13</span></div>
+      </div>
+      <div id="grid" class="grid"></div>
+    </section>
+
+    <section class="fx panel">
+      <div class="section-name">FX</div>
+      <div id="fxKeys" class="fxkeys"></div>
+      <div class="fxnote">READABLE. NO SYMBOL DECODING REQUIRED.</div>
+    </section>
+
+    <footer class="footerline">
+      <span id="selectedDisplay">PAD 1 / KIK</span>
+      <span>NO DEMOS / START EMPTY</span>
+      <span>ALAN AUDIO SYSTEM</span>
+    </footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
