@@ -1,0 +1,158 @@
+name: n333
+on:
+  push:
+    paths:
+      - '.github/workflows/n333.yml'
+permissions:
+  contents: read
+jobs:
+  render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: x
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq ffmpeg zip librsvg2-bin fonts-dejavu-core fonts-noto-core fonts-noto-color-emoji >/dev/null
+          mkdir -p "$RUNNER_TEMP/s" "$RUNNER_TEMP/t" "$RUNNER_TEMP/o" "$RUNNER_TEMP/a"
+          S="$RUNNER_TEMP/s"; T="$RUNNER_TEMP/t"; O="$RUNNER_TEMP/o"; A="$RUNNER_TEMP/a"
+
+          grab() {
+            local d="$1"; shift
+            rm -f "$d"
+            for u in "$@"; do
+              echo "$u"
+              if curl -fL --retry 3 --retry-delay 2 --connect-timeout 20 -A 'Mozilla/5.0' "$u" -o "$d"; then
+                if ffprobe -v error -show_entries format=duration -of csv=p=0 "$d" >/dev/null 2>&1; then return 0; fi
+              fi
+              rm -f "$d"
+            done
+            return 1
+          }
+
+          grab "$S/1.mp3" \
+            'https://raw.githubusercontent.com/sujithmu/Portfolio/main/sounds/ms-teams-notification.mp3' \
+            'https://www.myinstants.com/media/sounds/ms-teams-notification.mp3'
+          grab "$S/2.mp3" \
+            'https://www.ancta.com/wp-content/uploads/2023/01/teams.mp3' \
+            'https://www.myinstants.com/media/sounds/microsoft-teams-ringtone.mp3'
+          grab "$S/3.mp3" \
+            'https://archive.org/download/slack_sfx/knock_brush.mp3' \
+            'https://slack.global.ssl.fastly.net/dfc0/sounds/push/knock_brush.mp3'
+          grab "$S/4.wav" \
+            'https://raw.githubusercontent.com/Faris0520/windows-media/main/Windows%20Notify%20Email.wav'
+          grab "$S/5.wav" \
+            'https://raw.githubusercontent.com/Faris0520/windows-media/main/Windows%20Notify%20System%20Generic.wav'
+          grab "$S/6.mp3" \
+            'https://www.myinstants.com/media/sounds/iosrebound.mp3'
+          grab "$S/7.mp3" \
+            'https://raw.githubusercontent.com/bmagee88/cougar-cash/main/public/assets/sounds/samsung-spaceline-notification.mp3' \
+            'https://site-ringtone.com/wp-content/uploads/2021/03/samsung-galaxy-spaceline-notification-sound.mp3'
+          grab "$S/8.mp3" \
+            'https://www.myinstants.com/media/sounds/whatsapp-notification-sound.mp3'
+          grab "$S/9.mp3" \
+            'https://unpkg.com/@zoom/meetingsdk@3.1.6/dist/lib/audio/incoming-msg-chime.mp3'
+
+          chain() {
+            python3 - "$1" <<'PY'
+          import sys
+          p=float(sys.argv[1]); a=[]
+          while p < 0.5:
+              a.append('atempo=0.5'); p /= 0.5
+          while p > 2.0:
+              a.append('atempo=2.0'); p /= 2.0
+          a.append(f'atempo={p:.12f}')
+          print(','.join(a))
+          PY
+          }
+
+          stretch() {
+            local src="$1" out="$2" id="$3"
+            local d p c a i sr samples
+            d=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$src")
+            p=$(python3 - "$d" <<'PY'
+          import sys
+          print(float(sys.argv[1])/213.0)
+          PY
+          )
+            for i in 1 2 3 4 5 6 7 8; do
+              c=$(chain "$p")
+              ffmpeg -hide_banner -loglevel error -y -i "$src" -af "$c" -c:a pcm_s16le -map_metadata -1 "$T/$id.wav"
+              a=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$T/$id.wav")
+              if python3 - "$a" <<'PY'
+          import sys
+          raise SystemExit(0 if float(sys.argv[1]) >= 213.0 else 1)
+          PY
+              then break; fi
+              p=$(python3 - "$p" "$a" <<'PY'
+          import sys
+          print(float(sys.argv[1])*(float(sys.argv[2])/213.0)*0.992)
+          PY
+          )
+            done
+            a=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$T/$id.wav")
+            python3 - "$a" <<'PY'
+          import sys
+          if float(sys.argv[1]) < 213.0: raise SystemExit('short')
+          PY
+            sr=$(ffprobe -v error -select_streams a:0 -show_entries stream=sample_rate -of csv=p=0 "$T/$id.wav")
+            samples=$(python3 - "$sr" <<'PY'
+          import sys
+          print(int(round(float(sys.argv[1])*213.0)))
+          PY
+          )
+            ffmpeg -hide_banner -loglevel error -y -i "$T/$id.wav" -af "atrim=end_sample=$samples,asetpts=N/SR/TB" -c:a pcm_s16le -map_metadata -1 "$out"
+            a=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$out")
+            python3 - "$a" <<'PY'
+          import sys
+          x=float(sys.argv[1])
+          if abs(x-213.0)>0.0001: raise SystemExit(f'bad duration {x}')
+          PY
+          }
+
+          stretch "$S/1.mp3" "$O/▦.wav" 1
+          stretch "$S/2.mp3" "$O/▦☎.wav" 2
+          stretch "$S/3.mp3" "$O/✣.wav" 3
+          stretch "$S/4.wav" "$O/✉.wav" 4
+          stretch "$S/5.wav" "$O/⊞.wav" 5
+          stretch "$S/6.mp3" "$O/🍎.wav" 6
+          stretch "$S/7.mp3" "$O/◉.wav" 7
+          stretch "$S/8.mp3" "$O/☏.wav" 8
+          stretch "$S/9.mp3" "$O/⌾.wav" 9
+
+          cat > "$T/c.svg" <<'SVG'
+          <svg xmlns="http://www.w3.org/2000/svg" width="1500" height="1500" viewBox="0 0 1500 1500">
+            <rect width="1500" height="1500" fill="#09090b"/>
+            <g fill="#f4f4f5" text-anchor="middle" dominant-baseline="central" font-family="DejaVu Sans, Noto Sans Symbols 2, Noto Sans Symbols" font-size="190">
+              <text x="250" y="250">▦</text>
+              <text x="750" y="250">▦☎</text>
+              <text x="1250" y="250">✣</text>
+              <text x="250" y="750">✉</text>
+              <text x="750" y="750">⊞</text>
+              <text x="1250" y="750">●</text>
+              <text x="250" y="1250">◉</text>
+              <text x="750" y="1250">☏</text>
+              <text x="1250" y="1250">⌾</text>
+            </g>
+            <g stroke="#27272a" stroke-width="2">
+              <path d="M500 0V1500M1000 0V1500M0 500H1500M0 1000H1500"/>
+            </g>
+          </svg>
+          SVG
+          rsvg-convert -w 1500 -h 1500 "$T/c.svg" -o "$O/◌.png"
+          exiftool -overwrite_original -all= "$O/◌.png" >/dev/null 2>&1 || true
+          printf '%s\n' '▦.wav' '▦☎.wav' '✣.wav' '✉.wav' '⊞.wav' '🍎.wav' '◉.wav' '☏.wav' '⌾.wav' > "$O/◌.m3u"
+
+          cd "$O"
+          zip -9 -q "$A/◌.zip" '▦.wav' '▦☎.wav' '✣.wav' '✉.wav' '⊞.wav' '🍎.wav' '◉.wav' '☏.wav' '⌾.wav' '◌.png' '◌.m3u'
+          unzip -l "$A/◌.zip"
+          for f in '▦.wav' '▦☎.wav' '✣.wav' '✉.wav' '⊞.wav' '🍎.wav' '◉.wav' '☏.wav' '⌾.wav'; do ffprobe -v error -show_entries format=duration -of csv=p=0 "$f"; done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: x
+          path: ${{ runner.temp }}/a/◌.zip
+          if-no-files-found: error
+          compression-level: 0
