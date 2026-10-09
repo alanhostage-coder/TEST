@@ -38,16 +38,30 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           import re
-          root = Path('PocketLabAndroid-v0.5/build.gradle.kts')
-          app = Path('PocketLabAndroid-v0.5/app/build.gradle.kts')
+
+          project = Path('PocketLabAndroid-v0.5')
+          root = project / 'build.gradle.kts'
+          app = project / 'app/build.gradle.kts'
+          main = project / 'app/src/main/java/dev/alan/pocketlab/MainActivity.kt'
+
           r = root.read_text()
           r = re.sub(r'^\s*id\("org\.jetbrains\.kotlin\.android"\).*\n', '', r, flags=re.M)
           root.write_text(r)
+
           a = app.read_text()
           a = re.sub(r'^\s*id\("org\.jetbrains\.kotlin\.android"\)\s*\n', '', a, flags=re.M)
           a = a.replace('compileSdk = 37', 'compileSdk = 36').replace('targetSdk = 37', 'targetSdk = 36')
           a = re.sub(r'\n\s*kotlinOptions\s*\{\s*\n\s*jvmTarget\s*=\s*"17"\s*\n\s*\}\s*\n', '\n', a)
+          a = a.replace('androidx.compose:compose-bom:2026.09.00', 'androidx.compose:compose-bom:2025.05.01')
+          a = a.replace('androidx.activity:activity-compose:1.12.3', 'androidx.activity:activity-compose:1.10.1')
+          a = a.replace('androidx.core:core-ktx:1.17.0', 'androidx.core:core-ktx:1.16.0')
+          a = a.replace('androidx.lifecycle:lifecycle-runtime-ktx:2.10.0', 'androidx.lifecycle:lifecycle-runtime-ktx:2.9.0')
           app.write_text(a)
+
+          m = main.read_text()
+          if 'import androidx.activity.compose.setContent' not in m:
+              m = m.replace('import androidx.activity.ComponentActivity\n', 'import androidx.activity.ComponentActivity\nimport androidx.activity.compose.setContent\n')
+          main.write_text(m)
           PY
 
       - name: Install Android API 36
