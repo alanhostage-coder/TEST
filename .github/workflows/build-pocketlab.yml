@@ -37,7 +37,7 @@ jobs:
         run: |
           sed -i 's/compileSdk = 37/compileSdk = 36/' PocketLabAndroid-v0.5/app/build.gradle.kts
           sed -i 's/targetSdk = 37/targetSdk = 36/' PocketLabAndroid-v0.5/app/build.gradle.kts
-          echo 'android.builtInKotlin=false' >> PocketLabAndroid-v0.5/gradle.properties
+          printf '\nandroid.builtInKotlin=false\nandroid.newDsl=false\n' >> PocketLabAndroid-v0.5/gradle.properties
 
       - name: Install Android API 36
         run: |
