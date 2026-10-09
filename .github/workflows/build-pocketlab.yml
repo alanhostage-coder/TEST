@@ -26,13 +26,18 @@ jobs:
         with:
           gradle-version: '9.6.0'
 
-      - name: Install Android API 37
-        run: |
-          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
-          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-37" "build-tools;37.0.0"
-
       - name: Extract source
         run: unzip -q pocketlab-source.zip
+
+      - name: Patch SDK level for hosted runner
+        run: |
+          sed -i 's/compileSdk = 37/compileSdk = 36/' PocketLabAndroid-v0.5/app/build.gradle.kts
+          sed -i 's/targetSdk = 37/targetSdk = 36/' PocketLabAndroid-v0.5/app/build.gradle.kts
+
+      - name: Install Android API 36
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses >/dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"
 
       - name: Build debug APK
         working-directory: PocketLabAndroid-v0.5
