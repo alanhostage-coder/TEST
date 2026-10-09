@@ -35,9 +35,20 @@ jobs:
 
       - name: Patch build for hosted runner
         run: |
-          sed -i 's/compileSdk = 37/compileSdk = 36/' PocketLabAndroid-v0.5/app/build.gradle.kts
-          sed -i 's/targetSdk = 37/targetSdk = 36/' PocketLabAndroid-v0.5/app/build.gradle.kts
-          printf '\nandroid.builtInKotlin=false\nandroid.newDsl=false\n' >> PocketLabAndroid-v0.5/gradle.properties
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          root = Path('PocketLabAndroid-v0.5/build.gradle.kts')
+          app = Path('PocketLabAndroid-v0.5/app/build.gradle.kts')
+          r = root.read_text()
+          r = re.sub(r'^\s*id\("org\.jetbrains\.kotlin\.android"\).*\n', '', r, flags=re.M)
+          root.write_text(r)
+          a = app.read_text()
+          a = re.sub(r'^\s*id\("org\.jetbrains\.kotlin\.android"\)\s*\n', '', a, flags=re.M)
+          a = a.replace('compileSdk = 37', 'compileSdk = 36').replace('targetSdk = 37', 'targetSdk = 36')
+          a = re.sub(r'\n\s*kotlinOptions\s*\{\s*\n\s*jvmTarget\s*=\s*"17"\s*\n\s*\}\s*\n', '\n', a)
+          app.write_text(a)
+          PY
 
       - name: Install Android API 36
         run: |
