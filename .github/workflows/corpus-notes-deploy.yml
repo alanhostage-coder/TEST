@@ -40,3 +40,13 @@ jobs:
           project_dir: './'
           account_id: '145209388'
           personal_access_key: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+      - name: Verify HubSpot installation status
+        env:
+          HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+          HUBSPOT_ACCOUNT_ID: '145209388'
+        run: |
+          npm install -g @hubspot/cli@8.7.0
+          echo "=== HubSpot build history ==="
+          hs project list-builds --use-env --json || echo "::warning::Could not retrieve build history"
+          echo "=== Corpus Note installation status ==="
+          hs project app-install-status --use-env --json || echo "::warning::Could not retrieve app installation status"
