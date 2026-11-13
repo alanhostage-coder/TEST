@@ -73,7 +73,9 @@ async function main() {
   } catch (error) {
     console.warn('Website branding unavailable, using safe defaults:', error.message);
   }
-  const domainName = site.hostname.replace(/^www\./,'').split('.')[0];
+  const domainKey = site.hostname.replace(/^www\./,'').split('.')[0];
+  const domainName = domainKey.toLowerCase() === 'prosperohub' ? 'ProsperoHub' :
+    domainKey.slice(0,1).toUpperCase() + domainKey.slice(1);
   const fromTitle = ((/<title[^>]*>([^<]+)/i.exec(html) || [,''])[1]).split(/[|–—-]/)[0];
   const name = String(process.env.CORPUS_BRAND_NAME || meta(html,'og:site_name') ||
     fromTitle || domainName || 'ProsperoHub').replace(/[\u0000-\u001f<>]/g,'').trim().slice(0,32);
