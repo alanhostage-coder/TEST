@@ -36,7 +36,7 @@ jobs:
         if: steps.upload.outputs.deploy_id == ''
         uses: HubSpot/hubspot-project-actions/project-deploy@v1.1.0
         with:
-          build_id: ${{ steps.upload.outputs.build_id }}
+          deploy_latest_build: true
           project_dir: './'
           account_id: '145209388'
           personal_access_key: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
