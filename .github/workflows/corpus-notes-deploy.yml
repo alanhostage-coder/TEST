@@ -4,6 +4,21 @@ on:
     branches:
       - codex/corpus-note-hubspot-card
   workflow_dispatch:
+    inputs:
+      brand_website:
+        description: 'Organisation public website URL for Corpus branding'
+        type: string
+        required: false
+        default: 'https://www.prosperohub.com'
+      brand_name:
+        description: 'Organisation display name (optional)'
+        type: string
+        required: false
+        default: 'ProsperoHub'
+      brand_accent:
+        description: 'Override detected accent colour, for example #DAEAFF'
+        type: string
+        required: false
 permissions:
   contents: read
 jobs:
@@ -17,6 +32,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+      - name: Configure organisation brand
+        env:
+          CORPUS_BRAND_URL: ${{ inputs.brand_website || vars.CORPUS_BRAND_URL || 'https://www.prosperohub.com' }}
+          CORPUS_BRAND_NAME: ${{ inputs.brand_name || vars.CORPUS_BRAND_NAME || 'ProsperoHub' }}
+          CORPUS_BRAND_ACCENT: ${{ inputs.brand_accent || vars.CORPUS_BRAND_ACCENT || '' }}
+        run: node scripts/configure-corpus-brand.mjs
       - name: Run tests
         run: node --test tests/corpus-notes.test.js
       - name: Verify authorised HubSpot key
