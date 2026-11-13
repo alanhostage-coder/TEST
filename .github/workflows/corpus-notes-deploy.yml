@@ -1,0 +1,42 @@
+name: Upload and deploy Corpus Note to HubSpot
+on:
+  push:
+    branches:
+      - codex/corpus-note-hubspot-card
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      DEFAULT_ACCOUNT_ID: '145209388'
+      DEFAULT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Run tests
+        run: node --test tests/corpus-notes.test.js
+      - name: Verify authorised HubSpot key
+        run: |
+          if [ -z "$DEFAULT_PERSONAL_ACCESS_KEY" ]; then
+            echo "::error::Missing repository secret HUBSPOT_PERSONAL_ACCESS_KEY."
+            exit 1
+          fi
+      - name: Upload project
+        id: upload
+        uses: HubSpot/hubspot-project-actions/project-upload@v1.1.0
+        with:
+          project_dir: './'
+          account_id: '145209388'
+          personal_access_key: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+      - name: Deploy build if not auto-deployed
+        if: steps.upload.outputs.deploy_id == ''
+        uses: HubSpot/hubspot-project-actions/project-deploy@v1.1.0
+        with:
+          build_id: ${{ steps.upload.outputs.build_id }}
+          project_dir: './'
+          account_id: '145209388'
+          personal_access_key: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}

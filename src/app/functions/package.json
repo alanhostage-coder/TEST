@@ -1,0 +1,7 @@
+{
+  "name": "corpus-note-functions",
+  "version": "1.0.0",
+  "private": true,
+  "main": "CorpusNotes.js",
+  "engines": {"node": ">=22"}
+}

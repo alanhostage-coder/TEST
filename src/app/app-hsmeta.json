@@ -1,0 +1,26 @@
+{
+  "uid": "corpus_note_safe_notetaker_app",
+  "type": "app",
+  "config": {
+    "name": "Corpus Note | Internal Notetaker",
+    "description": "Confidential internal company notes using an existing Corpus Notes custom object, never meeting invitations.",
+    "distribution": "private",
+    "auth": {
+      "type": "static",
+      "requiredScopes": [
+        "oauth",
+        "crm.objects.companies.read",
+        "crm.objects.custom.read",
+        "crm.objects.custom.write"
+      ],
+      "optionalScopes": [],
+      "conditionallyRequiredScopes": []
+    },
+    "permittedUrls": {"fetch": [], "iframe": [], "img": []},
+    "support": {
+      "supportEmail": "support@prosperohub.com",
+      "documentationUrl": "https://developers.hubspot.com/docs/apps/developer-platform/add-features/ui-extensibility/overview",
+      "supportUrl": "https://www.prosperohub.com"
+    }
+  }
+}

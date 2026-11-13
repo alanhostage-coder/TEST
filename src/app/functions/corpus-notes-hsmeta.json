@@ -1,0 +1,8 @@
+{
+  "uid": "corpus_notes_api",
+  "type": "app-function",
+  "config": {
+    "entrypoint": "/app/functions/CorpusNotes.js",
+    "secretKeys": []
+  }
+}
