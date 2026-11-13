@@ -2,9 +2,11 @@
   "uid": "corpus_note_company_card",
   "type": "card",
   "config": {
-    "name": "Corpus Note | Confidential Internal Notes",
+    "name": "Corpus Notes | Internal workspace",
     "location": "crm.record.tab",
     "entrypoint": "/app/cards/CorpusNoteCard.jsx",
-    "objectTypes": ["companies"]
+    "objectTypes": [
+      "companies"
+    ]
   }
 }
