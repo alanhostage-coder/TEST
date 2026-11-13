@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   hubspot, Heading, Text, Input, TextArea, Select, Button, Link,
-  Divider, LoadingSpinner
+  Divider, LoadingSpinner, Flex, Tile, Tag, Image
 } from '@hubspot/ui-extensions';
+import brandBanner from './assets/brand-banner.svg';
+import { CORPUS_BRAND } from './brand-config';
 
 const OPTIONS = [
   { label: 'Meeting', value: 'meeting' },
@@ -117,10 +119,17 @@ function CorpusNoteCard({ context, addAlert }) {
 
   return (
     <>
-      <Heading>Corpus Note</Heading>
-      <Text>Confidential internal notes. This card never writes into a meeting invitation or attendee description.</Text>
+      <Image src={brandBanner} alt={CORPUS_BRAND.name + ' Corpus Note, internal workflow'} width={900} />
+      <Flex direction="row" wrap="wrap" gap="small">
+        <Tag variant="warning">Internal only</Tag>
+        <Tag variant="info">No invitation updates</Tag>
+        <Tag variant="default">{CORPUS_BRAND.name}</Tag>
+      </Flex>
+      <Text variant="microcopy">Internal capture workflow. Notes are not inserted into meeting descriptions or attendee invitations. Record visibility still depends on HubSpot permissions.</Text>
       <Divider />
-      <Heading>New internal note</Heading>
+      <Tile>
+      <Heading>Create an internal note</Heading>
+      <Text variant="microcopy">Private working notes for this Company. Keep meeting attendee information in the normal calendar flow.</Text>
       <Input name="noteTitle" label="Title" required value={form.note_title}
         onChange={v => set('note_title', v)} placeholder="Portfolio review" />
       <Select name="noteType" label="Type" options={OPTIONS}
@@ -145,7 +154,9 @@ function CorpusNoteCard({ context, addAlert }) {
       <Button onClick={save} disabled={saving || !/^\d+$/.test(companyId)}>
         {saving ? 'Saving...' : 'Save confidential note'}
       </Button>
+      </Tile>
       <Divider />
+      <Tile>
       <Heading>Company note history</Heading>
       <Button variant="secondary" onClick={reload} disabled={loading}>Refresh notes</Button>
       {loading ? <LoadingSpinner label="Loading notes" /> : null}
@@ -168,7 +179,8 @@ function CorpusNoteCard({ context, addAlert }) {
         </React.Fragment>
       ))}
       {truncated ? <Text>Showing up to 100 linked notes. Open Corpus Notes for older history.</Text> : null}
-      <Text>Attachments can be managed on the native Corpus Note record.</Text>
+      </Tile>
+      <Text variant="microcopy">Attachments are managed on the Corpus Note record. Brand identity: {CORPUS_BRAND.name} ({CORPUS_BRAND.websiteUrl}).</Text>
     </>
   );
 }
