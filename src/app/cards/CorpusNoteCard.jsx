@@ -153,7 +153,7 @@ function CorpusNoteCard({ context, addAlert }) {
 
   return (
     <>
-      <Image src={brandBanner} alt="Corpus Notes by Siloy UKI. Internal workspace." width={900} />
+      <Image src={brandBanner} alt={'Corpus Notes by ' + CORPUS_BRAND.name + '. Internal workspace.'} width={900} />
       <Flex direction="row" wrap="wrap" gap="small">
         <Tag variant="warning">Internal only</Tag>
         <Tag variant="info">Not sent to attendees</Tag>
@@ -234,7 +234,7 @@ function CorpusNoteCard({ context, addAlert }) {
                 disabled={saving || !/^\d+$/.test(companyId) || !form.note_title.trim() || !form.internal_notes.trim()}>
                 {saving ? 'Saving note…' : 'Save internal note'}
               </Button>
-              <Button variant="secondary" onClick={discard} disabled={saving}>
+              <Button variant={dirty ? 'destructive' : 'secondary'} onClick={discard} disabled={saving}>
                 {dirty && !discardArmed ? 'Discard draft' : dirty ? 'Confirm discard' : 'Clear'}
               </Button>
             </Flex>
@@ -288,8 +288,8 @@ function CorpusNoteCard({ context, addAlert }) {
         {truncated ? <Text variant="microcopy">Showing up to 100 notes. Older notes remain on Corpus Notes records.</Text> : null}
       </Tile>
       <Text variant="microcopy">
-        Corpus Notes by {CORPUS_BRAND.name}. Attachments are managed on each saved note.
-        Verify app and CRM permissions before recording confidential information.
+        Corpus Notes by Siloy UKI · {CORPUS_BRAND.name} workspace.
+        Attachments are managed on each saved note. Verify app and CRM permissions before recording confidential information.
       </Text>
     </>
   );
