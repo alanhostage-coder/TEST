@@ -14,7 +14,6 @@ on:
         description: 'Organisation display name (optional)'
         type: string
         required: false
-        default: 'ProsperoHub'
       brand_accent:
         description: 'Override detected accent colour, for example #DAEAFF'
         type: string
@@ -35,7 +34,7 @@ jobs:
       - name: Configure organisation brand
         env:
           CORPUS_BRAND_URL: ${{ inputs.brand_website || vars.CORPUS_BRAND_URL || 'https://www.prosperohub.com' }}
-          CORPUS_BRAND_NAME: ${{ inputs.brand_name || vars.CORPUS_BRAND_NAME || 'ProsperoHub' }}
+          CORPUS_BRAND_NAME: ${{ inputs.brand_name || vars.CORPUS_BRAND_NAME || '' }}
           CORPUS_BRAND_ACCENT: ${{ inputs.brand_accent || vars.CORPUS_BRAND_ACCENT || '' }}
         run: node scripts/configure-corpus-brand.mjs
       - name: Run tests
