@@ -37,6 +37,11 @@ function isoToUK(value) {
     ? '' : date.toLocaleDateString('en-GB', { timeZone: 'UTC' });
 }
 function unwrap(response) { return response && (response.body || response) || {}; }
+function readable(value, limit = 600) {
+  const plain = String(value || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&').replace(/\s+/g, ' ').trim();
+  return plain.length > limit ? plain.slice(0, limit).trimEnd() + '…' : plain;
+}
 
 hubspot.extend(({ context, actions }) => (
   <CorpusNoteCard context={context} addAlert={actions.addAlert} />
@@ -52,7 +57,30 @@ function CorpusNoteCard({ context, addAlert }) {
   const [form, setForm] = useState(empty);
   const [ukDate, setUkDate] = useState(isoToUK(today()));
   const [ukFollowup, setUkFollowup] = useState('');
-  const set = (key, value) => setForm(old => ({ ...old, [key]: value }));
+  const [composerOpen, setComposerOpen] = useState(true);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [historyExpanded, setHistoryExpanded] = useState(false);
+  const [receipt, setReceipt] = useState(null);
+  const [discardArmed, setDiscardArmed] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const set = (key, value) => {
+    setDirty(true);
+    setDiscardArmed(false);
+    setForm(old => ({ ...old, [key]: value }));
+  };
+  const setDate = value => { setDirty(true); setUkDate(value); setDiscardArmed(false); };
+  const setFollowDate = value => { setDirty(true); setUkFollowup(value); setDiscardArmed(false); };
+  const noteUrl = id => 'https://app-eu1.hubspot.com/contacts/' + portalId +
+    '/record/2-256491528/' + id;
+  const discard = () => {
+    if (dirty && !discardArmed) { setDiscardArmed(true); return; }
+    setForm(empty());
+    setUkDate(isoToUK(today()));
+    setUkFollowup('');
+    setDirty(false);
+    setDiscardArmed(false);
+    setDetailsOpen(false);
+  };
 
   const reload = useCallback(async () => {
     if (!/^\d+$/.test(companyId)) {
@@ -79,6 +107,7 @@ function CorpusNoteCard({ context, addAlert }) {
   useEffect(() => { reload(); }, [reload]);
 
   const save = async () => {
+    if (saving) return;
     const noteDate = ukToISO(ukDate);
     const followDate = ukFollowup ? ukToISO(ukFollowup) : '';
     if (!form.note_title.trim() || !form.internal_notes.trim() ||
@@ -106,6 +135,11 @@ function CorpusNoteCard({ context, addAlert }) {
       setForm(empty());
       setUkDate(isoToUK(today()));
       setUkFollowup('');
+      setReceipt({ id: result.noteId, title: form.note_title.trim() });
+      setDirty(false);
+      setDiscardArmed(false);
+      setDetailsOpen(false);
+      setComposerOpen(false);
       await reload();
     } catch (err) {
       addAlert({
@@ -119,68 +153,144 @@ function CorpusNoteCard({ context, addAlert }) {
 
   return (
     <>
-      <Image src={brandBanner} alt={CORPUS_BRAND.name + ' Corpus Note, internal workflow'} width={900} />
+      <Image src={brandBanner} alt={'Corpus Notes by ' + CORPUS_BRAND.name + '. Internal workspace.'} width={900} />
       <Flex direction="row" wrap="wrap" gap="small">
         <Tag variant="warning">Internal only</Tag>
-        <Tag variant="info">No invitation updates</Tag>
+        <Tag variant="info">Not sent to attendees</Tag>
         <Tag variant="default">{CORPUS_BRAND.name}</Tag>
       </Flex>
-      <Text variant="microcopy">Internal capture workflow. Notes are not inserted into meeting descriptions or attendee invitations. Record visibility still depends on HubSpot permissions.</Text>
+      <Text variant="microcopy">
+        Notes created here stay out of meeting invitations and attendee descriptions.
+        This label is a reminder, not an access-control setting.
+      </Text>
+      <Divider />
+
+      {receipt ? (
+        <Tile>
+          <Tag variant="success">Note saved</Tag>
+          <Heading>{receipt.title}</Heading>
+          <Text>Saved to Corpus Notes and linked to this Company record.</Text>
+          <Flex direction="row" gap="small" wrap="wrap">
+            <Link href={noteUrl(receipt.id)}>Open saved note</Link>
+            <Button variant="secondary" onClick={() => { setReceipt(null); setComposerOpen(true); }}>
+              Write another note
+            </Button>
+          </Flex>
+        </Tile>
+      ) : null}
+
+      <Tile>
+        <Flex direction="row" justify="between" gap="small" align="center" wrap="wrap">
+          <Heading>Write an internal note</Heading>
+          <Button variant="secondary" onClick={() => setComposerOpen(v => !v)}>
+            {composerOpen ? 'Hide editor' : 'New note'}
+          </Button>
+        </Flex>
+        {!composerOpen && dirty ? <Text variant="microcopy">Your unsaved draft is retained while this card is open.</Text> : null}
+        {composerOpen ? (
+          <>
+            <Text variant="microcopy">
+              Capture the important part first. Add decisions, risks and follow-up details only when needed.
+            </Text>
+            <Input name="noteTitle" label="Title" required value={form.note_title}
+              onChange={v => set('note_title', v)} placeholder="e.g. Internal client review" />
+            <Select name="noteType" label="Note type" options={OPTIONS}
+              value={form.note_type} onChange={v => set('note_type', v)} />
+            <TextArea name="noteBody" label="Your internal notes" required rows={5}
+              value={form.internal_notes} onChange={v => set('internal_notes', v)}
+              placeholder="What happened, what matters, and what needs attention..." />
+            <Flex direction="row" gap="small" wrap="wrap">
+              <Tag variant="default">{dirty ? 'Unsaved changes' : 'Ready to write'}</Tag>
+              <Text variant="microcopy">Save to the Company, not to an invitation.</Text>
+            </Flex>
+            <Divider />
+            <Button variant="secondary" onClick={() => setDetailsOpen(v => !v)}>
+              {detailsOpen ? 'Hide extra details' : 'Add decisions, risks or follow-ups'}
+            </Button>
+            {detailsOpen ? (
+              <>
+                <Input name="noteDate" label="Note date (dd/mm/yyyy)" value={ukDate}
+                  onChange={setDate} placeholder="13/11/2026" />
+                <TextArea name="decisions" label="Decisions" rows={2}
+                  value={form.decisions} onChange={v => set('decisions', v)}
+                  placeholder="What was agreed?" />
+                <TextArea name="risks" label="Risks and concerns" rows={2}
+                  value={form.risks} onChange={v => set('risks', v)}
+                  placeholder="What needs watching?" />
+                <TextArea name="nextSteps" label="Next actions" rows={2}
+                  value={form.next_steps} onChange={v => set('next_steps', v)}
+                  placeholder="Who is doing what?" />
+                <Input name="followupDate" label="Follow-up date (dd/mm/yyyy)" value={ukFollowup}
+                  onChange={setFollowDate} placeholder="Optional" />
+                <Input name="meetingActivityId" label="Meeting activity ID (optional reference only)"
+                  value={form.meeting_activity_id}
+                  onChange={v => set('meeting_activity_id', v)}
+                  placeholder="Digits only. Not a meeting association." />
+              </>
+            ) : null}
+            <Divider />
+            <Flex direction="row" gap="small" wrap="wrap">
+              <Button onClick={save}
+                disabled={saving || !/^\d+$/.test(companyId) || !form.note_title.trim() || !form.internal_notes.trim()}>
+                {saving ? 'Saving note…' : 'Save internal note'}
+              </Button>
+              <Button variant={dirty ? 'destructive' : 'secondary'} onClick={discard} disabled={saving}>
+                {dirty && !discardArmed ? 'Discard draft' : dirty ? 'Confirm discard' : 'Clear'}
+              </Button>
+            </Flex>
+            {discardArmed ? (
+              <Text variant="microcopy">Select Confirm discard to permanently clear this unsaved draft.</Text>
+            ) : null}
+          </>
+        ) : (
+          <Text variant="microcopy">Select New note to open the editor. You can review the Company history below.</Text>
+        )}
+      </Tile>
+
       <Divider />
       <Tile>
-      <Heading>Create an internal note</Heading>
-      <Text variant="microcopy">Private working notes for this Company. Keep meeting attendee information in the normal calendar flow.</Text>
-      <Input name="noteTitle" label="Title" required value={form.note_title}
-        onChange={v => set('note_title', v)} placeholder="Portfolio review" />
-      <Select name="noteType" label="Type" options={OPTIONS}
-        value={form.note_type} onChange={v => set('note_type', v)} />
-      <Input name="noteDate" label="Date (dd/mm/yyyy)" value={ukDate}
-        onChange={setUkDate} placeholder="13/11/2026" />
-      <TextArea name="noteBody" label="Internal notes" required rows={5}
-        value={form.internal_notes} onChange={v => set('internal_notes', v)}
-        placeholder="Confidential meeting summary..." />
-      <Input name="meetingActivityId" label="Meeting activity ID (optional reference)"
-        value={form.meeting_activity_id}
-        onChange={v => set('meeting_activity_id', v)}
-        placeholder="Digits only; reference, not association" />
-      <TextArea name="decisions" label="Decisions" rows={2}
-        value={form.decisions} onChange={v => set('decisions', v)} />
-      <TextArea name="risks" label="Risks" rows={2}
-        value={form.risks} onChange={v => set('risks', v)} />
-      <TextArea name="nextSteps" label="Next steps" rows={2}
-        value={form.next_steps} onChange={v => set('next_steps', v)} />
-      <Input name="followupDate" label="Follow-up date (dd/mm/yyyy, optional)"
-        value={ukFollowup} onChange={setUkFollowup} />
-      <Button onClick={save} disabled={saving || !/^\d+$/.test(companyId)}>
-        {saving ? 'Saving...' : 'Save confidential note'}
-      </Button>
+        <Flex direction="row" justify="between" gap="small" wrap="wrap" align="center">
+          <Heading>Company note history</Heading>
+          <Button variant="secondary" onClick={reload} disabled={loading}>
+            {loading ? 'Refreshing…' : 'Refresh'}
+          </Button>
+        </Flex>
+        {loading ? <LoadingSpinner label="Loading saved notes" /> : null}
+        {error ? <Text>{error}</Text> : null}
+        {!loading && !error && notes.length === 0 ? (
+          <Text>No linked Corpus Notes yet. Create the first internal note above.</Text>
+        ) : null}
+        {!loading && !error && notes.length > 0 ? (
+          <>
+            <Text variant="microcopy">{notes.length}{truncated ? '+' : ''} linked notes, newest first</Text>
+            {notes.slice(0, historyExpanded ? notes.length : 3).map(note => (
+              <React.Fragment key={note.id}>
+                <Divider />
+                <Heading>{note.note_title || 'Untitled internal note'}</Heading>
+                <Flex direction="row" gap="small" wrap="wrap">
+                  <Tag variant="default">{note.note_type || 'Internal'}</Tag>
+                  <Text variant="microcopy">{isoToUK(note.note_date || note.hs_createdate)}</Text>
+                </Flex>
+                <Text>{readable(note.internal_notes, 240)}</Text>
+                {note.decisions ? <Text>Decision: {readable(note.decisions, 180)}</Text> : null}
+                {note.risks ? <Text>Risk: {readable(note.risks, 160)}</Text> : null}
+                {note.next_steps ? <Text>Next: {readable(note.next_steps, 180)}</Text> : null}
+                <Link href={noteUrl(note.id)}>Open full note</Link>
+              </React.Fragment>
+            ))}
+            {notes.length > 3 ? (
+              <Button variant="secondary" onClick={() => setHistoryExpanded(v => !v)}>
+                {historyExpanded ? 'Show recent notes' : 'Show all ' + notes.length + ' notes'}
+              </Button>
+            ) : null}
+          </>
+        ) : null}
+        {truncated ? <Text variant="microcopy">Showing up to 100 notes. Older notes remain on Corpus Notes records.</Text> : null}
       </Tile>
-      <Divider />
-      <Tile>
-      <Heading>Company note history</Heading>
-      <Button variant="secondary" onClick={reload} disabled={loading}>Refresh notes</Button>
-      {loading ? <LoadingSpinner label="Loading notes" /> : null}
-      {error ? <Text>{error}</Text> : null}
-      {!loading && !error && notes.length === 0
-        ? <Text>No Corpus Notes are linked to this company yet.</Text> : null}
-      {notes.map(note => (
-        <React.Fragment key={note.id}>
-          <Heading>{note.note_title || 'Untitled internal note'}</Heading>
-          <Text>{isoToUK(note.note_date || note.hs_createdate)} | {note.note_type || 'Internal note'}</Text>
-          <Text>{note.internal_notes || ''}</Text>
-          {note.decisions ? <Text>Decision: {note.decisions}</Text> : null}
-          {note.risks ? <Text>Risk: {note.risks}</Text> : null}
-          {note.next_steps ? <Text>Next: {note.next_steps}</Text> : null}
-          {note.meeting_activity_id
-            ? <Text>Meeting reference: {note.meeting_activity_id}</Text> : null}
-          <Link href={'https://app-eu1.hubspot.com/contacts/' + portalId +
-            '/record/2-256491528/' + note.id}>Open Corpus Note</Link>
-          <Divider />
-        </React.Fragment>
-      ))}
-      {truncated ? <Text>Showing up to 100 linked notes. Open Corpus Notes for older history.</Text> : null}
-      </Tile>
-      <Text variant="microcopy">Attachments are managed on the Corpus Note record. Brand identity: {CORPUS_BRAND.name} ({CORPUS_BRAND.websiteUrl}).</Text>
+      <Text variant="microcopy">
+        Corpus Notes by Siloy UKI · {CORPUS_BRAND.name} workspace.
+        Attachments are managed on each saved note. Verify app and CRM permissions before recording confidential information.
+      </Text>
     </>
   );
 }

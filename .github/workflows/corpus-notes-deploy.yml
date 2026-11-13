@@ -9,13 +9,25 @@ on:
         description: 'Organisation public website URL for Corpus branding'
         type: string
         required: false
-        default: 'https://www.prosperohub.com'
+        default: 'https://siloy.com/brand'
       brand_name:
         description: 'Organisation display name (optional)'
         type: string
         required: false
       brand_accent:
-        description: 'Override detected accent colour, for example #DAEAFF'
+        description: 'Primary accent colour, for example #DAEAFF'
+        type: string
+        required: false
+      brand_background:
+        description: 'Banner background, for example #010103'
+        type: string
+        required: false
+      brand_highlight:
+        description: 'Internal-only badge colour, for example #FEF5AC'
+        type: string
+        required: false
+      brand_logo_url:
+        description: 'Optional HTTPS logo image hosted on the same domain as the website'
         type: string
         required: false
 permissions:
@@ -33,9 +45,12 @@ jobs:
           node-version: '22'
       - name: Configure organisation brand
         env:
-          CORPUS_BRAND_URL: ${{ inputs.brand_website || vars.CORPUS_BRAND_URL || 'https://www.prosperohub.com' }}
+          CORPUS_BRAND_URL: ${{ inputs.brand_website || vars.CORPUS_BRAND_URL || 'https://siloy.com/brand' }}
           CORPUS_BRAND_NAME: ${{ inputs.brand_name || vars.CORPUS_BRAND_NAME || '' }}
           CORPUS_BRAND_ACCENT: ${{ inputs.brand_accent || vars.CORPUS_BRAND_ACCENT || '' }}
+          CORPUS_BRAND_BACKGROUND: ${{ inputs.brand_background || vars.CORPUS_BRAND_BACKGROUND || '' }}
+          CORPUS_BRAND_HIGHLIGHT: ${{ inputs.brand_highlight || vars.CORPUS_BRAND_HIGHLIGHT || '' }}
+          CORPUS_BRAND_LOGO_URL: ${{ inputs.brand_logo_url || vars.CORPUS_BRAND_LOGO_URL || '' }}
         run: node scripts/configure-corpus-brand.mjs
       - name: Run tests
         run: node --test tests/corpus-notes.test.js
