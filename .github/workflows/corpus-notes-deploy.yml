@@ -46,7 +46,9 @@ jobs:
           HUBSPOT_ACCOUNT_ID: '145209388'
         run: |
           npm install -g @hubspot/cli@8.18.0
-          hs project install-app --use-env
+          # HubSpot 8.18 prompts for an affirmative install confirmation.
+          # Run under a PTY so the approved POC installation can complete in CI.
+          printf 'y\n' | timeout 60s script -q -e -c "hs project install-app --use-env" /dev/null
       - name: Verify HubSpot installation status
         env:
           HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
