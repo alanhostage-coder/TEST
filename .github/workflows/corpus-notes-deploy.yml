@@ -40,12 +40,19 @@ jobs:
           project_dir: './'
           account_id: '145209388'
           personal_access_key: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+      - name: Install Corpus Note private app into Product Updates
+        env:
+          HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+          HUBSPOT_ACCOUNT_ID: '145209388'
+        run: |
+          npm install -g @hubspot/cli@8.18.0
+          hs project install-app --use-env
       - name: Verify HubSpot installation status
         env:
           HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
           HUBSPOT_ACCOUNT_ID: '145209388'
         run: |
-          npm install -g @hubspot/cli@8.7.0
+          npm install -g @hubspot/cli@8.18.0
           echo "=== HubSpot build history ==="
           hs project list-builds --use-env --json || echo "::warning::Could not retrieve build history"
           echo "=== Corpus Note installation status ==="
