@@ -77,7 +77,8 @@ async function main() {
   const domainName = domainKey.toLowerCase() === 'prosperohub' ? 'ProsperoHub' :
     domainKey.slice(0,1).toUpperCase() + domainKey.slice(1);
   const fromTitle = ((/<title[^>]*>([^<]+)/i.exec(html) || [,''])[1]).split(/[|–—-]/)[0];
-  const name = String(process.env.CORPUS_BRAND_NAME || meta(html,'og:site_name') ||
+  const siteName = meta(html,'og:site_name').replace(/,\s+(?:a|an|the)\s+.+$/i,'').trim();
+  const name = String(process.env.CORPUS_BRAND_NAME || siteName ||
     fromTitle || domainName || 'ProsperoHub').replace(/[\u0000-\u001f<>]/g,'').trim().slice(0,32);
   const inlineColor = (/--(?:brand|primary)(?:-[\w]+)?\s*:\s*(#[0-9a-f]{3}(?:[0-9a-f]{3})?)\b/i.exec(html) || [,''])[1];
   const accent = hexColour(process.env.CORPUS_BRAND_ACCENT || meta(html,'theme-color') || inlineColor);
