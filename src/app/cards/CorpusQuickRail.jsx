@@ -1,8 +1,13 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   hubspot, Heading, Text, Tag, Divider, Button, Input,
-  TextArea, Flex, Link, LoadingSpinner, Tile
+  TextArea, Flex, Link, LoadingSpinner, Tile, Image
 } from '@hubspot/ui-extensions';
+import { CORPUS_BRAND } from './brand-config';
+
+const SILOY_COLOUR_RAIL_URL =
+  'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-colour-rail.svg';
+const isSiloyBrand = /^https:\/\/(?:www\.)?siloy\.com(?:\/|$)/i.test(CORPUS_BRAND.websiteUrl || '');
 
 function day(value) {
   if (!value) return null;
@@ -136,10 +141,23 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
   const url = id => 'https://app-eu1.hubspot.com/contacts/' + portalId + '/record/2-256491528/' + id;
   return (
     <>
-      <Heading>Corpus Notes</Heading>
+      <Flex direction="row" align="center" gap="small" wrap="wrap">
+        {CORPUS_BRAND.logoUrl ? (
+          <Image src={CORPUS_BRAND.logoUrl}
+            alt={CORPUS_BRAND.name + ' official brand mark'} width={42} />
+        ) : null}
+        <Flex direction="column" gap="extra-small">
+          <Heading>Corpus Notes</Heading>
+          <Text variant="microcopy">by Siloy UKI</Text>
+        </Flex>
+      </Flex>
+      {isSiloyBrand ? (
+        <Image src={SILOY_COLOUR_RAIL_URL} width={250}
+          alt="Siloy blue, yellow and mint accent" />
+      ) : null}
       <Flex direction="row" gap="small" wrap="wrap">
         <Tag variant="warning">INTERNAL ONLY</Tag>
-        <Tag variant="default">Siloy UKI</Tag>
+        <Tag variant="info">Company workspace</Tag>
       </Flex>
       <Text variant="microcopy">Quick capture and follow-up cues for this Company. Nothing is written to meeting invitations.</Text>
       <Divider />
@@ -169,7 +187,10 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       ) : null}
       {savedId ? <Text><Link href={url(savedId)}>Open the note just saved</Link></Text> : null}
       <Divider />
-      <Heading>02 · What needs attention?</Heading>
+      <Flex direction="row" gap="small" align="center" wrap="wrap">
+        <Tag variant="info">02 / Review</Tag>
+        <Heading>What needs attention?</Heading>
+      </Flex>
       <Flex direction="row" gap="small" wrap="wrap">
         <Button variant={filter === 'due' ? 'primary' : 'secondary'}
           onClick={() => setFilter('due')}>Due ({due.length})</Button>
