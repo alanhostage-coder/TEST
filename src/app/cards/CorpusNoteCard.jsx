@@ -94,6 +94,8 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
   const dueCount = notes.filter(hasDueFollowup).length;
   const followupCount = notes.filter(hasFollowup).length;
   const riskCount = notes.filter(n => String(n.risks || '').trim()).length;
+  const decisionCount = notes.filter(n => String(n.decisions || '').trim()).length;
+  const nextActionCount = notes.filter(n => String(n.next_steps || '').trim()).length;
   const visibleNotes = notes.filter(note => {
     const q = historyQuery.toLowerCase().trim();
     if (q && ![note.note_title, note.note_type, note.internal_notes, note.decisions, note.risks,
@@ -102,6 +104,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
     if (historyFilter === 'followups') return hasFollowup(note);
     if (historyFilter === 'risks') return Boolean(String(note.risks || '').trim());
     if (historyFilter === 'decisions') return Boolean(String(note.decisions || '').trim());
+    if (historyFilter === 'actions') return Boolean(String(note.next_steps || '').trim());
     return true;
   });
   const set = (key, value) => {
@@ -221,6 +224,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
         setComposerOpen(false);
         setDirty(false);
         setDraftProtected(false);
+        setFocusWriting(false);
         addAlert({
           type: 'danger', title: 'Note created, but not linked',
           message: 'Open the saved record and associate this Company. Do not save again or you could create a duplicate.'
@@ -238,6 +242,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
       setDetailsOpen(false);
       setComposerOpen(false);
       setDraftProtected(false);
+      setFocusWriting(false);
       addAlert({
         type: 'success', title: 'Internal note saved',
         message: 'Your note is linked to this Company.'
@@ -415,6 +420,10 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
                 onClick={() => { setHistoryFilter('followups'); setHistoryExpanded(true); }}>Follow-ups ({followupCount})</Button>
               <Button variant={historyFilter === 'risks' ? 'primary' : 'secondary'}
                 onClick={() => { setHistoryFilter('risks'); setHistoryExpanded(true); }}>Risks ({riskCount})</Button>
+              <Button variant={historyFilter === 'decisions' ? 'primary' : 'secondary'}
+                onClick={() => { setHistoryFilter('decisions'); setHistoryExpanded(true); }}>Decisions ({decisionCount})</Button>
+              <Button variant={historyFilter === 'actions' ? 'primary' : 'secondary'}
+                onClick={() => { setHistoryFilter('actions'); setHistoryExpanded(true); }}>Next actions ({nextActionCount})</Button>
             </Flex>
             {visibleNotes.length === 0 ? <Text>No notes match this filter. Choose All to see the full Company history.</Text> : null}
             {visibleNotes.slice(0, historyExpanded ? visibleNotes.length : 3).map(note => (
