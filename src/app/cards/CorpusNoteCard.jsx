@@ -5,6 +5,12 @@ import {
 } from '@hubspot/ui-extensions';
 import { CORPUS_BRAND } from './brand-config';
 
+// A public brand-only asset, never a people photograph or arbitrary website hero.
+// Native CRM UI extensions do not support arbitrary CSS hex-colour borders.
+const SILOY_COLOUR_RAIL_URL =
+  'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-colour-rail.svg';
+const isSiloyBrand = /^https:\/\/(?:www\.)?siloy\.com(?:\/|$)/i.test(CORPUS_BRAND.websiteUrl || '');
+
 const OPTIONS = [
   { label: 'Meeting', value: 'meeting' },
   { label: 'Call', value: 'call' },
@@ -266,16 +272,26 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
   return (
     <>
       <Tile>
-        {CORPUS_BRAND.logoUrl ? (
-          <Image src={CORPUS_BRAND.logoUrl} alt={CORPUS_BRAND.name + ' logo'} width={180} />
+        <Flex direction="row" align="center" gap="medium" wrap="wrap">
+          {CORPUS_BRAND.logoUrl ? (
+            <Image src={CORPUS_BRAND.logoUrl}
+              alt={CORPUS_BRAND.name + ' official brand mark'} width={64} />
+          ) : null}
+          <Flex direction="column" gap="extra-small">
+            <Heading>Corpus Notes</Heading>
+            <Text variant="microcopy">by Siloy UKI</Text>
+          </Flex>
+        </Flex>
+        {isSiloyBrand ? (
+          <Image src={SILOY_COLOUR_RAIL_URL}
+            alt="Siloy brand accent colours: powder blue, yellow and mint" width={900} />
         ) : null}
-        <Text variant="microcopy">SILOY UKI / INTERNAL WORKSPACE</Text>
-        <Heading>Corpus Notes</Heading>
         <Flex direction="row" wrap="wrap" gap="small">
-          <Tag variant="default">by Siloy UKI</Tag>
           <Tag variant="warning">INTERNAL ONLY</Tag>
-          <Tag variant="info">Not in attendee invitations</Tag>
-          <Tag variant="default">Brand: {CORPUS_BRAND.name}</Tag>
+          <Tag variant="info">Never included in meeting invitations</Tag>
+          {CORPUS_BRAND.name !== 'Siloy UKI' ? (
+            <Tag variant="default">{CORPUS_BRAND.name} workspace</Tag>
+          ) : null}
         </Flex>
       </Tile>
       <Text>Capture internal context, document decisions and keep the next action visible.</Text>
@@ -313,7 +329,10 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
 
       <Tile>
         <Flex direction="row" justify="between" gap="small" align="center" wrap="wrap">
-          <Heading>01 · Capture the note</Heading>
+          <Flex direction="row" align="center" gap="small" wrap="wrap">
+            <Tag variant="info">01 / Capture</Tag>
+            <Heading>Write an internal note</Heading>
+          </Flex>
           <Button variant="secondary" onClick={() => setComposerOpen(v => !v)}>
             {composerOpen ? 'Hide editor' : 'New note'}
           </Button>
@@ -370,7 +389,10 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
               </>
             ) : null}
             <Divider />
-            <Heading>03 · Save to Company</Heading>
+            <Flex direction="row" gap="small" align="center" wrap="wrap">
+              <Tag variant="success">03 / Save</Tag>
+              <Heading>Save to Company</Heading>
+            </Flex>
             <Text variant="microcopy">Save works even when the editor is protected. A blank title is automatically generated from the note type and date.</Text>
             {saveIssue ? <Text>{saveIssue}</Text> : null}
             <Flex direction="row" gap="small" wrap="wrap">
@@ -399,7 +421,10 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
       <Divider />
       <Tile>
         <Flex direction="row" justify="between" gap="small" wrap="wrap" align="center">
-          <Heading>04 · Review and follow up</Heading>
+          <Flex direction="row" gap="small" align="center" wrap="wrap">
+            <Tag variant="info">04 / Review</Tag>
+            <Heading>Company notes and follow-ups</Heading>
+          </Flex>
           <Button variant="secondary" onClick={reload} disabled={loading}>
             {loading ? 'Refreshing…' : 'Refresh'}
           </Button>
