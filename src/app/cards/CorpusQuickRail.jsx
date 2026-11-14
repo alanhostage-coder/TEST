@@ -146,7 +146,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
           <Image src={CORPUS_BRAND.logoUrl}
             alt={CORPUS_BRAND.name + ' official brand mark'} width={42} />
         ) : null}
-        <Flex direction="column" gap="extra-small">
+        <Flex direction="column" gap="small">
           <Heading>Corpus Notes</Heading>
           <Text variant="microcopy">by Siloy UKI</Text>
         </Flex>
