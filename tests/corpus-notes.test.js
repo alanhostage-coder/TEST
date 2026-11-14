@@ -143,8 +143,8 @@ test('Siloy lockup keeps official mark, app name and brand-only colour rail with
   const stripe=fs.readFileSync(require.resolve('../src/app/cards/assets/siloy-colour-rail.svg'),'utf8');
   assert.match(main,/<Heading>Corpus Notes<\/Heading>/);
   assert.match(rail,/<Heading>Corpus Notes<\/Heading>/);
-  assert.match(main,/<Image src=\{CORPUS_BRAND\.logoUrl\}/);
-  assert.match(rail,/<Image src=\{CORPUS_BRAND\.logoUrl\}/);
+  assert.match(main,/<Image src=\{displayedBrandMark\}/);
+  assert.match(rail,/<Image src=\{displayedBrandMark\}/);
   assert.match(main,/SILOY_COLOUR_RAIL_URL/);
   assert.match(rail,/SILOY_COLOUR_RAIL_URL/);
   assert.match(stripe,/#010103/);
@@ -153,4 +153,20 @@ test('Siloy lockup keeps official mark, app name and brand-only colour rail with
   assert.match(stripe,/#EAFDD6/);
   assert.doesNotMatch(main,/cover-photo|cover-image|hero-photo|siloy-cover/);
   assert.doesNotMatch(rail,/cover-photo|cover-image|hero-photo|siloy-cover/);
+});
+
+test('Siloy branding uses supplied cropped mark instead of an empty favicon',()=>{
+  const fs=require('node:fs');
+  const path=require('node:path');
+  const main=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
+  const rail=fs.readFileSync(require.resolve('../src/app/cards/CorpusQuickRail.jsx'),'utf8');
+  const lockup=fs.readFileSync(path.resolve(__dirname,'../src/app/cards/assets/siloy-signage-mark.svg'),'utf8');
+  assert.match(main,/SILOY_SIGNAGE_MARK_URL/);
+  assert.match(rail,/SILOY_SIGNAGE_MARK_URL/);
+  assert.match(main,/isSiloyBrand \? SILOY_SIGNAGE_MARK_URL : CORPUS_BRAND\.logoUrl/);
+  assert.match(rail,/isSiloyBrand \? SILOY_SIGNAGE_MARK_URL : CORPUS_BRAND\.logoUrl/);
+  assert.match(lockup,/data:image\/jpeg;base64,/);
+  assert.match(lockup,/width="300" height="137"/);
+  assert.doesNotMatch(main,/src=\{CORPUS_BRAND\.logoUrl\}/);
+  assert.doesNotMatch(rail,/src=\{CORPUS_BRAND\.logoUrl\}/);
 });
