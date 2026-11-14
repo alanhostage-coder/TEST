@@ -109,7 +109,9 @@ test('writing focus and cognitive signposting remain present',()=>{
   assert.match(main,/Next actions \(\{nextActionCount\}\)/);
   assert.match(main,/Decisions \(\{decisionCount\}\)/);
   assert.doesNotMatch(main,/<Image src=\{CORPUS_BANNER_DATA_URI\}/);
-  assert.match(main,/SILOY UKI \/ INTERNAL WORKSPACE/);
+  assert.match(main,/SILOY_COLOUR_RAIL_URL/);
+  assert.match(main,/CORPUS_BRAND\.logoUrl/);
+  assert.match(main,/by Siloy UKI/);
 });
 
 test('brand importer uses a bounded HTML stream rather than rejecting a large site by Content-Length',()=>{
@@ -132,4 +134,23 @@ test('Siloy logo detection does not treat generic photography as a brand mark',(
   assert.match(generator,/officialVector/);
   assert.match(generator,/Never inline remote SVG/);
   assert.doesNotMatch(generator,/\/\\bsiloy\\b\|\\blogo\\b\/i\.test/);
+});
+
+test('Siloy lockup keeps official mark, app name and brand-only colour rail without photographs',()=>{
+  const fs=require('node:fs');
+  const main=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
+  const rail=fs.readFileSync(require.resolve('../src/app/cards/CorpusQuickRail.jsx'),'utf8');
+  const stripe=fs.readFileSync(require.resolve('../src/app/cards/assets/siloy-colour-rail.svg'),'utf8');
+  assert.match(main,/<Heading>Corpus Notes<\/Heading>/);
+  assert.match(rail,/<Heading>Corpus Notes<\/Heading>/);
+  assert.match(main,/<Image src=\{CORPUS_BRAND\.logoUrl\}/);
+  assert.match(rail,/<Image src=\{CORPUS_BRAND\.logoUrl\}/);
+  assert.match(main,/SILOY_COLOUR_RAIL_URL/);
+  assert.match(rail,/SILOY_COLOUR_RAIL_URL/);
+  assert.match(stripe,/#010103/);
+  assert.match(stripe,/#DAEAFF/);
+  assert.match(stripe,/#FEF5AC/);
+  assert.match(stripe,/#EAFDD6/);
+  assert.doesNotMatch(main,/cover-photo|cover-image|hero-photo|siloy-cover/);
+  assert.doesNotMatch(rail,/cover-photo|cover-image|hero-photo|siloy-cover/);
 });
