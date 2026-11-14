@@ -141,8 +141,8 @@ test('Siloy lockup keeps official mark, app name and brand-only colour rail with
   const main=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
   const rail=fs.readFileSync(require.resolve('../src/app/cards/CorpusQuickRail.jsx'),'utf8');
   const stripe=fs.readFileSync(require.resolve('../src/app/cards/assets/siloy-colour-rail.svg'),'utf8');
-  assert.match(main,/<Heading>Corpus Notes<\/Heading>/);
-  assert.match(rail,/<Heading>Corpus Notes<\/Heading>/);
+  assert.match(main,/<Heading>Siloy Notes<\/Heading>/);
+  assert.match(rail,/<Heading>Siloy Notes<\/Heading>/);
   assert.match(main,/<Image src=\{displayedBrandMark\}/);
   assert.match(rail,/<Image src=\{displayedBrandMark\}/);
   assert.match(main,/SILOY_COLOUR_RAIL_URL/);

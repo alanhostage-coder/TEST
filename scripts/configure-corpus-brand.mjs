@@ -195,7 +195,7 @@ async function main() {
     logoArt,
     '<rect x="169" y="31" width="120" height="5" rx="2.5" fill="' + accent + '"/>',
     '<text x="168" y="70" font-family="Arial,Helvetica,sans-serif" font-size="24" font-weight="500" fill="' + accent + '">' + escapeXml(name) + '</text>',
-    '<text x="168" y="122" font-family="Arial,Helvetica,sans-serif" font-size="48" font-weight="700" letter-spacing="0.8" fill="' + headlineInk + '">Corpus Notes</text>',
+    '<text x="168" y="122" font-family="Arial,Helvetica,sans-serif" font-size="48" font-weight="700" letter-spacing="0.8" fill="' + headlineInk + '">Siloy Notes</text>',
     '<text x="169" y="154" font-family="Arial,Helvetica,sans-serif" font-size="20" fill="' + headlineInk + '">Internal workspace</text>',
     '<rect x="828" y="44" width="258" height="61" rx="12" fill="' + highlight + '"/>',
     '<text x="957" y="81" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="24" font-weight="700" fill="' + badgeInk + '">INTERNAL ONLY</text>',

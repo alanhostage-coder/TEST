@@ -127,7 +127,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
   const noteUrl = id => 'https://app-eu1.hubspot.com/contacts/' + portalId +
     '/record/2-256491528/' + id;
   const recoveryText = () => [
-    'Corpus Notes · INTERNAL draft backup',
+    'Siloy Notes · INTERNAL draft backup',
     'Company record ID: ' + companyId,
     'Title: ' + effectiveTitle,
     'Type: ' + noteTypeLabel,
@@ -282,7 +282,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
               width={180} />
           ) : null}
           <Flex direction="column" gap="small">
-            <Heading>Corpus Notes</Heading>
+            <Heading>Siloy Notes</Heading>
             <Text variant="microcopy">Internal workspace · by Siloy UKI</Text>
           </Flex>
         </Flex>
@@ -436,7 +436,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
         {loading ? <LoadingSpinner label="Loading saved notes" /> : null}
         {error ? <Text>{error}</Text> : null}
         {!loading && !error && notes.length === 0 ? (
-          <Text>No linked Corpus Notes yet. Create the first internal note above.</Text>
+          <Text>No linked Siloy Notes yet. Create the first internal note above.</Text>
         ) : null}
         {!loading && !error && notes.length > 0 ? (
           <>
@@ -482,7 +482,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
             ) : null}
           </>
         ) : null}
-        {truncated ? <Text variant="microcopy">Showing up to 100 notes. Older records can be found in Corpus Notes. Filter counts only cover loaded notes.</Text> : null}
+        {truncated ? <Text variant="microcopy">Showing up to 100 notes. Older records can be found in Siloy Notes. Filter counts only cover loaded notes.</Text> : null}
         <Text variant="microcopy">Search and follow-up indicators use loaded notes only (up to 100). They are not notifications or CRM tasks.</Text>
       </Tile>
       </>
@@ -490,7 +490,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
         <Text variant="microcopy">Focus mode: history is hidden while you write. Select Show history to review saved notes.</Text>
       )}
       <Text variant="microcopy">
-        Corpus Notes by Siloy UKI · {CORPUS_BRAND.name} workspace.
+        Siloy Notes by Siloy UKI · {CORPUS_BRAND.name} workspace.
         Attachments are managed on each saved note. Verify app and CRM permissions before recording confidential information.
       </Text>
     </>
