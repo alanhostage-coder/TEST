@@ -11,7 +11,8 @@
         "oauth",
         "crm.objects.contacts.read",
         "crm.objects.custom.read",
-        "crm.objects.custom.write"
+        "crm.objects.custom.write",
+        "crm.objects.projects.read"
       ],
       "optionalScopes": [],
       "conditionallyRequiredScopes": []
