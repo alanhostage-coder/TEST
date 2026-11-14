@@ -52,6 +52,11 @@ jobs:
           CORPUS_BRAND_HIGHLIGHT: ${{ inputs.brand_highlight || vars.CORPUS_BRAND_HIGHLIGHT || '' }}
           CORPUS_BRAND_LOGO_URL: ${{ inputs.brand_logo_url || vars.CORPUS_BRAND_LOGO_URL || '' }}
         run: node scripts/configure-corpus-brand.mjs
+      - name: Validate generated brand asset
+        run: |
+          node --input-type=module --check < src/app/cards/brand-banner.js
+          grep -q 'data:image/svg+xml' src/app/cards/brand-banner.js
+          grep -q 'Siloy UKI' src/app/cards/CorpusNoteCard.jsx
       - name: Run tests
         run: node --test tests/corpus-notes.test.js
       - name: Verify authorised HubSpot key
