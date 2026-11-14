@@ -123,3 +123,13 @@ test('brand importer uses a bounded HTML stream rather than rejecting a large si
   assert.match(ui,/CORPUS_BRAND\.logoUrl/);
   assert.match(ui,/SILOY UKI \/ INTERNAL WORKSPACE/);
 });
+
+test('Siloy logo detection does not treat generic photography as a brand mark',()=>{
+  const fs=require('node:fs');
+  const generator=fs.readFileSync(require.resolve('../scripts/configure-corpus-brand.mjs'),'utf8');
+  assert.match(generator,/brandmark/);
+  assert.match(generator,/const alt = valueOf\(tag,'alt'\)\.trim\(\)/);
+  assert.match(generator,/officialVector/);
+  assert.match(generator,/Never inline remote SVG/);
+  assert.doesNotMatch(generator,/\/\\bsiloy\\b\|\\blogo\\b\/i\.test/);
+});

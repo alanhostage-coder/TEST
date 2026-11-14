@@ -88,8 +88,13 @@ function allowedPublicLogoHost(host, brandHost) {
 async function siteIcon(html,site) {
   const links = html.match(/<link\b[^>]*>/gi) || [];
   const images = html.match(/<img\b[^>]*>/gi) || [];
-  const imagesWithIdentity = images.filter(tag =>
-    /\bsiloy\b|\blogo\b/i.test(valueOf(tag,'alt') + ' ' + valueOf(tag,'class')));
+  // Do not treat Siloy-themed photography or customers' logos as the Siloy brand mark.
+  // Require an explicit brand identity label, then fall back to the site's icon.
+  const imagesWithIdentity = images.filter(tag => {
+    const alt = valueOf(tag,'alt').trim();
+    return /^siloy(?:\s+(?:logo|wordmark|brandmark))?$/i.test(alt) ||
+      /^siloy\s+(?:logo|wordmark|brandmark)\b/i.test(alt);
+  });
   const candidates = [
     ...imagesWithIdentity.map(tag=>valueOf(tag,'src')),
     ...links.filter(tag=>/apple-touch-icon|\bicon\b/i.test(valueOf(tag,'rel'))).map(tag=>valueOf(tag,'href'))
@@ -108,11 +113,16 @@ async function siteIcon(html,site) {
     if (src.protocol !== 'https:' || !allowedPublicLogoHost(src.hostname,site.hostname) ||
       (src.port && src.port !== '443')) continue;
     try {
-      const result = await fetchBounded(src.href,160000,'image/png,image/jpeg,image/webp');
-      if (!['image/png','image/jpeg','image/webp'].includes(result.type)) continue;
+      const result = await fetchBounded(src.href,160000,'image/png,image/jpeg,image/webp,image/svg+xml');
+      const raster = ['image/png','image/jpeg','image/webp'].includes(result.type);
+      const officialVector = result.type === 'image/svg+xml' &&
+        src.hostname.replace(/^www\./,'') === site.hostname.replace(/^www\./,'') &&
+        /(?:favicon|siloy[-_]?logo|siloy[-_]?mark|wordmark)\.svg(?:$|[?#])/i.test(src.href);
+      if (!raster && !officialVector) continue;
       return {
         src:src.href,
-        embedded:'data:' + result.type + ';base64,' + Buffer.from(result.data).toString('base64')
+        // Never inline remote SVG into generated markup.
+        embedded:raster ? 'data:' + result.type + ';base64,' + Buffer.from(result.data).toString('base64') : ''
       };
     } catch {}
   }
