@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   hubspot, Heading, Text, Input, TextArea, Select, Button, Link,
-  Divider, LoadingSpinner, Flex, Tile, Tag
+  Divider, LoadingSpinner, Flex, Tile, Tag, Image
 } from '@hubspot/ui-extensions';
 import { CORPUS_BRAND } from './brand-config';
 
@@ -266,6 +266,9 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
   return (
     <>
       <Tile>
+        {CORPUS_BRAND.logoUrl ? (
+          <Image src={CORPUS_BRAND.logoUrl} alt={CORPUS_BRAND.name + ' logo'} width={180} />
+        ) : null}
         <Text variant="microcopy">SILOY UKI / INTERNAL WORKSPACE</Text>
         <Heading>Corpus Notes</Heading>
         <Flex direction="row" wrap="wrap" gap="small">

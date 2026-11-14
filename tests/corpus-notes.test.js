@@ -111,3 +111,15 @@ test('writing focus and cognitive signposting remain present',()=>{
   assert.doesNotMatch(main,/<Image src=\{CORPUS_BANNER_DATA_URI\}/);
   assert.match(main,/SILOY UKI \/ INTERNAL WORKSPACE/);
 });
+
+test('brand importer uses a bounded HTML stream rather than rejecting a large site by Content-Length',()=>{
+  const fs=require('node:fs');
+  const generator=fs.readFileSync(require.resolve('../scripts/configure-corpus-brand.mjs'),'utf8');
+  const ui=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
+  assert.match(generator,/async function fetchHtmlHead/);
+  assert.match(generator,/getReader\(\)/);
+  assert.match(generator,/html = await fetchHtmlHead\(site\.href\)/);
+  assert.match(generator,/logoUrl/);
+  assert.match(ui,/CORPUS_BRAND\.logoUrl/);
+  assert.match(ui,/SILOY UKI \/ INTERNAL WORKSPACE/);
+});
