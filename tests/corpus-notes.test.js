@@ -170,3 +170,18 @@ test('Siloy branding uses supplied cropped mark instead of an empty favicon',()=
   assert.doesNotMatch(main,/src=\{CORPUS_BRAND\.logoUrl\}/);
   assert.doesNotMatch(rail,/src=\{CORPUS_BRAND\.logoUrl\}/);
 });
+
+test('Siloy logo uses the exact supplied-crop JPEG and decodes without corruption',()=>{
+  const fs=require('node:fs');
+  const crypto=require('node:crypto');
+  const path=require('node:path');
+  const svg=fs.readFileSync(path.resolve(__dirname,'../src/app/cards/assets/siloy-signage-mark.svg'),'utf8');
+  const match=/data:image\/jpeg;base64,([A-Za-z0-9+/=]+)/.exec(svg);
+  assert.ok(match,'Siloy mark should embed a cropped JPEG');
+  const bytes=Buffer.from(match[1],'base64');
+  assert.equal(bytes.byteLength,3470);
+  assert.equal(bytes.subarray(0,3).toString('hex'),'ffd8ff');
+  assert.equal(bytes.subarray(bytes.length-2).toString('hex'),'ffd9');
+  assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),
+    '7e98e00fc00981e538c0da6950abb821427f45738838e1e97d9a413b9d7edd89');
+});
