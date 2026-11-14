@@ -123,7 +123,7 @@ test('brand importer uses a bounded HTML stream rather than rejecting a large si
   assert.match(generator,/html = await fetchHtmlHead\(site\.href\)/);
   assert.match(generator,/logoUrl/);
   assert.match(ui,/CORPUS_BRAND\.logoUrl/);
-  assert.match(ui,/SILOY UKI \/ INTERNAL WORKSPACE/);
+  assert.match(ui,/by Siloy UKI/);
 });
 
 test('Siloy logo detection does not treat generic photography as a brand mark',()=>{
