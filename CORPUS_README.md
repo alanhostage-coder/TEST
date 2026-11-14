@@ -114,6 +114,27 @@ is used, save confirmation does not depend on history refresh, type-specific wri
 guides and filters remain present, and meeting/calendar endpoints are not written.
 A manual save-and-copy acceptance check in the live HubSpot card is still needed.
 
+## Siloy logo lockup and colour accents
+
+Both the Company workspace and the optional right-sidebar quick actions now use
+a compact **official Siloy brand mark + Corpus Notes** lockup with `by Siloy UKI`
+under the app title. No people photographs or promotional cover imagery are used.
+The app selects a validated, public HTTPS logo from the brand website, falling
+back to readable native branding if the asset cannot be detected.
+
+The brand-only colour rail is hosted as an SVG in this public source repository,
+using `#010103`, `#DAEAFF`, `#FEF5AC` and `#EAFDD6`. This is a small
+decorative accent, **not** the former full-width banner. Siloy is the default
+identity; custom clients retain their deployment-time website, name and logo
+configuration.
+
+HubSpot native UI extensions do **not** support arbitrary CSS to recolour
+the CRM's actual card borders or button backgrounds. To avoid unsupported
+styling, we use the exact Siloy colours on the SVG rail and native, accessible
+semantic tag colours for internal status, capture, review and save feedback.
+Any customer-specific pixel-perfect borders require a separately hosted app
+surface rather than unsupported card CSS.
+
 ## Deployment
 
 Store `HUBSPOT_PERSONAL_ACCESS_KEY` as a GitHub Actions repository secret for account 145209388. Run the Upload Corpus Note workflow. Its official HubSpot Actions steps upload and deploy the project. Once built, install the private app from Development > Projects > Distribution, grant scopes, and add the card to the Company record layout via Customize > Add card > Apps. Verify with a safe test note.
