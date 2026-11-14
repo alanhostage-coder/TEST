@@ -1,0 +1,30 @@
+{
+  "uid": "siloy_time_enterprise_app",
+  "type": "app",
+  "config": {
+    "name": "Siloy Time",
+    "description": "Standalone enterprise timesheets by Siloy UKI.",
+    "distribution": "private",
+    "auth": {
+      "type": "static",
+      "requiredScopes": [
+        "oauth",
+        "crm.objects.contacts.read",
+        "crm.objects.custom.read",
+        "crm.objects.custom.write"
+      ],
+      "optionalScopes": [],
+      "conditionallyRequiredScopes": []
+    },
+    "permittedUrls": {
+      "fetch": [],
+      "iframe": [],
+      "img": []
+    },
+    "support": {
+      "supportEmail": "support@prosperohub.com",
+      "documentationUrl": "https://developers.hubspot.com/docs/apps/developer-platform/add-features/ui-extensions/overview",
+      "supportUrl": "https://siloy.com/companies/uk-i"
+    }
+  }
+}

@@ -1,0 +1,63 @@
+name: Deploy Siloy Time to HubSpot Product Updates
+on:
+  push:
+    branches:
+      - codex/siloy-time-enterprise
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      DEFAULT_ACCOUNT_ID: '145209388'
+      DEFAULT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate Siloy logo identity
+        env:
+          CORPUS_BRAND_URL: 'https://siloy.com/brand'
+          CORPUS_BRAND_NAME: 'Siloy UKI'
+        run: node scripts/configure-corpus-brand.mjs
+      - name: Validate code and timesheet behaviour
+        run: |
+          node --check src/app/functions/SiloyTime.js
+          node --test tests/siloy-time.test.js
+      - name: Verify authorised HubSpot key
+        run: |
+          if [ -z "$DEFAULT_PERSONAL_ACCESS_KEY" ]; then
+            echo "::error::Missing HUBSPOT_PERSONAL_ACCESS_KEY repository secret"
+            exit 1
+          fi
+      - name: Upload isolated Siloy Time project
+        id: upload
+        uses: HubSpot/hubspot-project-actions/project-upload@v1.1.0
+        with:
+          project_dir: './'
+          account_id: '145209388'
+          personal_access_key: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+      - name: Deploy build when required
+        if: steps.upload.outputs.deploy_id == ''
+        uses: HubSpot/hubspot-project-actions/project-deploy@v1.1.0
+        with:
+          deploy_latest_build: true
+          project_dir: './'
+          account_id: '145209388'
+          personal_access_key: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+      - name: Install Siloy Time app separately
+        env:
+          HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+          HUBSPOT_ACCOUNT_ID: '145209388'
+        run: |
+          npm install -g @hubspot/cli@8.18.0
+          printf 'y\n' | timeout 60s script -q -e -c "hs project install-app --use-env" /dev/null
+      - name: Verify installation status
+        env:
+          HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+          HUBSPOT_ACCOUNT_ID: '145209388'
+        run: |
+          hs project list-builds --use-env --json
+          hs project app-install-status --use-env --json

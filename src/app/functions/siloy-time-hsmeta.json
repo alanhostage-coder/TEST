@@ -1,0 +1,8 @@
+{
+  "uid": "siloy_time_api",
+  "type": "app-function",
+  "config": {
+    "entrypoint": "/app/functions/SiloyTime.js",
+    "secretKeys": []
+  }
+}
