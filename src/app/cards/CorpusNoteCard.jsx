@@ -64,6 +64,7 @@ function CorpusNoteCard({ context, addAlert }) {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const saveInFlight = React.useRef(false);
   const [error, setError] = useState('');
   const [truncated, setTruncated] = useState(false);
   const [form, setForm] = useState(empty);
@@ -138,7 +139,7 @@ function CorpusNoteCard({ context, addAlert }) {
   useEffect(() => { reload(); }, [reload]);
 
   const save = async () => {
-    if (saving) return;
+    if (saveInFlight.current) return;
     setSaveIssue('');
     const noteDate = ukToISO(ukDate);
     const followDate = ukFollowup ? ukToISO(ukFollowup) : '';
@@ -163,6 +164,7 @@ function CorpusNoteCard({ context, addAlert }) {
       addAlert({type: 'danger', title: 'One thing to check', message: problem});
       return;
     }
+    saveInFlight.current = true;
     setSaving(true);
     try {
       const result = unwrap(await hubspot.serverless('corpus_notes_api', {
@@ -207,6 +209,7 @@ function CorpusNoteCard({ context, addAlert }) {
         message: reason + ' Your draft is still here.'
       });
     } finally {
+      saveInFlight.current = false;
       setSaving(false);
     }
   };
