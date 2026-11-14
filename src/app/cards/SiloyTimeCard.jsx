@@ -2,6 +2,9 @@ import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {hubspot,Heading,Text,Input,TextArea,Select,Button,Divider,Flex,Tile,Tag,Image,LoadingSpinner} from '@hubspot/ui-extensions';
 import {CORPUS_BRAND} from './brand-config';
 const RAIL='https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/siloy-time-enterprise/src/app/cards/assets/siloy-colour-rail.svg';
+const SILOY_MARK='https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/siloy-time-enterprise/src/app/cards/assets/siloy-signage-mark.svg';
+const isSiloyBrand=/^https:\/\/(?:www\.)?siloy\.com(?:\/|$)/i.test(CORPUS_BRAND.websiteUrl||'');
+const displayedBrandMark=isSiloyBrand?SILOY_MARK:CORPUS_BRAND.logoUrl;
 const NAMES=['Monday','Tuesday','Wednesday','Thursday','Friday'];
 function iso(d){return d.toISOString().slice(0,10);}
 function monday(v){const d=new Date(v.slice(0,10)+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-(d.getUTCDay()+6)%7);return iso(d);}
@@ -36,8 +39,12 @@ function TimeCard({context,alert}){
   }catch(e){setError(String(e.message||e));}finally{setLoading(false);}
  },[contactId,week]);
  useEffect(()=>{reload();},[reload]);
- const fresh=date=>{setForm(blank(date));setDirty(false);setReceipt('');setOpen(true);};
+ const fresh=date=>{
+  if(dirty){alert({type:'warning',title:'Unsaved time',message:'Save or clear the form before adding another entry.'});return;}
+  setForm(blank(date));setDirty(false);setReceipt('');setOpen(true);
+ };
  const edit=row=>{
+  if(dirty){alert({type:'warning',title:'Unsaved time',message:'Save or clear the form before editing a different entry.'});return;}
   setForm({id:row.id,date:row.date,start:row.start||'09:00',projectId:row.projectId,
    hours:String(row.hours||1),description:row.description||'',billable:String(row.billable)});
   setDirty(false);setError('');setReceipt('');setOpen(true);
@@ -74,7 +81,7 @@ function TimeCard({context,alert}){
  return <>
   <Tile>
    <Flex direction="row" gap="medium" align="center" wrap="wrap">
-    {CORPUS_BRAND.logoUrl?<Image src={CORPUS_BRAND.logoUrl} alt="Official Siloy logo" width={64}/>:null}
+    {displayedBrandMark?<Image src={displayedBrandMark} alt="Official Siloy brand mark" width={64}/>:null}
     <Flex direction="column" gap="small">
      <Heading>Siloy Time</Heading>
      <Text variant="microcopy">by Siloy UKI · Enterprise timesheets</Text>
