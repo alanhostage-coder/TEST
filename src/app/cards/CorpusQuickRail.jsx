@@ -8,6 +8,9 @@ import { CORPUS_BRAND } from './brand-config';
 const SILOY_COLOUR_RAIL_URL =
   'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-colour-rail.svg';
 const isSiloyBrand = /^https:\/\/(?:www\.)?siloy\.com(?:\/|$)/i.test(CORPUS_BRAND.websiteUrl || '');
+const SILOY_SIGNAGE_MARK_URL =
+  'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-signage-mark.svg';
+const displayedBrandMark = isSiloyBrand ? SILOY_SIGNAGE_MARK_URL : CORPUS_BRAND.logoUrl;
 
 function day(value) {
   if (!value) return null;
@@ -142,9 +145,10 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
   return (
     <>
       <Flex direction="row" align="center" gap="small" wrap="wrap">
-        {CORPUS_BRAND.logoUrl ? (
-          <Image src={CORPUS_BRAND.logoUrl}
-            alt={CORPUS_BRAND.name + ' official brand mark'} width={42} />
+        {displayedBrandMark ? (
+          <Image src={displayedBrandMark}
+            alt={isSiloyBrand ? 'Siloy official mark on UKI signage' : CORPUS_BRAND.name + ' brand mark'}
+            width={118} />
         ) : null}
         <Flex direction="column" gap="small">
           <Heading>Corpus Notes</Heading>
