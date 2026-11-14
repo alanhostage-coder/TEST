@@ -82,6 +82,38 @@ After deployment, add it to the Company record layout separately via
 - Confirm that notes never appear in meeting invitations or attendee descriptions.
 - Review record and object permissions before using sensitive client information.
 
+## Draft recovery and focused writing
+
+Corpus Notes now supports **Copy recovery draft** in the main Company card and **Copy draft**
+in the optional right-hand card. The HubSpot UI Extensions `copyTextToClipboard` action
+is used only in response to an explicit button click. The copied text contains the note
+title and body and, in the main card, decisions, risks, follow-up date and next steps.
+It is a **manual rescue copy**, not automatic draft persistence. Clipboard contents
+must be treated as confidential and pasted into a secure authorised location if needed.
+
+The main card also offers **Focus on writing**, which temporarily hides note history,
+and contextual questions for meeting, call, discovery, handover and internal-update
+types. Saved history has a local text search and filters for overdue follow-ups, all
+follow-ups, risks, decisions, and next actions. Searches and counts cover only notes
+loaded into the current Company card, up to 100.
+
+After HubSpot confirms a save, Corpus releases its saving indicator immediately. A
+subsequent history refresh runs separately; a refresh failure does **not** mean the
+note failed to save. The saved-note receipt provides the direct record link.
+
+The previous SVG image import and generated data URI proved unreliable in HubSpot's
+native card renderer and have been removed from the visible card. The guaranteed
+native brand identity remains **Corpus Notes by Siloy UKI**. Full custom brand
+imagery and branded typography should be delivered through a separately validated
+HTTPS image strategy or hosted app interface, rather than an image that fails silently.
+
+### Quality gate
+
+The automated tests assert clipboard actions are user-initiated, no browser storage
+is used, save confirmation does not depend on history refresh, type-specific writing
+guides and filters remain present, and meeting/calendar endpoints are not written.
+A manual save-and-copy acceptance check in the live HubSpot card is still needed.
+
 ## Deployment
 
 Store `HUBSPOT_PERSONAL_ACCESS_KEY` as a GitHub Actions repository secret for account 145209388. Run the Upload Corpus Note workflow. Its official HubSpot Actions steps upload and deploy the project. Once built, install the private app from Development > Projects > Distribution, grant scopes, and add the card to the Company record layout via Customize > Add card > Apps. Verify with a safe test note.
