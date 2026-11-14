@@ -47,6 +47,41 @@ These options are **developer/deployment settings**, not yet an in-app admin set
 
 HubSpot UI extensions do not permit arbitrary CSS or webfont injection into the native CRM card. Native controls remain accessible and consistent with the CRM. The branded banner uses a bundled SVG asset and safe fallbacks.
 
+## Visible branding and the right-hand quick rail
+
+The prior SVG file import rendered an empty image source inside the live HubSpot UI Extension.
+Corpus now bundles a generated URL-safe banner data URI **and** displays its product name,
+`by Siloy UKI`, and the internal-only status as native text and tags. The identity remains
+visible even if a client's custom logo cannot render.
+
+The primary Company card is a guided four-step workspace:
+1. **Capture the note**
+2. **Add context** if needed, including decisions, risks and next steps
+3. **Save to Company**, with a receipt and direct record link
+4. **Review and follow up**, using All / Due / Follow-ups / Risks quick filters
+
+The Protect draft switch is a **local accidental-edit guard only**. It does not persist,
+change permissions or encrypt the note. Follow-up counters and due badges are
+**in-card cues**, not reminders, CRM tasks, emails or push notifications.
+They reflect the notes loaded into the card and can be refreshed.
+
+The optional second app card, **Corpus Notes | Internal quick actions**, targets
+`crm.record.sidebar` and offers quick internal note capture and a small
+Due / Risks / All review rail. It does not require a change to the primary card.
+After deployment, add it to the Company record layout separately via
+**Customize > right sidebar > Add card > Apps**.
+
+### Acceptance checks in Product Updates
+
+- On Fulcrum's Company record, visually confirm the main card displays
+  **Corpus Notes**, **by Siloy UKI**, and **INTERNAL ONLY** regardless of the banner image.
+- Toggle **Protect draft** and verify fields and Save are disabled until unlocked.
+- Load sample notes, select Due and Risks and verify the visible notes change.
+- Test a synthetic note and confirm a linked Corpus Note record and save receipt.
+- Add the optional right-rail card manually and check the quick-capture flow with synthetic data.
+- Confirm that notes never appear in meeting invitations or attendee descriptions.
+- Review record and object permissions before using sensitive client information.
+
 ## Deployment
 
 Store `HUBSPOT_PERSONAL_ACCESS_KEY` as a GitHub Actions repository secret for account 145209388. Run the Upload Corpus Note workflow. Its official HubSpot Actions steps upload and deploy the project. Once built, install the private app from Development > Projects > Distribution, grant scopes, and add the card to the Company record layout via Customize > Add card > Apps. Verify with a safe test note.

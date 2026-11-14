@@ -3,7 +3,7 @@ import {
   hubspot, Heading, Text, Input, TextArea, Select, Button, Link,
   Divider, LoadingSpinner, Flex, Tile, Tag, Image
 } from '@hubspot/ui-extensions';
-import brandBanner from './assets/brand-banner.svg';
+import { CORPUS_BANNER_DATA_URI } from './brand-banner';
 import { CORPUS_BRAND } from './brand-config';
 
 const OPTIONS = [
@@ -37,6 +37,18 @@ function isoToUK(value) {
     ? '' : date.toLocaleDateString('en-GB', { timeZone: 'UTC' });
 }
 function unwrap(response) { return response && (response.body || response) || {}; }
+function toDay(value) {
+  if (!value) return null;
+  const n = /^\d+$/.test(String(value)) ? Number(value) : Date.parse(String(value));
+  if (!Number.isFinite(n)) return null;
+  const date = new Date(n);
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+function hasDueFollowup(note) {
+  const d = toDay(note.followup_date);
+  return d !== null && d <= toDay(new Date().toISOString());
+}
+function hasFollowup(note) { return toDay(note.followup_date) !== null; }
 function readable(value, limit = 600) {
   const plain = String(value || '').replace(/<[^>]*>/g, ' ').replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&').replace(/\s+/g, ' ').trim();
@@ -63,6 +75,18 @@ function CorpusNoteCard({ context, addAlert }) {
   const [receipt, setReceipt] = useState(null);
   const [discardArmed, setDiscardArmed] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [draftProtected, setDraftProtected] = useState(false);
+  const [historyFilter, setHistoryFilter] = useState('all');
+  const dueCount = notes.filter(hasDueFollowup).length;
+  const followupCount = notes.filter(hasFollowup).length;
+  const riskCount = notes.filter(n => String(n.risks || '').trim()).length;
+  const visibleNotes = notes.filter(note => {
+    if (historyFilter === 'due') return hasDueFollowup(note);
+    if (historyFilter === 'followups') return hasFollowup(note);
+    if (historyFilter === 'risks') return Boolean(String(note.risks || '').trim());
+    if (historyFilter === 'decisions') return Boolean(String(note.decisions || '').trim());
+    return true;
+  });
   const set = (key, value) => {
     setDirty(true);
     setDiscardArmed(false);
@@ -80,6 +104,7 @@ function CorpusNoteCard({ context, addAlert }) {
     setDirty(false);
     setDiscardArmed(false);
     setDetailsOpen(false);
+    setDraftProtected(false);
   };
 
   const reload = useCallback(async () => {
@@ -107,7 +132,7 @@ function CorpusNoteCard({ context, addAlert }) {
   useEffect(() => { reload(); }, [reload]);
 
   const save = async () => {
-    if (saving) return;
+    if (saving || draftProtected) return;
     const noteDate = ukToISO(ukDate);
     const followDate = ukFollowup ? ukToISO(ukFollowup) : '';
     if (!form.note_title.trim() || !form.internal_notes.trim() ||
@@ -140,6 +165,7 @@ function CorpusNoteCard({ context, addAlert }) {
       setDiscardArmed(false);
       setDetailsOpen(false);
       setComposerOpen(false);
+      setDraftProtected(false);
       await reload();
     } catch (err) {
       addAlert({
@@ -153,16 +179,25 @@ function CorpusNoteCard({ context, addAlert }) {
 
   return (
     <>
-      <Image src={brandBanner} alt={'Corpus Notes by ' + CORPUS_BRAND.name + '. Internal workspace.'} width={900} />
+      <Image src={CORPUS_BANNER_DATA_URI}
+        alt={'Corpus Notes by ' + CORPUS_BRAND.name + '. Internal workspace.'} width={900} />
+      <Heading>Corpus Notes</Heading>
       <Flex direction="row" wrap="wrap" gap="small">
-        <Tag variant="warning">Internal only</Tag>
-        <Tag variant="info">Not sent to attendees</Tag>
-        <Tag variant="default">{CORPUS_BRAND.name}</Tag>
+        <Tag variant="default">by Siloy UKI</Tag>
+        <Tag variant="warning">INTERNAL ONLY</Tag>
+        <Tag variant="info">No attendee invitations</Tag>
+        <Tag variant="default">Workspace: {CORPUS_BRAND.name}</Tag>
       </Flex>
-      <Text variant="microcopy">
-        Notes created here stay out of meeting invitations and attendee descriptions.
-        This label is a reminder, not an access-control setting.
-      </Text>
+      <Text>Capture internal context, document decisions and keep the next action visible.</Text>
+      <Text variant="microcopy">Notes created here are stored on the Company, never in a meeting invitation. CRM permissions still govern who can see them.</Text>
+      <Flex direction="row" wrap="wrap" gap="small">
+        <Button variant="secondary" onClick={() => { setComposerOpen(true); setReceipt(null); }}>
+          Write a note
+        </Button>
+        <Button variant="secondary" onClick={() => { setHistoryFilter('due'); setHistoryExpanded(true); }}>
+          Follow-ups due ({dueCount})
+        </Button>
+      </Flex>
       <Divider />
 
       {receipt ? (
@@ -181,7 +216,7 @@ function CorpusNoteCard({ context, addAlert }) {
 
       <Tile>
         <Flex direction="row" justify="between" gap="small" align="center" wrap="wrap">
-          <Heading>Write an internal note</Heading>
+          <Heading>01 · Capture the note</Heading>
           <Button variant="secondary" onClick={() => setComposerOpen(v => !v)}>
             {composerOpen ? 'Hide editor' : 'New note'}
           </Button>
@@ -190,13 +225,20 @@ function CorpusNoteCard({ context, addAlert }) {
         {composerOpen ? (
           <>
             <Text variant="microcopy">
-              Capture the important part first. Add decisions, risks and follow-up details only when needed.
+              Start with the essentials. Keep decisions, risks and next actions separate so they can be found later.
             </Text>
-            <Input name="noteTitle" label="Title" required value={form.note_title}
+            <Flex direction="row" gap="small" wrap="wrap">
+              <Button variant="secondary" onClick={() => setDraftProtected(v => !v)} disabled={saving}>
+                {draftProtected ? 'Unlock editor' : 'Protect draft'}
+              </Button>
+              {draftProtected ? <Tag variant="warning">Editing paused</Tag> : null}
+            </Flex>
+            {draftProtected ? <Text variant="microcopy">Draft protection prevents accidental edits in this open card only. It is not a security lock or persisted setting.</Text> : null}
+            <Input name="noteTitle" label="Title" required disabled={draftProtected || saving} value={form.note_title}
               onChange={v => set('note_title', v)} placeholder="e.g. Internal client review" />
-            <Select name="noteType" label="Note type" options={OPTIONS}
+            <Select name="noteType" label="Note type" disabled={draftProtected || saving} options={OPTIONS}
               value={form.note_type} onChange={v => set('note_type', v)} />
-            <TextArea name="noteBody" label="Your internal notes" required rows={5}
+            <TextArea name="noteBody" label="Your internal notes" required rows={5} disabled={draftProtected || saving}
               value={form.internal_notes} onChange={v => set('internal_notes', v)}
               placeholder="What happened, what matters, and what needs attention..." />
             <Flex direction="row" gap="small" wrap="wrap">
@@ -205,36 +247,38 @@ function CorpusNoteCard({ context, addAlert }) {
             </Flex>
             <Divider />
             <Button variant="secondary" onClick={() => setDetailsOpen(v => !v)}>
-              {detailsOpen ? 'Hide extra details' : 'Add decisions, risks or follow-ups'}
+              {detailsOpen ? '02 · Hide context' : '02 · Add decisions, risks or next steps'}
             </Button>
             {detailsOpen ? (
               <>
-                <Input name="noteDate" label="Note date (dd/mm/yyyy)" value={ukDate}
+                <Input name="noteDate" disabled={draftProtected || saving} label="Note date (dd/mm/yyyy)" value={ukDate}
                   onChange={setDate} placeholder="13/11/2026" />
-                <TextArea name="decisions" label="Decisions" rows={2}
+                <TextArea name="decisions" disabled={draftProtected || saving} label="Decisions" rows={2}
                   value={form.decisions} onChange={v => set('decisions', v)}
                   placeholder="What was agreed?" />
-                <TextArea name="risks" label="Risks and concerns" rows={2}
+                <TextArea name="risks" disabled={draftProtected || saving} label="Risks and concerns" rows={2}
                   value={form.risks} onChange={v => set('risks', v)}
                   placeholder="What needs watching?" />
-                <TextArea name="nextSteps" label="Next actions" rows={2}
+                <TextArea name="nextSteps" disabled={draftProtected || saving} label="Next actions" rows={2}
                   value={form.next_steps} onChange={v => set('next_steps', v)}
                   placeholder="Who is doing what?" />
-                <Input name="followupDate" label="Follow-up date (dd/mm/yyyy)" value={ukFollowup}
+                <Input name="followupDate" disabled={draftProtected || saving} label="Follow-up date (dd/mm/yyyy)" value={ukFollowup}
                   onChange={setFollowDate} placeholder="Optional" />
-                <Input name="meetingActivityId" label="Meeting activity ID (optional reference only)"
+                <Input name="meetingActivityId" disabled={draftProtected || saving} label="Meeting activity ID (optional reference only)"
                   value={form.meeting_activity_id}
                   onChange={v => set('meeting_activity_id', v)}
                   placeholder="Digits only. Not a meeting association." />
               </>
             ) : null}
             <Divider />
+            <Heading>03 · Save to Company</Heading>
+            <Text variant="microcopy">This action creates a new Corpus Note linked to the current Company. It does not edit the calendar event.</Text>
             <Flex direction="row" gap="small" wrap="wrap">
               <Button onClick={save}
-                disabled={saving || !/^\d+$/.test(companyId) || !form.note_title.trim() || !form.internal_notes.trim()}>
+                disabled={saving || draftProtected || !/^\d+$/.test(companyId) || !form.note_title.trim() || !form.internal_notes.trim()}>
                 {saving ? 'Saving note…' : 'Save internal note'}
               </Button>
-              <Button variant={dirty ? 'destructive' : 'secondary'} onClick={discard} disabled={saving}>
+              <Button variant={dirty ? 'destructive' : 'secondary'} onClick={discard} disabled={saving || draftProtected}>
                 {dirty && !discardArmed ? 'Discard draft' : dirty ? 'Confirm discard' : 'Clear'}
               </Button>
             </Flex>
@@ -250,7 +294,7 @@ function CorpusNoteCard({ context, addAlert }) {
       <Divider />
       <Tile>
         <Flex direction="row" justify="between" gap="small" wrap="wrap" align="center">
-          <Heading>Company note history</Heading>
+          <Heading>04 · Review and follow up</Heading>
           <Button variant="secondary" onClick={reload} disabled={loading}>
             {loading ? 'Refreshing…' : 'Refresh'}
           </Button>
@@ -262,30 +306,44 @@ function CorpusNoteCard({ context, addAlert }) {
         ) : null}
         {!loading && !error && notes.length > 0 ? (
           <>
-            <Text variant="microcopy">{notes.length}{truncated ? '+' : ''} linked notes, newest first</Text>
-            {notes.slice(0, historyExpanded ? notes.length : 3).map(note => (
+            <Text variant="microcopy">{notes.length}{truncated ? '+' : ''} saved notes · {dueCount} follow-ups due · {riskCount} with risks</Text>
+            <Flex direction="row" gap="small" wrap="wrap">
+              <Button variant={historyFilter === 'all' ? 'primary' : 'secondary'}
+                onClick={() => { setHistoryFilter('all'); setHistoryExpanded(false); }}>All</Button>
+              <Button variant={historyFilter === 'due' ? 'primary' : 'secondary'}
+                onClick={() => { setHistoryFilter('due'); setHistoryExpanded(true); }}>Due ({dueCount})</Button>
+              <Button variant={historyFilter === 'followups' ? 'primary' : 'secondary'}
+                onClick={() => { setHistoryFilter('followups'); setHistoryExpanded(true); }}>Follow-ups ({followupCount})</Button>
+              <Button variant={historyFilter === 'risks' ? 'primary' : 'secondary'}
+                onClick={() => { setHistoryFilter('risks'); setHistoryExpanded(true); }}>Risks ({riskCount})</Button>
+            </Flex>
+            {visibleNotes.length === 0 ? <Text>No notes match this filter. Choose All to see the full Company history.</Text> : null}
+            {visibleNotes.slice(0, historyExpanded ? visibleNotes.length : 3).map(note => (
               <React.Fragment key={note.id}>
                 <Divider />
                 <Heading>{note.note_title || 'Untitled internal note'}</Heading>
                 <Flex direction="row" gap="small" wrap="wrap">
                   <Tag variant="default">{note.note_type || 'Internal'}</Tag>
+                  {hasDueFollowup(note) ? <Tag variant="warning">Follow-up due</Tag> : null}
                   <Text variant="microcopy">{isoToUK(note.note_date || note.hs_createdate)}</Text>
                 </Flex>
                 <Text>{readable(note.internal_notes, 240)}</Text>
                 {note.decisions ? <Text>Decision: {readable(note.decisions, 180)}</Text> : null}
                 {note.risks ? <Text>Risk: {readable(note.risks, 160)}</Text> : null}
-                {note.next_steps ? <Text>Next: {readable(note.next_steps, 180)}</Text> : null}
+                {note.next_steps ? <Text>Next action: {readable(note.next_steps, 180)}</Text> : null}
+                {hasFollowup(note) ? <Text variant="microcopy">Follow-up: {isoToUK(note.followup_date)}</Text> : null}
                 <Link href={noteUrl(note.id)}>Open full note</Link>
               </React.Fragment>
             ))}
-            {notes.length > 3 ? (
+            {visibleNotes.length > 3 ? (
               <Button variant="secondary" onClick={() => setHistoryExpanded(v => !v)}>
-                {historyExpanded ? 'Show recent notes' : 'Show all ' + notes.length + ' notes'}
+                {historyExpanded ? 'Show first three' : 'Show all ' + visibleNotes.length + ' matching notes'}
               </Button>
             ) : null}
           </>
         ) : null}
-        {truncated ? <Text variant="microcopy">Showing up to 100 notes. Older notes remain on Corpus Notes records.</Text> : null}
+        {truncated ? <Text variant="microcopy">Showing up to 100 notes. Older records can be found in Corpus Notes. Filter counts only cover loaded notes.</Text> : null}
+        <Text variant="microcopy">Follow-up indicators update when the card loads or refreshes. No emails, push notifications or CRM tasks are sent.</Text>
       </Tile>
       <Text variant="microcopy">
         Corpus Notes by Siloy UKI · {CORPUS_BRAND.name} workspace.
