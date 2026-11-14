@@ -1,0 +1,13 @@
+{
+  "uid": "corpus_notes_quick_rail",
+  "type": "card",
+  "config": {
+    "name": "Corpus Notes | Internal quick actions",
+    "description": "Siloy UKI quick capture and follow-up cues for Company records",
+    "location": "crm.record.sidebar",
+    "entrypoint": "/app/cards/CorpusQuickRail.jsx",
+    "objectTypes": [
+      "companies"
+    ]
+  }
+}
