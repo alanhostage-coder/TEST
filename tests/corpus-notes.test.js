@@ -58,3 +58,23 @@ test('invalid date avoids mutation',async()=>{
   }}});
   assert.equal(r.statusCode,400);assert.equal(hits,0);
 });
+
+test('main Company card never silently blocks saving a blank-title or protected draft',()=>{
+  const fs=require('node:fs');
+  const ui=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
+  assert.match(ui,/<Button onClick=\{save\} disabled=\{saving\}>/);
+  assert.doesNotMatch(ui,/if \(saving \|\| draftProtected\) return/);
+  assert.match(ui,/note_title: effectiveTitle/);
+  assert.match(ui,/const effectiveTitle = form\.note_title\.trim\(\) \|\| suggestedTitle/);
+  assert.match(ui,/setSaveIssue\(problem\)/);
+  assert.match(ui,/result\.partial && result\.noteId/);
+  assert.match(ui,/saveInFlight\.current = true/);
+});
+test('sidebar quick capture keeps Save available and provides validation',()=>{
+  const fs=require('node:fs');
+  const ui=fs.readFileSync(require.resolve('../src/app/cards/CorpusQuickRail.jsx'),'utf8');
+  assert.match(ui,/<Button onClick=\{save\} disabled=\{busy\}>/);
+  assert.match(ui,/const titleToSave = title\.trim\(\) \|\| defaultTitle/);
+  assert.match(ui,/Write your internal note before saving/);
+  assert.match(ui,/result\.partial && result\.noteId/);
+});
