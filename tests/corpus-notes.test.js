@@ -78,3 +78,36 @@ test('sidebar quick capture keeps Save available and provides validation',()=>{
   assert.match(ui,/Write your internal note before saving/);
   assert.match(ui,/result\.partial && result\.noteId/);
 });
+
+test('draft rescue uses HubSpot clipboard only on explicit user action',()=>{
+  const fs=require('node:fs');
+  const main=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
+  const rail=fs.readFileSync(require.resolve('../src/app/cards/CorpusQuickRail.jsx'),'utf8');
+  assert.match(main,/copyTextToClipboard=\{actions\.copyTextToClipboard\}/);
+  assert.match(main,/await copyTextToClipboard\(recoveryText\(\)\)/);
+  assert.match(main,/onClick=\{copyDraft\}/);
+  assert.match(main,/Recovery copies are manual/);
+  assert.match(rail,/onClick=\{copyQuickDraft\}/);
+  assert.match(rail,/await copyTextToClipboard\(\[/);
+  assert.doesNotMatch(main,/navigator\.clipboard|localStorage|sessionStorage/);
+  assert.doesNotMatch(rail,/navigator\.clipboard|localStorage|sessionStorage/);
+});
+test('confirmed save does not wait for a history reload',()=>{
+  const fs=require('node:fs');
+  const main=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
+  const rail=fs.readFileSync(require.resolve('../src/app/cards/CorpusQuickRail.jsx'),'utf8');
+  assert.match(main,/void reload\(\);/);
+  assert.match(rail,/void reload\(\);/);
+  assert.match(main,/setReceipt\(\{ id: result\.noteId, title: effectiveTitle, linked: true \}\)/);
+});
+test('writing focus and cognitive signposting remain present',()=>{
+  const fs=require('node:fs');
+  const main=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
+  assert.match(main,/const WRITING_GUIDES =/);
+  assert.match(main,/Focus on writing/);
+  assert.match(main,/Find in loaded notes/);
+  assert.match(main,/Next actions \(\{nextActionCount\}\)/);
+  assert.match(main,/Decisions \(\{decisionCount\}\)/);
+  assert.doesNotMatch(main,/<Image src=\{CORPUS_BANNER_DATA_URI\}/);
+  assert.match(main,/SILOY UKI \/ INTERNAL WORKSPACE/);
+});

@@ -1,9 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   hubspot, Heading, Text, Input, TextArea, Select, Button, Link,
-  Divider, LoadingSpinner, Flex, Tile, Tag, Image
+  Divider, LoadingSpinner, Flex, Tile, Tag
 } from '@hubspot/ui-extensions';
-import { CORPUS_BANNER_DATA_URI } from './brand-banner';
 import { CORPUS_BRAND } from './brand-config';
 
 const OPTIONS = [
@@ -13,6 +12,13 @@ const OPTIONS = [
   { label: 'Handover', value: 'handover' },
   { label: 'Internal update', value: 'internal_update' }
 ];
+const WRITING_GUIDES = {
+  meeting: 'Capture the discussion privately: what was decided, what is sensitive and who owns the next step?',
+  call: 'Capture the context, what changed and the action to take next.',
+  discovery: 'What did we learn, what is not yet confirmed and what is the next question?',
+  handover: 'What must the next colleague know, what is unresolved and what happens next?',
+  internal_update: 'What is the update, why does it matter and what needs attention?'
+};
 function today() { return new Date().toISOString().slice(0, 10); }
 function empty() {
   return {
@@ -56,9 +62,10 @@ function readable(value, limit = 600) {
 }
 
 hubspot.extend(({ context, actions }) => (
-  <CorpusNoteCard context={context} addAlert={actions.addAlert} />
+  <CorpusNoteCard context={context} addAlert={actions.addAlert}
+    copyTextToClipboard={actions.copyTextToClipboard} />
 ));
-function CorpusNoteCard({ context, addAlert }) {
+function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
   const companyId = String(context?.crm?.objectId || '');
   const portalId = String(context?.portal?.id || '145209388');
   const [notes, setNotes] = useState([]);
@@ -79,17 +86,25 @@ function CorpusNoteCard({ context, addAlert }) {
   const [saveIssue, setSaveIssue] = useState('');
   const [draftProtected, setDraftProtected] = useState(false);
   const [historyFilter, setHistoryFilter] = useState('all');
+  const [historyQuery, setHistoryQuery] = useState('');
+  const [focusWriting, setFocusWriting] = useState(false);
   const noteTypeLabel = OPTIONS.find(option => option.value === form.note_type)?.label || 'Internal note';
   const suggestedTitle = noteTypeLabel + ' · ' + (ukDate || isoToUK(today()));
   const effectiveTitle = form.note_title.trim() || suggestedTitle;
   const dueCount = notes.filter(hasDueFollowup).length;
   const followupCount = notes.filter(hasFollowup).length;
   const riskCount = notes.filter(n => String(n.risks || '').trim()).length;
+  const decisionCount = notes.filter(n => String(n.decisions || '').trim()).length;
+  const nextActionCount = notes.filter(n => String(n.next_steps || '').trim()).length;
   const visibleNotes = notes.filter(note => {
+    const q = historyQuery.toLowerCase().trim();
+    if (q && ![note.note_title, note.note_type, note.internal_notes, note.decisions, note.risks,
+      note.next_steps].some(item => readable(item, 65000).toLowerCase().includes(q))) return false;
     if (historyFilter === 'due') return hasDueFollowup(note);
     if (historyFilter === 'followups') return hasFollowup(note);
     if (historyFilter === 'risks') return Boolean(String(note.risks || '').trim());
     if (historyFilter === 'decisions') return Boolean(String(note.decisions || '').trim());
+    if (historyFilter === 'actions') return Boolean(String(note.next_steps || '').trim());
     return true;
   });
   const set = (key, value) => {
@@ -102,6 +117,36 @@ function CorpusNoteCard({ context, addAlert }) {
   const setFollowDate = value => { setSaveIssue(''); setDirty(true); setUkFollowup(value); setDiscardArmed(false); };
   const noteUrl = id => 'https://app-eu1.hubspot.com/contacts/' + portalId +
     '/record/2-256491528/' + id;
+  const recoveryText = () => [
+    'Corpus Notes · INTERNAL draft backup',
+    'Company record ID: ' + companyId,
+    'Title: ' + effectiveTitle,
+    'Type: ' + noteTypeLabel,
+    'Note date: ' + ukDate,
+    'Internal notes:', form.internal_notes || '(empty)',
+    'Decisions:', form.decisions || '(none)',
+    'Risks:', form.risks || '(none)',
+    'Next steps:', form.next_steps || '(none)',
+    'Follow-up date: ' + (ukFollowup || '(none)'),
+    'Meeting reference (not an association): ' + (form.meeting_activity_id || '(none)')
+  ].join('\n');
+  const copyDraft = async () => {
+    if (!form.internal_notes.trim() && !form.decisions.trim() && !form.risks.trim()
+      && !form.next_steps.trim() && !form.note_title.trim()) {
+      addAlert({ type: 'info', title: 'Nothing to copy yet',
+        message: 'Write a note first, then use Copy recovery draft.' });
+      return;
+    }
+    try {
+      if (typeof copyTextToClipboard !== 'function') throw new Error('Clipboard action unavailable.');
+      await copyTextToClipboard(recoveryText());
+      addAlert({type: 'success', title: 'Recovery copy created',
+        message: 'Your draft is on the device clipboard. Paste it into a secure location before refreshing.'});
+    } catch (error) {
+      addAlert({type: 'warning', title: 'Could not copy draft',
+        message: 'Clipboard access was unavailable. Keep this card open until you have saved the note.'});
+    }
+  };
   const discard = () => {
     if (dirty && !discardArmed) { setDiscardArmed(true); return; }
     setForm(empty());
@@ -179,6 +224,7 @@ function CorpusNoteCard({ context, addAlert }) {
         setComposerOpen(false);
         setDirty(false);
         setDraftProtected(false);
+        setFocusWriting(false);
         addAlert({
           type: 'danger', title: 'Note created, but not linked',
           message: 'Open the saved record and associate this Company. Do not save again or you could create a duplicate.'
@@ -196,11 +242,14 @@ function CorpusNoteCard({ context, addAlert }) {
       setDetailsOpen(false);
       setComposerOpen(false);
       setDraftProtected(false);
+      setFocusWriting(false);
       addAlert({
         type: 'success', title: 'Internal note saved',
         message: 'Your note is linked to this Company.'
       });
-      await reload();
+      // Saving and refreshing history are separate operations. The save is already confirmed;
+      // a slow or failed history refresh must not turn it into an apparent save failure.
+      void reload();
     } catch (err) {
       const reason = String(err.message || err);
       setSaveIssue(reason);
@@ -216,23 +265,27 @@ function CorpusNoteCard({ context, addAlert }) {
 
   return (
     <>
-      <Image src={CORPUS_BANNER_DATA_URI}
-        alt={'Corpus Notes by ' + CORPUS_BRAND.name + '. Internal workspace.'} width={900} />
-      <Heading>Corpus Notes</Heading>
-      <Flex direction="row" wrap="wrap" gap="small">
-        <Tag variant="default">by Siloy UKI</Tag>
-        <Tag variant="warning">INTERNAL ONLY</Tag>
-        <Tag variant="info">No attendee invitations</Tag>
-        <Tag variant="default">Workspace: {CORPUS_BRAND.name}</Tag>
-      </Flex>
+      <Tile>
+        <Text variant="microcopy">SILOY UKI / INTERNAL WORKSPACE</Text>
+        <Heading>Corpus Notes</Heading>
+        <Flex direction="row" wrap="wrap" gap="small">
+          <Tag variant="default">by Siloy UKI</Tag>
+          <Tag variant="warning">INTERNAL ONLY</Tag>
+          <Tag variant="info">Not in attendee invitations</Tag>
+          <Tag variant="default">Brand: {CORPUS_BRAND.name}</Tag>
+        </Flex>
+      </Tile>
       <Text>Capture internal context, document decisions and keep the next action visible.</Text>
       <Text variant="microcopy">Notes created here are stored on the Company, never in a meeting invitation. CRM permissions still govern who can see them.</Text>
       <Flex direction="row" wrap="wrap" gap="small">
         <Button variant="secondary" onClick={() => { setComposerOpen(true); setReceipt(null); }}>
           Write a note
         </Button>
-        <Button variant="secondary" onClick={() => { setHistoryFilter('due'); setHistoryExpanded(true); }}>
+        <Button variant="secondary" onClick={() => { setHistoryFilter('due'); setHistoryExpanded(true); setFocusWriting(false); }}>
           Follow-ups due ({dueCount})
+        </Button>
+        <Button variant="secondary" onClick={() => setFocusWriting(v => !v)}>
+          {focusWriting ? 'Show history' : 'Focus on writing'}
         </Button>
       </Flex>
       <Divider />
@@ -280,6 +333,7 @@ function CorpusNoteCard({ context, addAlert }) {
             {!form.note_title.trim() ? <Text variant="microcopy">We'll name this note: {suggestedTitle}</Text> : null}
             <Select name="noteType" label="Note type" disabled={draftProtected || saving} options={OPTIONS}
               value={form.note_type} onChange={v => set('note_type', v)} />
+            <Text variant="microcopy">{WRITING_GUIDES[form.note_type] || WRITING_GUIDES.internal_update}</Text>
             <TextArea name="noteBody" label="Your internal notes" required rows={5} disabled={draftProtected || saving}
               value={form.internal_notes} onChange={v => set('internal_notes', v)}
               placeholder="What happened, what matters, and what needs attention..." />
@@ -320,10 +374,14 @@ function CorpusNoteCard({ context, addAlert }) {
               <Button onClick={save} disabled={saving}>
                 {saving ? 'Saving note…' : 'Save internal note'}
               </Button>
+              <Button variant="secondary" onClick={copyDraft} disabled={saving}>
+                Copy recovery draft
+              </Button>
               <Button variant={dirty ? 'destructive' : 'secondary'} onClick={discard} disabled={saving || draftProtected}>
                 {dirty && !discardArmed ? 'Discard draft' : dirty ? 'Confirm discard' : 'Clear'}
               </Button>
             </Flex>
+            <Text variant="microcopy">Recovery copies are manual and stored in your device clipboard, not automatically saved by Corpus. Handle confidential text carefully.</Text>
             {discardArmed ? (
               <Text variant="microcopy">Select Confirm discard to permanently clear this unsaved draft.</Text>
             ) : null}
@@ -333,6 +391,8 @@ function CorpusNoteCard({ context, addAlert }) {
         )}
       </Tile>
 
+      {!focusWriting ? (
+      <>
       <Divider />
       <Tile>
         <Flex direction="row" justify="between" gap="small" wrap="wrap" align="center">
@@ -349,6 +409,8 @@ function CorpusNoteCard({ context, addAlert }) {
         {!loading && !error && notes.length > 0 ? (
           <>
             <Text variant="microcopy">{notes.length}{truncated ? '+' : ''} saved notes · {dueCount} follow-ups due · {riskCount} with risks</Text>
+            <Input name="historySearch" label="Find in loaded notes" value={historyQuery}
+              onChange={setHistoryQuery} placeholder="Search titles, decisions, risks or actions" />
             <Flex direction="row" gap="small" wrap="wrap">
               <Button variant={historyFilter === 'all' ? 'primary' : 'secondary'}
                 onClick={() => { setHistoryFilter('all'); setHistoryExpanded(false); }}>All</Button>
@@ -358,6 +420,10 @@ function CorpusNoteCard({ context, addAlert }) {
                 onClick={() => { setHistoryFilter('followups'); setHistoryExpanded(true); }}>Follow-ups ({followupCount})</Button>
               <Button variant={historyFilter === 'risks' ? 'primary' : 'secondary'}
                 onClick={() => { setHistoryFilter('risks'); setHistoryExpanded(true); }}>Risks ({riskCount})</Button>
+              <Button variant={historyFilter === 'decisions' ? 'primary' : 'secondary'}
+                onClick={() => { setHistoryFilter('decisions'); setHistoryExpanded(true); }}>Decisions ({decisionCount})</Button>
+              <Button variant={historyFilter === 'actions' ? 'primary' : 'secondary'}
+                onClick={() => { setHistoryFilter('actions'); setHistoryExpanded(true); }}>Next actions ({nextActionCount})</Button>
             </Flex>
             {visibleNotes.length === 0 ? <Text>No notes match this filter. Choose All to see the full Company history.</Text> : null}
             {visibleNotes.slice(0, historyExpanded ? visibleNotes.length : 3).map(note => (
@@ -385,8 +451,12 @@ function CorpusNoteCard({ context, addAlert }) {
           </>
         ) : null}
         {truncated ? <Text variant="microcopy">Showing up to 100 notes. Older records can be found in Corpus Notes. Filter counts only cover loaded notes.</Text> : null}
-        <Text variant="microcopy">Follow-up indicators update when the card loads or refreshes. No emails, push notifications or CRM tasks are sent.</Text>
+        <Text variant="microcopy">Search and follow-up indicators use loaded notes only (up to 100). They are not notifications or CRM tasks.</Text>
       </Tile>
+      </>
+      ) : (
+        <Text variant="microcopy">Focus mode: history is hidden while you write. Select Show history to review saved notes.</Text>
+      )}
       <Text variant="microcopy">
         Corpus Notes by Siloy UKI · {CORPUS_BRAND.name} workspace.
         Attachments are managed on each saved note. Verify app and CRM permissions before recording confidential information.
