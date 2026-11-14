@@ -160,7 +160,7 @@ function TimeCard({context,alert}){
      <Button variant="primary" disabled={saving||loading} onClick={save}>{saving?'Saving...':form.id?'Save changes':'Save time'}</Button>
      <Button variant="secondary" disabled={saving} onClick={()=>{setForm(blank(form.date));setDirty(false);setError('');}}>Clear form</Button>
     </Flex>
-    <Text variant="microcopy">Stored as an STT Time Log linked to this Contact and to a HubSpot Project. Native CRM permissions apply.</Text>
+    <Text variant="microcopy">Stored as an STT Time Log linked to this Contact and to a HubSpot Project. User-level access control is not yet enabled. Administrators must restrict this pilot to authorised staff.</Text>
    </>:null}
   </Tile>
  </>;

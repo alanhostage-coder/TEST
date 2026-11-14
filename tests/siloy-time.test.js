@@ -142,3 +142,11 @@ test('UAT: review usability and warn on unsaved draft replacement',()=>{
  assert.match(ui,/onClick=\{\(\)=>edit\(e\)\}/);
  assert.match(ui,/pending\.current/);
 });
+
+test('UAT: draft switching is guarded and official Siloy brand asset is loaded',()=>{
+ const ui=fs.readFileSync('src/app/cards/SiloyTimeCard.jsx','utf8');
+ assert.match(ui,/const fresh=date=>\{\s*if\(dirty\)/);
+ assert.match(ui,/const edit=row=>\{\s*if\(dirty\)/);
+ assert.match(ui,/const displayedBrandMark=isSiloyBrand\?SILOY_MARK:CORPUS_BRAND.logoUrl/);
+ assert.match(ui,/User-level access control is not yet enabled/);
+});
