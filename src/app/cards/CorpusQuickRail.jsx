@@ -23,10 +23,11 @@ function unwrap(response) { return response && (response.body || response) || {}
 function todayISO() { return new Date().toISOString().slice(0, 10); }
 
 hubspot.extend(({ context, actions }) => (
-  <CorpusQuickRail context={context} addAlert={actions.addAlert} />
+  <CorpusQuickRail context={context} addAlert={actions.addAlert}
+    copyTextToClipboard={actions.copyTextToClipboard} />
 ));
 
-function CorpusQuickRail({ context, addAlert }) {
+function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
   const companyId = String(context?.crm?.objectId || '');
   const portalId = String(context?.portal?.id || '145209388');
   const [notes, setNotes] = useState([]);
@@ -58,6 +59,26 @@ function CorpusQuickRail({ context, addAlert }) {
   const due = notes.filter(isDue);
   const risks = notes.filter(note => clean(note.risks));
   const current = filter === 'due' ? due : filter === 'risks' ? risks : notes;
+  const copyQuickDraft = async () => {
+    if (!title.trim() && !body.trim()) {
+      addAlert({ type: 'info', title: 'Nothing to copy yet',
+        message: 'Write your internal update first.'});
+      return;
+    }
+    try {
+      if (typeof copyTextToClipboard !== 'function') throw new Error('Clipboard not available.');
+      await copyTextToClipboard([
+        'Corpus Notes · INTERNAL draft backup',
+        'Company record ID: ' + companyId,
+        'Title: ' + (title.trim() || 'Internal update · ' + new Date().toLocaleDateString('en-GB')),
+        'Internal note: ' + body
+      ].join('\n'));
+      addAlert({type: 'success', title: 'Draft copied', message: 'Paste into a secure location before refreshing.'});
+    } catch (_) {
+      addAlert({type: 'warning', title: 'Copy unavailable',
+        message: 'Leave this card open until the note is saved.'});
+    }
+  };
   const save = async () => {
     if (saveInFlight.current) return;
     setSaveIssue('');
@@ -100,7 +121,8 @@ function CorpusQuickRail({ context, addAlert }) {
       setComposer(false);
       setFilter('all');
       addAlert({type:'success',title:'Internal note saved',message:'Saved to this Company.'});
-      await reload();
+      // Save is confirmed. Do not keep the save button busy while history refreshes.
+      void reload();
     } catch(e) {
       const reason = String(e.message || e);
       setSaveIssue(reason);
@@ -136,9 +158,13 @@ function CorpusQuickRail({ context, addAlert }) {
           <Button onClick={save} disabled={busy}>
             {busy ? 'Saving…' : 'Save internal note'}
           </Button>
+          <Button variant="secondary" onClick={copyQuickDraft} disabled={busy}>
+            Copy draft
+          </Button>
           <Button variant="secondary" onClick={() => setComposer(false)} disabled={busy}>
             Keep draft and close
           </Button>
+          <Text variant="microcopy">Copy draft places text on your device clipboard. No automatic recovery after refreshing the page.</Text>
         </Tile>
       ) : null}
       {savedId ? <Text><Link href={url(savedId)}>Open the note just saved</Link></Text> : null}
