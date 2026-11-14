@@ -114,6 +114,24 @@ is used, save confirmation does not depend on history refresh, type-specific wri
 guides and filters remain present, and meeting/calendar endpoints are not written.
 A manual save-and-copy acceptance check in the live HubSpot card is still needed.
 
+## Compact Siloy mark (user-supplied image)
+
+The default Siloy UKI installation uses `src/app/cards/assets/siloy-signage-mark.svg`,
+a tightly cropped photograph of the **actual Siloy mark and wordmark** taken from
+the supplied Siloy / ProsperoHub / BBD Boom signage photograph. It contains no people
+or unrelated room imagery. The asset is a fixed-ratio, small file linked publicly via
+this repo, so the main card does not rely on the remote site's oversized favicon
+viewbox. The product name `Corpus Notes` stays in native HubSpot text beside it.
+
+Both main-card and sidebar templates select the fixed Siloy mark **only** when
+the configured branding website is `siloy.com`. Customer deployments continue
+using their own validated logo URL, name and three colour settings. The Siloy
+blue/yellow/mint brand rail remains underneath the compact lockup.
+
+**Acceptance:** inspect in the live Company record after refreshing, ensure the
+logo appears without the previous tall empty section, and confirm the note Save
+action and history still operate.
+
 ## Siloy logo lockup and colour accents
 
 Both the Company workspace and the optional right-sidebar quick actions now use
