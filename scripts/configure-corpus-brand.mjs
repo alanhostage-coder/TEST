@@ -48,18 +48,62 @@ async function fetchBounded(url, maximum, accept) {
   if (data.byteLength > maximum) throw Error('Brand metadata too large');
   return {data, type: (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase()};
 }
+// Read the head of a large public brand page without rejecting it because its
+// full Content-Length exceeds our former 400 KB limit.
+async function fetchHtmlHead(url, maximum = 2000000) {
+  const res = await fetch(url, {
+    redirect: 'error',
+    signal: AbortSignal.timeout(12000),
+    headers: { Accept: 'text/html' }
+  });
+  if (!res.ok) throw Error('Website response ' + res.status);
+  const type = (res.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  if (type !== 'text/html') throw Error('Brand URL did not return HTML');
+  if (!res.body) throw Error('No website body');
+  const reader = res.body.getReader();
+  const chunks = [];
+  let count = 0;
+  try {
+    while (count < maximum) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = value.slice(0, maximum - count);
+      chunks.push(chunk);
+      count += chunk.byteLength;
+      if (chunk.byteLength < value.byteLength) break;
+    }
+  } finally {
+    try { await reader.cancel(); } catch {}
+  }
+  const data = new Uint8Array(count);
+  let offset = 0;
+  for (const c of chunks) { data.set(c, offset); offset += c.byteLength; }
+  return new TextDecoder().decode(data);
+}
 async function siteIcon(html,site) {
   const tags = html.match(/<link\b[^>]*>/gi) || [];
-  const tag = tags.find(x => /apple-touch-icon/i.test(valueOf(x,'rel')) && valueOf(x,'href')) ||
-    tags.find(x => /\bicon\b/i.test(valueOf(x,'rel')) && /\.png(?:[?#]|$)/i.test(valueOf(x,'href')));
-  if (!tag) return '';
-  const uri = new URL(valueOf(tag,'href'),site);
-  if (uri.protocol !== 'https:' || uri.hostname !== site.hostname || (uri.port && uri.port !== '443')) return '';
-  try {
-    const result = await fetchBounded(uri.href,100000,'image/png,image/jpeg,image/webp');
-    if (!['image/png','image/jpeg','image/webp'].includes(result.type)) return '';
-    return 'data:' + result.type + ';base64,' + Buffer.from(result.data).toString('base64');
-  } catch { return ''; }
+  const images = html.match(/<img\b[^>]*>/gi) || [];
+  // Prefer the first public same-domain image explicitly labelled as Siloy.
+  const candidates = [
+    ...images.filter(tag=>/^\s*siloy(?:\s|$)/i.test(valueOf(tag,'alt'))).map(tag=>valueOf(tag,'src')),
+    ...tags.filter(tag=>/apple-touch-icon|\bicon\b/i.test(valueOf(tag,'rel'))).map(tag=>valueOf(tag,'href'))
+  ].filter(Boolean);
+  for (const path of candidates.slice(0, 8)) {
+    let src;
+    try { src = new URL(path,site); }
+    catch { continue; }
+    if (src.protocol !== 'https:' || src.hostname !== site.hostname ||
+      (src.port && src.port !== '443')) continue;
+    try {
+      const result = await fetchBounded(src.href,160000,'image/png,image/jpeg,image/webp');
+      if (!['image/png','image/jpeg','image/webp'].includes(result.type)) continue;
+      return {
+        src:src.href,
+        embedded:'data:' + result.type + ';base64,' + Buffer.from(result.data).toString('base64')
+      };
+    } catch {}
+  }
+  return null;
 }
 async function siteLogoOverride(raw, site) {
   if (!raw) return '';
@@ -75,13 +119,12 @@ async function siteLogoOverride(raw, site) {
 }
 async function main() {
   const site = brandUrl(process.env.CORPUS_BRAND_URL || process.argv[2]);
-  let html = '', logo = '', detected = false;
+  let html = '', logo = '', logoUrl = '', detected = false;
   try {
-    const page = await fetchBounded(site.href,400000,'text/html');
-    if (page.type !== 'text/html') throw Error('Not an HTML site');
-    html = new TextDecoder().decode(page.data);
+    html = await fetchHtmlHead(site.href);
     detected = true;
-    logo = await siteIcon(html,site);
+    const candidate = await siteIcon(html,site);
+    if (candidate) { logo = candidate.embedded; logoUrl = candidate.src; }
   } catch (error) {
     console.warn('Website branding unavailable, using safe defaults:', error.message);
   }
@@ -95,7 +138,10 @@ async function main() {
     siteName || fromTitle || domainName || 'Siloy UKI')
     .replace(/[\u0000-\u001f<>]/g,'').trim().slice(0,32);
   if (process.env.CORPUS_BRAND_LOGO_URL) {
-    try { logo = await siteLogoOverride(process.env.CORPUS_BRAND_LOGO_URL, site); }
+    try {
+      logo = await siteLogoOverride(process.env.CORPUS_BRAND_LOGO_URL, site);
+      logoUrl = new URL(process.env.CORPUS_BRAND_LOGO_URL, site).href;
+    }
     catch (error) { throw Error('Invalid configured logo: ' + error.message); }
   }
   const inlineColor = (/--(?:brand|primary)(?:-[\w]+)?\s*:\s*(#[0-9a-f]{3}(?:[0-9a-f]{3})?)\b/i.exec(html) || [,''])[1];
@@ -126,7 +172,7 @@ async function main() {
     '</svg>'
   ].join('\n');
   const config = '// Generated at build time from public website metadata.\n' +
-    'export const CORPUS_BRAND = Object.freeze(' + JSON.stringify({name,websiteUrl:site.href,accentHex:accent,backgroundHex:background,highlightHex:highlight,metadataDetected:detected},null,2) + ');\n';
+    'export const CORPUS_BRAND = Object.freeze(' + JSON.stringify({name,websiteUrl:site.href,accentHex:accent,backgroundHex:background,highlightHex:highlight,logoUrl,metadataDetected:detected},null,2) + ');\n';
   await fs.mkdir(new URL('assets/',OUTPUT),{recursive:true});
   // HubSpot UI Extensions bundle SVG imports without an image URL in production.
   // Export a valid data URI from a JavaScript module instead of importing an .svg asset.
@@ -136,6 +182,6 @@ async function main() {
   await fs.writeFile(new URL('assets/brand-banner.svg',OUTPUT),graphic);
   await fs.writeFile(new URL('brand-banner.js',OUTPUT),imageModule);
   await fs.writeFile(new URL('brand-config.js',OUTPUT),config);
-  console.log('Corpus brand:',name,site.hostname,'accent:',accent,'background:',background,'highlight:',highlight,'website data:',detected,'logo:',Boolean(logo));
+  console.log('Corpus brand:',name,site.hostname,'accent:',accent,'background:',background,'highlight:',highlight,'website data:',detected,'logo:',Boolean(logo),'logo URL present:',Boolean(logoUrl));
 }
 main().catch(error => { console.error(error.message); process.exitCode = 1; });
