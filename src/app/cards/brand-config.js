@@ -5,5 +5,6 @@ export const CORPUS_BRAND = Object.freeze({
   accentHex: '#DAEAFF',
   backgroundHex: '#010103',
   highlightHex: '#FEF5AC',
+  logoUrl: '',
   metadataDetected: false
 });
