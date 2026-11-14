@@ -80,19 +80,32 @@ async function fetchHtmlHead(url, maximum = 2000000) {
   for (const c of chunks) { data.set(c, offset); offset += c.byteLength; }
   return new TextDecoder().decode(data);
 }
+function allowedPublicLogoHost(host, brandHost) {
+  const a = host.toLowerCase().replace(/^www\./,'');
+  const b = brandHost.toLowerCase().replace(/^www\./,'');
+  return a === b || /(?:^|\.)(?:hubspot\.net|hs-cdn\.com|hubspotusercontent\d*\.net)$/.test(a);
+}
 async function siteIcon(html,site) {
-  const tags = html.match(/<link\b[^>]*>/gi) || [];
+  const links = html.match(/<link\b[^>]*>/gi) || [];
   const images = html.match(/<img\b[^>]*>/gi) || [];
-  // Prefer the first public same-domain image explicitly labelled as Siloy.
+  const imagesWithIdentity = images.filter(tag =>
+    /\bsiloy\b|\blogo\b/i.test(valueOf(tag,'alt') + ' ' + valueOf(tag,'class')));
   const candidates = [
-    ...images.filter(tag=>/^\s*siloy(?:\s|$)/i.test(valueOf(tag,'alt'))).map(tag=>valueOf(tag,'src')),
-    ...tags.filter(tag=>/apple-touch-icon|\bicon\b/i.test(valueOf(tag,'rel'))).map(tag=>valueOf(tag,'href'))
+    ...imagesWithIdentity.map(tag=>valueOf(tag,'src')),
+    ...links.filter(tag=>/apple-touch-icon|\bicon\b/i.test(valueOf(tag,'rel'))).map(tag=>valueOf(tag,'href'))
   ].filter(Boolean);
-  for (const path of candidates.slice(0, 8)) {
+  const audit = candidates.slice(0, 12).map(path=>{
+    try {
+      const u = new URL(path,site);
+      return u.protocol === 'https:' ? u.origin + u.pathname.slice(0,90) : '(non-HTTPS)';
+    } catch { return '(invalid URL)'; }
+  });
+  console.log('Public Siloy brand logo candidates:',JSON.stringify(audit));
+  for (const path of candidates.slice(0, 16)) {
     let src;
     try { src = new URL(path,site); }
     catch { continue; }
-    if (src.protocol !== 'https:' || src.hostname !== site.hostname ||
+    if (src.protocol !== 'https:' || !allowedPublicLogoHost(src.hostname,site.hostname) ||
       (src.port && src.port !== '443')) continue;
     try {
       const result = await fetchBounded(src.href,160000,'image/png,image/jpeg,image/webp');
@@ -123,7 +136,15 @@ async function main() {
   try {
     html = await fetchHtmlHead(site.href);
     detected = true;
-    const candidate = await siteIcon(html,site);
+    let candidate = await siteIcon(html,site);
+    if (!candidate && /(^|\.)siloy\.com$/i.test(site.hostname)) {
+      try {
+        const homeHtml = await fetchHtmlHead(new URL('/',site).href);
+        candidate = await siteIcon(homeHtml,new URL('/',site));
+      } catch (error) {
+        console.warn('Siloy home logo lookup unavailable:',error.message);
+      }
+    }
     if (candidate) { logo = candidate.embedded; logoUrl = candidate.src; }
   } catch (error) {
     console.warn('Website branding unavailable, using safe defaults:', error.message);
