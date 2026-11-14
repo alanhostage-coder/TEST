@@ -38,6 +38,8 @@ function CorpusQuickRail({ context, addAlert }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [savedId, setSavedId] = useState('');
+  const [saveIssue, setSaveIssue] = useState('');
+  const saveInFlight = React.useRef(false);
   const reload = useCallback(async () => {
     if (!/^\d+$/.test(companyId)) { setLoading(false); setError('Open a Company record.'); return; }
     setLoading(true);
@@ -57,7 +59,19 @@ function CorpusQuickRail({ context, addAlert }) {
   const risks = notes.filter(note => clean(note.risks));
   const current = filter === 'due' ? due : filter === 'risks' ? risks : notes;
   const save = async () => {
-    if (busy || !title.trim() || !body.trim() || !/^\d+$/.test(companyId)) return;
+    if (saveInFlight.current) return;
+    setSaveIssue('');
+    const defaultTitle = 'Internal update · ' + new Date().toLocaleDateString('en-GB');
+    const titleToSave = title.trim() || defaultTitle;
+    if (!/^\d+$/.test(companyId)) {
+      setSaveIssue('Open a Company record to save this note.');
+      return;
+    }
+    if (!body.trim()) {
+      setSaveIssue('Write your internal note before saving. A title is optional.');
+      return;
+    }
+    saveInFlight.current = true;
     setBusy(true);
     try {
       const result = unwrap(await hubspot.serverless('corpus_notes_api', {
@@ -65,14 +79,21 @@ function CorpusQuickRail({ context, addAlert }) {
           action: 'create',
           companyId,
           note: {
-            note_title: title.trim(),
+            note_title: titleToSave,
             internal_notes: body.trim(),
             note_type: 'internal_update',
             note_date: todayISO()
           }
         }
       }));
-      if (!result.success) throw new Error(result.error || 'Unable to save this note.');
+      if (result.partial && result.noteId) {
+        setSavedId(result.noteId);
+        setComposer(false);
+        setSaveIssue('Note was created but not linked to this Company. Open the saved note and link it manually. Do not save it twice.');
+        addAlert({type:'danger', title:'Saved without Company link',message:'Open the saved note to complete the association.'});
+        return;
+      }
+      if (!result.success || !result.noteId) throw new Error(result.error || 'HubSpot did not confirm the note was saved.');
       setSavedId(result.noteId);
       setTitle('');
       setBody('');
@@ -81,9 +102,15 @@ function CorpusQuickRail({ context, addAlert }) {
       addAlert({type:'success',title:'Internal note saved',message:'Saved to this Company.'});
       await reload();
     } catch(e) {
-      addAlert({type:'danger',title:'Save not completed',message:String(e.message || e)});
-    } finally { setBusy(false); }
+      const reason = String(e.message || e);
+      setSaveIssue(reason);
+      addAlert({type:'danger',title:'Could not save note',message:reason + ' Your draft is still available.'});
+    } finally {
+      saveInFlight.current = false;
+      setBusy(false);
+    }
   };
+
   const url = id => 'https://app-eu1.hubspot.com/contacts/' + portalId + '/record/2-256491528/' + id;
   return (
     <>
@@ -100,12 +127,13 @@ function CorpusQuickRail({ context, addAlert }) {
       {composer ? (
         <Tile>
           <Heading>01 · Quick capture</Heading>
-          <Input name="quickTitle" label="Note title" value={title}
-            disabled={busy} onChange={setTitle} placeholder="Internal update" />
+          <Input name="quickTitle" label="Note title (optional)" value={title}
+            disabled={busy} onChange={v => { setTitle(v); setSaveIssue(''); }} placeholder="Auto-generated if empty" />
           <TextArea name="quickBody" label="Internal note" value={body}
-            disabled={busy} onChange={setBody} rows={3} />
+            disabled={busy} onChange={v => { setBody(v); setSaveIssue(''); }} rows={3} />
           <Text variant="microcopy">Linked only to the current Company. For decisions, risks and dates, use the full Corpus Notes workspace.</Text>
-          <Button onClick={save} disabled={busy || !title.trim() || !body.trim()}>
+          {saveIssue ? <Text>{saveIssue}</Text> : null}
+          <Button onClick={save} disabled={busy}>
             {busy ? 'Saving…' : 'Save internal note'}
           </Button>
           <Button variant="secondary" onClick={() => setComposer(false)} disabled={busy}>

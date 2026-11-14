@@ -64,6 +64,7 @@ function CorpusNoteCard({ context, addAlert }) {
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const saveInFlight = React.useRef(false);
   const [error, setError] = useState('');
   const [truncated, setTruncated] = useState(false);
   const [form, setForm] = useState(empty);
@@ -75,8 +76,12 @@ function CorpusNoteCard({ context, addAlert }) {
   const [receipt, setReceipt] = useState(null);
   const [discardArmed, setDiscardArmed] = useState(false);
   const [dirty, setDirty] = useState(false);
+  const [saveIssue, setSaveIssue] = useState('');
   const [draftProtected, setDraftProtected] = useState(false);
   const [historyFilter, setHistoryFilter] = useState('all');
+  const noteTypeLabel = OPTIONS.find(option => option.value === form.note_type)?.label || 'Internal note';
+  const suggestedTitle = noteTypeLabel + ' · ' + (ukDate || isoToUK(today()));
+  const effectiveTitle = form.note_title.trim() || suggestedTitle;
   const dueCount = notes.filter(hasDueFollowup).length;
   const followupCount = notes.filter(hasFollowup).length;
   const riskCount = notes.filter(n => String(n.risks || '').trim()).length;
@@ -88,12 +93,13 @@ function CorpusNoteCard({ context, addAlert }) {
     return true;
   });
   const set = (key, value) => {
+    setSaveIssue('');
     setDirty(true);
     setDiscardArmed(false);
     setForm(old => ({ ...old, [key]: value }));
   };
-  const setDate = value => { setDirty(true); setUkDate(value); setDiscardArmed(false); };
-  const setFollowDate = value => { setDirty(true); setUkFollowup(value); setDiscardArmed(false); };
+  const setDate = value => { setSaveIssue(''); setDirty(true); setUkDate(value); setDiscardArmed(false); };
+  const setFollowDate = value => { setSaveIssue(''); setDirty(true); setUkFollowup(value); setDiscardArmed(false); };
   const noteUrl = id => 'https://app-eu1.hubspot.com/contacts/' + portalId +
     '/record/2-256491528/' + id;
   const discard = () => {
@@ -105,6 +111,7 @@ function CorpusNoteCard({ context, addAlert }) {
     setDiscardArmed(false);
     setDetailsOpen(false);
     setDraftProtected(false);
+    setSaveIssue('');
   };
 
   const reload = useCallback(async () => {
@@ -132,47 +139,77 @@ function CorpusNoteCard({ context, addAlert }) {
   useEffect(() => { reload(); }, [reload]);
 
   const save = async () => {
-    if (saving || draftProtected) return;
+    if (saveInFlight.current) return;
+    setSaveIssue('');
     const noteDate = ukToISO(ukDate);
     const followDate = ukFollowup ? ukToISO(ukFollowup) : '';
-    if (!form.note_title.trim() || !form.internal_notes.trim() ||
-        !noteDate || (ukFollowup && !followDate)) {
-      addAlert({
-        type: 'danger', title: 'Check required fields',
-        message: 'A title, internal note and valid UK dates (dd/mm/yyyy) are required.'
-      });
+    const activityId = String(form.meeting_activity_id || '').trim();
+    let problem = '';
+    if (!/^\d+$/.test(companyId)) {
+      problem = 'Open a Company record to save your note.';
+    } else if (!form.internal_notes.trim()) {
+      problem = 'Add your internal notes before saving. A title is optional.';
+    } else if (!noteDate) {
+      problem = 'Enter a valid note date (dd/mm/yyyy) in Add decisions, risks or next steps.';
+      setDetailsOpen(true);
+    } else if (ukFollowup && !followDate) {
+      problem = 'Check the optional follow-up date (dd/mm/yyyy).';
+      setDetailsOpen(true);
+    } else if (activityId && !/^\d+$/.test(activityId)) {
+      problem = 'Meeting activity ID must contain digits only. It is an optional reference.';
+      setDetailsOpen(true);
+    }
+    if (problem) {
+      setSaveIssue(problem);
+      addAlert({type: 'danger', title: 'One thing to check', message: problem});
       return;
     }
+    saveInFlight.current = true;
     setSaving(true);
     try {
       const result = unwrap(await hubspot.serverless('corpus_notes_api', {
         parameters: {
-          action: 'create', companyId,
-          note: { ...form, note_date: noteDate, followup_date: followDate }
+          action: 'create',
+          companyId,
+          note: { ...form, note_title: effectiveTitle, note_date: noteDate, followup_date: followDate }
         }
       }));
-      if (!result.success)
-        throw new Error(result.error || 'Could not save this internal note.');
-      addAlert({
-        type: 'success', title: 'Corpus Note saved',
-        message: 'Note ' + result.noteId + ' linked to this company.'
-      });
+      if (result.partial && result.noteId) {
+        setReceipt({ id: result.noteId, title: effectiveTitle, linked: false });
+        setComposerOpen(false);
+        setDirty(false);
+        setDraftProtected(false);
+        addAlert({
+          type: 'danger', title: 'Note created, but not linked',
+          message: 'Open the saved record and associate this Company. Do not save again or you could create a duplicate.'
+        });
+        return;
+      }
+      if (!result.success || !result.noteId)
+        throw new Error(result.error || 'HubSpot did not confirm the saved note.');
+      setReceipt({ id: result.noteId, title: effectiveTitle, linked: true });
       setForm(empty());
       setUkDate(isoToUK(today()));
       setUkFollowup('');
-      setReceipt({ id: result.noteId, title: form.note_title.trim() });
       setDirty(false);
       setDiscardArmed(false);
       setDetailsOpen(false);
       setComposerOpen(false);
       setDraftProtected(false);
+      addAlert({
+        type: 'success', title: 'Internal note saved',
+        message: 'Your note is linked to this Company.'
+      });
       await reload();
     } catch (err) {
+      const reason = String(err.message || err);
+      setSaveIssue(reason);
       addAlert({
-        type: 'danger', title: 'Save not completed',
-        message: String(err.message || err)
+        type: 'danger', title: 'Could not save this note',
+        message: reason + ' Your draft is still here.'
       });
     } finally {
+      saveInFlight.current = false;
       setSaving(false);
     }
   };
@@ -202,9 +239,13 @@ function CorpusNoteCard({ context, addAlert }) {
 
       {receipt ? (
         <Tile>
-          <Tag variant="success">Note saved</Tag>
+          <Tag variant={receipt.linked ? 'success' : 'warning'}>
+            {receipt.linked ? 'Note saved and linked' : 'Note created, association needed'}
+          </Tag>
           <Heading>{receipt.title}</Heading>
-          <Text>Saved to Corpus Notes and linked to this Company record.</Text>
+          <Text>{receipt.linked
+            ? 'Your note was saved and linked to this Company.'
+            : 'The note exists, but the Company link failed. Open the record and associate the Company. Do not save the same note again.'}</Text>
           <Flex direction="row" gap="small" wrap="wrap">
             <Link href={noteUrl(receipt.id)}>Open saved note</Link>
             <Button variant="secondary" onClick={() => { setReceipt(null); setComposerOpen(true); }}>
@@ -233,9 +274,10 @@ function CorpusNoteCard({ context, addAlert }) {
               </Button>
               {draftProtected ? <Tag variant="warning">Editing paused</Tag> : null}
             </Flex>
-            {draftProtected ? <Text variant="microcopy">Draft protection prevents accidental edits in this open card only. It is not a security lock or persisted setting.</Text> : null}
-            <Input name="noteTitle" label="Title" required disabled={draftProtected || saving} value={form.note_title}
+            {draftProtected ? <Text variant="microcopy">Editing is paused, but you can still save your note. Unlock the editor to make changes. This is not a security control.</Text> : null}
+            <Input name="noteTitle" label="Title (optional)" disabled={draftProtected || saving} value={form.note_title}
               onChange={v => set('note_title', v)} placeholder="e.g. Internal client review" />
+            {!form.note_title.trim() ? <Text variant="microcopy">We'll name this note: {suggestedTitle}</Text> : null}
             <Select name="noteType" label="Note type" disabled={draftProtected || saving} options={OPTIONS}
               value={form.note_type} onChange={v => set('note_type', v)} />
             <TextArea name="noteBody" label="Your internal notes" required rows={5} disabled={draftProtected || saving}
@@ -272,10 +314,10 @@ function CorpusNoteCard({ context, addAlert }) {
             ) : null}
             <Divider />
             <Heading>03 · Save to Company</Heading>
-            <Text variant="microcopy">This action creates a new Corpus Note linked to the current Company. It does not edit the calendar event.</Text>
+            <Text variant="microcopy">Save works even when the editor is protected. A blank title is automatically generated from the note type and date.</Text>
+            {saveIssue ? <Text>{saveIssue}</Text> : null}
             <Flex direction="row" gap="small" wrap="wrap">
-              <Button onClick={save}
-                disabled={saving || draftProtected || !/^\d+$/.test(companyId) || !form.note_title.trim() || !form.internal_notes.trim()}>
+              <Button onClick={save} disabled={saving}>
                 {saving ? 'Saving note…' : 'Save internal note'}
               </Button>
               <Button variant={dirty ? 'destructive' : 'secondary'} onClick={discard} disabled={saving || draftProtected}>
