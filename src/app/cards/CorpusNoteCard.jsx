@@ -10,6 +10,9 @@ import { CORPUS_BRAND } from './brand-config';
 const SILOY_COLOUR_RAIL_URL =
   'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-colour-rail.svg';
 const isSiloyBrand = /^https:\/\/(?:www\.)?siloy\.com(?:\/|$)/i.test(CORPUS_BRAND.websiteUrl || '');
+const SILOY_SIGNAGE_MARK_URL =
+  'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-signage-mark.svg';
+const displayedBrandMark = isSiloyBrand ? SILOY_SIGNAGE_MARK_URL : CORPUS_BRAND.logoUrl;
 
 const OPTIONS = [
   { label: 'Meeting', value: 'meeting' },
@@ -272,14 +275,15 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
   return (
     <>
       <Tile>
-        <Flex direction="row" align="center" gap="medium" wrap="wrap">
-          {CORPUS_BRAND.logoUrl ? (
-            <Image src={CORPUS_BRAND.logoUrl}
-              alt={CORPUS_BRAND.name + ' official brand mark'} width={64} />
+        <Flex direction="row" align="center" gap="small" wrap="wrap">
+          {displayedBrandMark ? (
+            <Image src={displayedBrandMark}
+              alt={isSiloyBrand ? 'Siloy official mark on UKI signage' : CORPUS_BRAND.name + ' brand mark'}
+              width={180} />
           ) : null}
           <Flex direction="column" gap="small">
             <Heading>Corpus Notes</Heading>
-            <Text variant="microcopy">by Siloy UKI</Text>
+            <Text variant="microcopy">Internal workspace · by Siloy UKI</Text>
           </Flex>
         </Flex>
         {isSiloyBrand ? (
