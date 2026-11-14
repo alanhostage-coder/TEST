@@ -47,13 +47,27 @@ jobs:
           project_dir: './'
           account_id: '145209388'
           personal_access_key: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
-      - name: Install Siloy Time app separately
+      - name: Install Siloy Time after project registration
         env:
           HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
           HUBSPOT_ACCOUNT_ID: '145209388'
         run: |
           npm install -g @hubspot/cli@8.18.0
-          printf 'y\n' | timeout 60s script -q -e -c "hs project install-app --use-env" /dev/null
+          echo "=== Build status ==="
+          hs project list-builds --use-env --json
+          for attempt in 1 2 3 4; do
+            echo "=== Installation attempt $attempt ==="
+            if printf 'y\n' | timeout 70s script -q -e -c "hs project install-app --use-env" /dev/null; then
+              echo "Siloy Time installation accepted"
+              exit 0
+            fi
+            if [ "$attempt" -lt 4 ]; then
+              echo "HubSpot project registration may still be propagating"
+              sleep 25
+            fi
+          done
+          echo "::error::Siloy Time project deployed but install remains unavailable."
+          exit 1
       - name: Verify installation status
         env:
           HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
