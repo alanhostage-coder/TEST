@@ -171,7 +171,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
   const reload = useCallback(async () => {
     if (!/^\d+$/.test(companyId)) {
       setLoading(false);
-      setError('Open a Company record to use Corpus Note.');
+      setError('Open a Company record to use Siloy Notes.');
       return;
     }
     setLoading(true);
@@ -299,7 +299,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
         </Flex>
       </Tile>
       <Text>Capture internal context, document decisions and keep the next action visible.</Text>
-      <Text variant="microcopy">Notes created here are stored on the Company, never in a meeting invitation. CRM permissions still govern who can see them.</Text>
+      <Text variant="microcopy">Notes created here are stored on the Company, never in a meeting invitation. This pilot uses app-level permissions. Restrict access to authorised staff until user-level controls are enabled.</Text>
       <Flex direction="row" wrap="wrap" gap="small">
         <Button variant="secondary" onClick={() => { setComposerOpen(true); setReceipt(null); }}>
           Write a note
@@ -410,7 +410,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
                 {dirty && !discardArmed ? 'Discard draft' : dirty ? 'Confirm discard' : 'Clear'}
               </Button>
             </Flex>
-            <Text variant="microcopy">Recovery copies are manual and stored in your device clipboard, not automatically saved by Corpus. Handle confidential text carefully.</Text>
+            <Text variant="microcopy">Recovery copies are manual and stored in your device clipboard, not automatically saved by Siloy Notes. Handle confidential text carefully.</Text>
             {discardArmed ? (
               <Text variant="microcopy">Select Confirm discard to permanently clear this unsaved draft.</Text>
             ) : null}
