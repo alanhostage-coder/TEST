@@ -2,7 +2,7 @@
   "uid": "corpus_note_company_card",
   "type": "card",
   "config": {
-    "name": "Corpus Notes | Internal workspace",
+    "name": "Siloy Notes | Internal workspace",
     "location": "crm.record.tab",
     "entrypoint": "/app/cards/CorpusNoteCard.jsx",
     "objectTypes": [

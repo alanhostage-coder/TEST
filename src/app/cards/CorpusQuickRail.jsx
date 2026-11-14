@@ -76,7 +76,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
     try {
       if (typeof copyTextToClipboard !== 'function') throw new Error('Clipboard not available.');
       await copyTextToClipboard([
-        'Corpus Notes · INTERNAL draft backup',
+        'Siloy Notes · INTERNAL draft backup',
         'Company record ID: ' + companyId,
         'Title: ' + (title.trim() || 'Internal update · ' + new Date().toLocaleDateString('en-GB')),
         'Internal note: ' + body
@@ -151,7 +151,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
             width={118} />
         ) : null}
         <Flex direction="column" gap="small">
-          <Heading>Corpus Notes</Heading>
+          <Heading>Siloy Notes</Heading>
           <Text variant="microcopy">by Siloy UKI</Text>
         </Flex>
       </Flex>
@@ -175,7 +175,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
             disabled={busy} onChange={v => { setTitle(v); setSaveIssue(''); }} placeholder="Auto-generated if empty" />
           <TextArea name="quickBody" label="Internal note" value={body}
             disabled={busy} onChange={v => { setBody(v); setSaveIssue(''); }} rows={3} />
-          <Text variant="microcopy">Linked only to the current Company. For decisions, risks and dates, use the full Corpus Notes workspace.</Text>
+          <Text variant="microcopy">Linked only to the current Company. For decisions, risks and dates, use the full Siloy Notes workspace.</Text>
           {saveIssue ? <Text>{saveIssue}</Text> : null}
           <Button onClick={save} disabled={busy}>
             {busy ? 'Saving…' : 'Save internal note'}
@@ -203,7 +203,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
         <Button variant={filter === 'all' ? 'primary' : 'secondary'}
           onClick={() => setFilter('all')}>All ({notes.length})</Button>
       </Flex>
-      {loading ? <LoadingSpinner label="Loading Corpus Notes" /> : null}
+      {loading ? <LoadingSpinner label="Loading Siloy Notes" /> : null}
       {error ? <Text>{error}</Text> : null}
       {!loading && !error && current.length === 0 ? (
         <Text variant="microcopy">Nothing in this view. Use another quick filter to review notes.</Text>

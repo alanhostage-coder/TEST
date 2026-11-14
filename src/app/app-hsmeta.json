@@ -2,7 +2,7 @@
   "uid": "corpus_note_safe_notetaker_app",
   "type": "app",
   "config": {
-    "name": "Corpus Notes by Siloy UKI",
+    "name": "Siloy Notes by Siloy UKI",
     "description": "Internal-only Company note workspace. Built by Siloy UKI; client branding is configurable.",
     "distribution": "private",
     "auth": {
