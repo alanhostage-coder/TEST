@@ -1,0 +1,47 @@
+name: SUKI universal Notes and Time storage bootstrap
+on:
+  push:
+    branches: [codex/suki-suite-installer]
+    paths: [.github/workflows/suki-universal-storage.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      HUBSPOT_ACCOUNT_ID: '149783010'
+      HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - name: Check target
+        run: |
+          test "$HUBSPOT_ACCOUNT_ID" = '149783010'
+          test -n "$HUBSPOT_PERSONAL_ACCESS_KEY"
+      - name: Install HubSpot CLI
+        run: npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund >/dev/null 2>&1
+      - name: Provision universal schema versions without deleting existing data
+        run: |
+          set -euo pipefail
+          hs custom-object list-schemas --use-env --no-color > "$RUNNER_TEMP/schemas-before.txt"
+          for pair in "siloy_note_multi:schemas/siloy-note-multi.json" "siloy_time_entry_multi:schemas/siloy-time-multi.json"; do
+            name="${pair%%:*}"
+            file="${pair#*:}"
+            if grep -q "$name" "$RUNNER_TEMP/schemas-before.txt"; then
+              echo "$name already provisioned"
+              continue
+            fi
+            hs custom-object create-schema --path "$file" --use-env --no-color 2>&1 | tee "$RUNNER_TEMP/$name-create.log"
+            grep -q SUCCESS "$RUNNER_TEMP/$name-create.log" || { echo "::error::Could not create $name"; exit 1; }
+          done
+      - name: Verify both new object IDs
+        run: |
+          set -euo pipefail
+          hs custom-object list-schemas --use-env --no-color > "$RUNNER_TEMP/schemas-after.txt"
+          cat "$RUNNER_TEMP/schemas-after.txt"
+          for name in siloy_note_multi siloy_time_entry_multi; do
+            grep -F "$name" "$RUNNER_TEMP/schemas-after.txt" | grep -qE '2-[0-9]+' || exit 1
+          done
