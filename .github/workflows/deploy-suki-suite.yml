@@ -130,4 +130,23 @@ jobs:
           hs project app-install-status --use-env --json > "$RUNNER_TEMP/app-status.json"
           grep -Eq '"isInstalled"\s*:\s*true' "$RUNNER_TEMP/app-status.json"
           grep -Eq '"isInstalledWithCurrentScopes"\s*:\s*true' "$RUNNER_TEMP/app-status.json"
+          APP="${{ matrix.app }}" node - "$RUNNER_TEMP/app-build.json" "$RUNNER_TEMP/app-status.json" <<'NODE'
+          const fs=require('node:fs');
+          const builds=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));
+          const install=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));
+          const current=(builds.results||[]).find(x=>x.isDeployed===true);
+          if(!current || current.status!=='SUCCESS') throw Error('Deployed build missing or failed');
+          const expected=process.env.APP==='notes'
+            ? ['corpus_note_company_card','corpus_notes_quick_rail','corpus_notes_api']
+            : ['siloy_time_contact_card','siloy_time_quick_log_multiobject','siloy_time_api'];
+          for(const name of expected){
+            const part=(current.subbuildStatuses||[]).find(x=>x.buildName===name);
+            if(!part || part.status!=='SUCCESS') throw Error('Component not deployed successfully: '+name);
+            console.log('Verified',name);
+          }
+          if(install.accountId!==149783010 || install.isInstalled!==true ||
+            install.isInstalledWithCurrentScopes!==true) throw Error('SUKI installation/scopes incorrect');
+          console.log('Verified complete live project build',current.buildId);
+          console.log('CRM record layout placement and live save/retrieve remain separate UAT requirements.');
+          NODE
           echo "SUCCESS: ${{ matrix.app }} deployed and installed in SUKI (149783010)"
