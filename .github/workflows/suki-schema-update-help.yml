@@ -1,0 +1,20 @@
+name: SUKI inspect custom-object schema update command
+on:
+  push:
+    branches: [codex/suki-suite-installer]
+    paths: [.github/workflows/suki-schema-update-help.yml]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund >/dev/null 2>&1
+      - run: |
+          echo '=== update schema ==='
+          hs custom-object update-schema --help
+          echo '=== fetch schema ==='
+          hs custom-object fetch-schema --help
