@@ -83,7 +83,10 @@
     }
   ],
   "associatedObjects": [
+    "COMPANY",
     "CONTACT",
+    "DEAL",
+    "TICKET",
     "0-970"
   ]
 }
