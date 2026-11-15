@@ -1,0 +1,35 @@
+name: SUKI expand Notes and Time record associations
+on:
+  push:
+    branches: [codex/suki-suite-installer]
+    paths: [.github/workflows/suki-expand-associations.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  associations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 9
+    env:
+      HUBSPOT_ACCOUNT_ID: '149783010'
+      HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Guard deployment target
+        run: |
+          test "$HUBSPOT_ACCOUNT_ID" = '149783010'
+          test -n "$HUBSPOT_PERSONAL_ACCESS_KEY"
+      - name: Install HubSpot CLI
+        run: npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund >/dev/null 2>&1
+      - name: Expand Siloy Notes association schema
+        run: |
+          hs custom-object update-schema siloy_note --path schemas/siloy-note.json --use-env --no-color
+      - name: Expand Siloy Time association schema
+        run: |
+          hs custom-object update-schema siloy_time_entry --path schemas/siloy-time.json --use-env --no-color
+      - name: List resulting CRM object schemas
+        run: |
+          hs custom-object list-schemas --use-env --no-color
