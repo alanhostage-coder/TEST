@@ -35,11 +35,11 @@ jobs:
       - name: Create missing suite custom objects only
         run: |
           set -euo pipefail
-          if ! grep -q 'siloy_note' "$RUNNER_TEMP/objects-before.txt"; then
-            hs custom-object create-schema --path schemas/siloy-note.json --use-env --no-color
+          if ! grep -q 'siloy_note_multi' "$RUNNER_TEMP/objects-before.txt"; then
+            hs custom-object create-schema --path schemas/siloy-note-multi.json --use-env --no-color
           fi
-          if ! grep -q 'siloy_time_entry' "$RUNNER_TEMP/objects-before.txt"; then
-            hs custom-object create-schema --path schemas/siloy-time.json --use-env --no-color
+          if ! grep -q 'siloy_time_entry_multi' "$RUNNER_TEMP/objects-before.txt"; then
+            hs custom-object create-schema --path schemas/siloy-time-multi.json --use-env --no-color
           fi
       - name: Resolve exact per-portal type IDs
         id: types
@@ -47,8 +47,8 @@ jobs:
           set -euo pipefail
           hs custom-object list-schemas --use-env --no-color > "$RUNNER_TEMP/objects-after.txt"
           cat "$RUNNER_TEMP/objects-after.txt"
-          notes_type="$(grep -F 'siloy_note' "$RUNNER_TEMP/objects-after.txt" | grep -oE '2-[0-9]+' | head -1)"
-          time_type="$(grep -F 'siloy_time_entry' "$RUNNER_TEMP/objects-after.txt" | grep -oE '2-[0-9]+' | head -1)"
+          notes_type="$(grep -F 'siloy_note_multi' "$RUNNER_TEMP/objects-after.txt" | grep -oE '2-[0-9]+' | head -1)"
+          time_type="$(grep -F 'siloy_time_entry_multi' "$RUNNER_TEMP/objects-after.txt" | grep -oE '2-[0-9]+' | head -1)"
           [[ "$notes_type" =~ ^2-[0-9]+$ ]] || { echo "::error::Siloy Notes schema missing"; exit 1; }
           [[ "$time_type" =~ ^2-[0-9]+$ ]] || { echo "::error::Siloy Time schema missing"; exit 1; }
           echo "notes_type=$notes_type" >> "$GITHUB_OUTPUT"
