@@ -6,7 +6,11 @@
     "location": "crm.record.tab",
     "entrypoint": "/app/cards/CorpusNoteCard.jsx",
     "objectTypes": [
-      "companies"
-    ]
+      "companies",
+      "contacts",
+      "deals",
+      "tickets"
+    ],
+    "description": "Structured Siloy Notes and follow-ups for CRM records"
   }
 }
