@@ -1,0 +1,17 @@
+/* Siloy UKI Apps | shared design tokens; external web surfaces only.
+   HubSpot SDK UI extensions use native components, not arbitrary CSS. */
+:root {
+  --siloy-ink: #010103;
+  --siloy-charcoal: #2B2B2B;
+  --siloy-blue: #DAEAFF;
+  --siloy-yellow: #FEF5AC;
+  --siloy-mint: #EAFDD6;
+  --siloy-paper: #FFFEFA;
+  --siloy-radius-card: 16px;
+  --siloy-font-body: "Instrument Sans", system-ui, sans-serif;
+  --siloy-font-display: "Instrument Serif", Georgia, serif;
+  --siloy-font-data: "Inter Tight", system-ui, sans-serif;
+}
+.siloy-product-name { font-family: var(--siloy-font-display); font-style: italic; font-weight: 400; }
+.siloy-data-label { font-family: var(--siloy-font-data); font-weight: 600; }
+.siloy-card { background: var(--siloy-paper); border-radius: var(--siloy-radius-card); color: var(--siloy-ink); }
