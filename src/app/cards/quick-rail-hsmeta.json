@@ -7,7 +7,10 @@
     "location": "crm.record.sidebar",
     "entrypoint": "/app/cards/CorpusQuickRail.jsx",
     "objectTypes": [
-      "companies"
+      "companies",
+      "contacts",
+      "deals",
+      "tickets"
     ]
   }
 }
