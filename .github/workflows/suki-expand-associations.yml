@@ -24,12 +24,20 @@ jobs:
           test -n "$HUBSPOT_PERSONAL_ACCESS_KEY"
       - name: Install HubSpot CLI
         run: npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund >/dev/null 2>&1
-      - name: Expand Siloy Notes association schema
+      - name: Expand custom-object association schemas
         run: |
-          hs custom-object update-schema siloy_note --path schemas/siloy-note.json --use-env --no-color
-      - name: Expand Siloy Time association schema
-        run: |
-          hs custom-object update-schema siloy_time_entry --path schemas/siloy-time.json --use-env --no-color
+          set -euo pipefail
+          hs custom-object list-schemas --use-env --no-color > "$RUNNER_TEMP/schema-list.txt"
+          for pair in "siloy_note:schemas/siloy-note.json" "siloy_time_entry:schemas/siloy-time.json"; do
+            name="${pair%%:*}"
+            file="${pair#*:}"
+            type_id="$(grep -F "$name" "$RUNNER_TEMP/schema-list.txt" | grep -oE '2-[0-9]+' | head -1)"
+            [[ "$type_id" =~ ^2-[0-9]+$ ]] || { echo "::error::Missing object $name"; exit 1; }
+            echo "Updating existing schema $name ($type_id)"
+            hs custom-object update-schema "$type_id" --path "$file" --use-env --no-color 2>&1 | tee "$RUNNER_TEMP/$name-update.txt"
+            grep -q 'SUCCESS' "$RUNNER_TEMP/$name-update.txt" || { echo "::error::Schema update not confirmed for $name"; exit 1; }
+            if grep -q 'ERROR' "$RUNNER_TEMP/$name-update.txt"; then exit 1; fi
+          done
       - name: List resulting CRM object schemas
         run: |
           hs custom-object list-schemas --use-env --no-color
