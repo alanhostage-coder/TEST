@@ -1,0 +1,29 @@
+name: SUKI CRM schema API capability probe
+on:
+  push:
+    branches: [codex/suki-suite-installer]
+    paths: [.github/workflows/suki-schema-api-probe.yml]
+permissions: {contents: read}
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    env:
+      HUBSPOT_ACCOUNT_ID: '149783010'
+      HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+    steps:
+      - name: Probe schema API authentication (read only)
+        run: |
+          set -euo pipefail
+          test "$HUBSPOT_ACCOUNT_ID" = '149783010'
+          test -n "$HUBSPOT_PERSONAL_ACCESS_KEY"
+          for p in /crm/v3/schemas/2-256646328 /crm-object-schemas/v3/schemas/2-256646328; do
+            status="$(curl --silent --show-error --connect-timeout 8 --max-time 20 -o "$RUNNER_TEMP/schema-reply.json" -w '%{http_code}' -H "Authorization: Bearer $HUBSPOT_PERSONAL_ACCESS_KEY" "https://api.hubapi.com$p")"
+            echo "$p: HTTP $status"
+            if [ "$status" = '200' ]; then
+              echo "Authenticated CRM schema API read is available"
+              exit 0
+            fi
+          done
+          echo "CRM schema API not available with current Projects personal key"
+          exit 1
