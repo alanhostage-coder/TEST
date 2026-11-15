@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       DEFAULT_ACCOUNT_ID: '149783010'
-      DEFAULT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY }}
+      DEFAULT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -38,7 +38,7 @@ jobs:
         with:
           project_dir: './'
           account_id: '149783010'
-          personal_access_key: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY }}
+          personal_access_key: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
       - name: Deploy build when required
         if: steps.upload.outputs.deploy_id == ''
         uses: HubSpot/hubspot-project-actions/project-deploy@v1.1.0
@@ -46,10 +46,10 @@ jobs:
           deploy_latest_build: true
           project_dir: './'
           account_id: '149783010'
-          personal_access_key: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY }}
+          personal_access_key: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
       - name: Install Siloy Time after project registration
         env:
-          HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY }}
+          HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
           HUBSPOT_ACCOUNT_ID: '149783010'
         run: |
           npm install -g @hubspot/cli@8.18.0
@@ -70,7 +70,7 @@ jobs:
           exit 1
       - name: Verify installation status
         env:
-          HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY }}
+          HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
           HUBSPOT_ACCOUNT_ID: '149783010'
         run: |
           hs project list-builds --use-env --json
