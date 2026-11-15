@@ -230,8 +230,13 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
       }));
       if (result.partial && result.noteId) {
         setReceipt({ id: result.noteId, title: effectiveTitle, linked: false });
+        setForm(empty());
+        setUkDate(isoToUK(today()));
+        setUkFollowup('');
         setComposerOpen(false);
         setDirty(false);
+        setDiscardArmed(false);
+        setDetailsOpen(false);
         setDraftProtected(false);
         setFocusWriting(false);
         addAlert({
@@ -278,12 +283,12 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
         <Flex direction="row" align="center" gap="small" wrap="wrap">
           {displayedBrandMark ? (
             <Image src={displayedBrandMark}
-              alt={isSiloyBrand ? 'Siloy official mark on UKI signage' : CORPUS_BRAND.name + ' brand mark'}
-              width={180} />
+              alt={isSiloyBrand ? 'Siloy' : CORPUS_BRAND.name + ' brand mark'}
+              width={132} />
           ) : null}
           <Flex direction="column" gap="small">
             <Heading>Siloy Notes</Heading>
-            <Text variant="microcopy">Internal workspace · by Siloy UKI</Text>
+            <Text variant="microcopy">Internal notes · by Siloy UKI</Text>
           </Flex>
         </Flex>
         {isSiloyBrand ? (
@@ -291,15 +296,13 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
             alt="Siloy brand accent colours: powder blue, yellow and mint" width={900} />
         ) : null}
         <Flex direction="row" wrap="wrap" gap="small">
-          <Tag variant="warning">INTERNAL ONLY</Tag>
-          <Tag variant="info">Never included in meeting invitations</Tag>
+          <Tag variant="warning">Internal only</Tag>
           {CORPUS_BRAND.name !== 'Siloy UKI' ? (
             <Tag variant="default">{CORPUS_BRAND.name} workspace</Tag>
           ) : null}
         </Flex>
       </Tile>
-      <Text>Capture internal context, document decisions and keep the next action visible.</Text>
-      <Text variant="microcopy">Notes created here are stored on the Company, never in a meeting invitation. This pilot uses app-level permissions. Restrict access to authorised staff until user-level controls are enabled.</Text>
+      <Text variant="microcopy">Notes are saved on this Company and kept out of meeting invitations. This pilot uses app-level permissions. Restrict access to authorised staff.</Text>
       <Flex direction="row" wrap="wrap" gap="small">
         <Button variant="secondary" onClick={() => { setComposerOpen(true); setReceipt(null); }}>
           Write a note
@@ -334,7 +337,6 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
       <Tile>
         <Flex direction="row" justify="between" gap="small" align="center" wrap="wrap">
           <Flex direction="row" align="center" gap="small" wrap="wrap">
-            <Tag variant="info">01 / Capture</Tag>
             <Heading>Write an internal note</Heading>
           </Flex>
           <Button variant="secondary" onClick={() => setComposerOpen(v => !v)}>
@@ -363,13 +365,10 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
             <TextArea name="noteBody" label="Your internal notes" required rows={5} disabled={draftProtected || saving}
               value={form.internal_notes} onChange={v => set('internal_notes', v)}
               placeholder="What happened, what matters, and what needs attention..." />
-            <Flex direction="row" gap="small" wrap="wrap">
-              <Tag variant="default">{dirty ? 'Unsaved changes' : 'Ready to write'}</Tag>
-              <Text variant="microcopy">Save to the Company, not to an invitation.</Text>
-            </Flex>
+            {dirty ? <Tag variant="default">Unsaved changes</Tag> : null}
             <Divider />
             <Button variant="secondary" onClick={() => setDetailsOpen(v => !v)}>
-              {detailsOpen ? '02 · Hide context' : '02 · Add decisions, risks or next steps'}
+              {detailsOpen ? 'Hide context' : 'Add decisions, risks or next steps'}
             </Button>
             {detailsOpen ? (
               <>
@@ -393,11 +392,6 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
               </>
             ) : null}
             <Divider />
-            <Flex direction="row" gap="small" align="center" wrap="wrap">
-              <Tag variant="success">03 / Save</Tag>
-              <Heading>Save to Company</Heading>
-            </Flex>
-            <Text variant="microcopy">Save works even when the editor is protected. A blank title is automatically generated from the note type and date.</Text>
             {saveIssue ? <Text>{saveIssue}</Text> : null}
             <Flex direction="row" gap="small" wrap="wrap">
               <Button onClick={save} disabled={saving}>
@@ -426,7 +420,6 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
       <Tile>
         <Flex direction="row" justify="between" gap="small" wrap="wrap" align="center">
           <Flex direction="row" gap="small" align="center" wrap="wrap">
-            <Tag variant="info">04 / Review</Tag>
             <Heading>Company notes and follow-ups</Heading>
           </Flex>
           <Button variant="secondary" onClick={reload} disabled={loading}>

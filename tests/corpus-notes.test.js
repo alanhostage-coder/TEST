@@ -100,6 +100,14 @@ test('confirmed save does not wait for a history reload',()=>{
   assert.match(rail,/void reload\(\);/);
   assert.match(main,/setReceipt\(\{ id: result\.noteId, title: effectiveTitle, linked: true \}\)/);
 });
+test('an unlinked saved note is recoverable without resubmitting its draft',()=>{
+  const fs=require('node:fs');
+  const main=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
+  const rail=fs.readFileSync(require.resolve('../src/app/cards/CorpusQuickRail.jsx'),'utf8');
+  assert.match(main,/result\.partial && result\.noteId[\s\S]*?linked: false[\s\S]*?setForm\(empty\(\)\)[\s\S]*?return;/);
+  assert.match(rail,/result\.partial && result\.noteId[\s\S]*?setAssociationNeeded\(true\)[\s\S]*?setTitle\(''\);\s*setBody\(''\);\s*setComposer\(false\);/);
+  assert.match(rail,/associationNeeded \? <Tag variant="warning">[\s\S]*?url\(savedId\)/);
+});
 test('writing focus and cognitive signposting remain present',()=>{
   const fs=require('node:fs');
   const main=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');

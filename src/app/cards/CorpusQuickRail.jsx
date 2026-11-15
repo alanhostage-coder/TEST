@@ -47,6 +47,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
   const [title, setTitle] = useState('');
   const [body, setBody] = useState('');
   const [savedId, setSavedId] = useState('');
+  const [associationNeeded, setAssociationNeeded] = useState(false);
   const [saveIssue, setSaveIssue] = useState('');
   const saveInFlight = React.useRef(false);
   const reload = useCallback(async () => {
@@ -117,13 +118,16 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       }));
       if (result.partial && result.noteId) {
         setSavedId(result.noteId);
+        setAssociationNeeded(true);
+        setTitle('');
+        setBody('');
         setComposer(false);
-        setSaveIssue('Note was created but not linked to this Company. Open the saved note and link it manually. Do not save it twice.');
         addAlert({type:'danger', title:'Saved without Company link',message:'Open the saved note to complete the association.'});
         return;
       }
       if (!result.success || !result.noteId) throw new Error(result.error || 'HubSpot did not confirm the note was saved.');
       setSavedId(result.noteId);
+      setAssociationNeeded(false);
       setTitle('');
       setBody('');
       setComposer(false);
@@ -147,7 +151,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       <Flex direction="row" align="center" gap="small" wrap="wrap">
         {displayedBrandMark ? (
           <Image src={displayedBrandMark}
-            alt={isSiloyBrand ? 'Siloy official mark on UKI signage' : CORPUS_BRAND.name + ' brand mark'}
+            alt={isSiloyBrand ? 'Siloy' : CORPUS_BRAND.name + ' brand mark'}
             width={118} />
         ) : null}
         <Flex direction="column" gap="small">
@@ -160,8 +164,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
           alt="Siloy blue, yellow and mint accent" />
       ) : null}
       <Flex direction="row" gap="small" wrap="wrap">
-        <Tag variant="warning">INTERNAL ONLY</Tag>
-        <Tag variant="info">Company workspace</Tag>
+        <Tag variant="warning">Internal only</Tag>
       </Flex>
       <Text variant="microcopy">Quick capture and follow-up cues for this Company. Nothing is written to meeting invitations.</Text>
       <Divider />
@@ -170,7 +173,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       </Button>
       {composer ? (
         <Tile>
-          <Heading>01 · Quick capture</Heading>
+          <Heading>Quick capture</Heading>
           <Input name="quickTitle" label="Note title (optional)" value={title}
             disabled={busy} onChange={v => { setTitle(v); setSaveIssue(''); }} placeholder="Auto-generated if empty" />
           <TextArea name="quickBody" label="Internal note" value={body}
@@ -189,10 +192,14 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
           <Text variant="microcopy">Copy draft places text on your device clipboard. No automatic recovery after refreshing the page.</Text>
         </Tile>
       ) : null}
-      {savedId ? <Text><Link href={url(savedId)}>Open the note just saved</Link></Text> : null}
+      {savedId ? (
+        <Flex direction="column" gap="small">
+          {associationNeeded ? <Tag variant="warning">Created. Company link needed.</Tag> : null}
+          <Link href={url(savedId)}>Open saved note</Link>
+        </Flex>
+      ) : null}
       <Divider />
       <Flex direction="row" gap="small" align="center" wrap="wrap">
-        <Tag variant="info">02 / Review</Tag>
         <Heading>What needs attention?</Heading>
       </Flex>
       <Flex direction="row" gap="small" wrap="wrap">
