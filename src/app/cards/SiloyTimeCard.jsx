@@ -2,7 +2,7 @@ import React,{useCallback,useEffect,useRef,useState} from 'react';
 import {hubspot,Heading,Text,Input,TextArea,Select,Button,Divider,Flex,Tile,Tag,Image,Link,LoadingSpinner} from '@hubspot/ui-extensions';
 import {CORPUS_BRAND} from './brand-config';
 const RAIL='https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/siloy-time-enterprise/src/app/cards/assets/siloy-colour-rail.svg';
-const SILOY_MARK='https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/siloy-time-enterprise/src/app/cards/assets/siloy-signage-mark.svg';
+const SILOY_MARK='https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/siloy-time-enterprise/src/app/cards/assets/siloy-official-logo-black.svg';
 const isSiloyBrand=/^https:\/\/(?:www\.)?siloy\.com(?:\/|$)/i.test(CORPUS_BRAND.websiteUrl||'');
 const displayedBrandMark=isSiloyBrand?SILOY_MARK:CORPUS_BRAND.logoUrl;
 const NAMES=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
@@ -89,7 +89,7 @@ function TimeCard({context,alert}){
  return <>
   <Tile>
    <Flex direction="row" gap="medium" align="center" wrap="wrap">
-    {displayedBrandMark?<Image src={displayedBrandMark} alt="Siloy" width={132}/>:null}
+    {displayedBrandMark?<Image src={displayedBrandMark} alt="Official Siloy wordmark" width={148}/>:null}
     <Flex direction="column" gap="small">
      <Heading>Siloy Time</Heading>
      <Text variant="microcopy">by Siloy UKI · Enterprise timesheets</Text>
