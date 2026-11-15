@@ -59,3 +59,31 @@ Record deliverables by customer and portal: product and source version, build/de
 **Security warning:** An INTERNAL ONLY label is not access control. Current Notes and Time private-app functions have app-level tokens. Scope the record cards, CRM object permissions and access review appropriately, and enforce per-user authorization before advertising confidential-data guarantees.
 
 **Commercial guidance:** The first two apps can be delivered per-portal through the current Projects workflow. Surface has a continuing hosting and data-storage cost, so a one-off low-price licence should specify that cost and responsibility explicitly.
+
+
+## Mandatory record layout activation (not performed by project installation)
+
+**HubSpot app installed != card visible.** Each app UI extension is registered only for the object types declared in its `*-hsmeta.json`. Add each card to the relevant record view in HubSpot. Customer-specific record layouts require an explicit activation and UAT step.
+
+### Siloy Notes
+
+- Intended record: **Company** (`companies`, middle-column `crm.record.tab`), with optional Company sidebar quick rail.
+- Open any Company > **Customize** > edit the default record view > **Siloy Apps** tab > **Add card** > **Card library** > filter **App** > **Siloy Notes | Internal workspace** > **Add card** > **Save and exit**.
+- Add the optional **Siloy Notes | Internal quick actions** sidebar card if authorised, and validate its visibility separately.
+
+### Siloy Time
+
+- Intended record: **Contact** (`contacts`, middle-column `crm.record.tab`). It does **not** appear on a Company just because the Company has a tab named **Siloy Apps**.
+- Ensure at least one suitably authorised test Contact exists (create only when approved).
+- Open a Contact > **Customize** > edit the default record view > create/select **Siloy Apps** tab > **Add card** > **Card library** > filter **App** > **Siloy Time | Weekly timesheet** > **Add card** > **Save and exit**.
+- Reopen that Contact and verify the seven-day grid loads; create a sample Project if approved because new Time entries require an associated HubSpot Project.
+
+### Siloy Surface
+
+- Still not installed: its existing 0.1.1 branded package uses an external Node service, SQLite and OAuth; deploy the backend and complete tenant-specific OAuth before enabling cards or app pages. Never report a logo-only/placeholder card as a functional Surface installation.
+
+### Acceptance criteria
+
+- Record the exact target HubSpot portal ID, app installation success, deployed build ID, record type, card layout placement, test record URL, actual create/read UAT results and permissions review.
+- A successful CI install job is **not** proof that the app card was added to the CRM layout or that a custom-object association works.
+- For SUKI on 15 November 2026, both native apps were installed and schemas created. The reference portal had **0 Contact records** at the point of validation. Siloy Time therefore needed a Contact record and layout activation before it could appear.
