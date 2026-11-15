@@ -163,33 +163,16 @@ test('Siloy lockup keeps official mark, app name and brand-only colour rail with
   assert.doesNotMatch(rail,/cover-photo|cover-image|hero-photo|siloy-cover/);
 });
 
-test('Siloy branding uses supplied cropped mark instead of an empty favicon',()=>{
+test('Siloy branding uses official supplied vector wordmark instead of photographed signage',()=>{
   const fs=require('node:fs');
   const path=require('node:path');
   const main=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
   const rail=fs.readFileSync(require.resolve('../src/app/cards/CorpusQuickRail.jsx'),'utf8');
-  const lockup=fs.readFileSync(path.resolve(__dirname,'../src/app/cards/assets/siloy-signage-mark.svg'),'utf8');
-  assert.match(main,/SILOY_SIGNAGE_MARK_URL/);
-  assert.match(rail,/SILOY_SIGNAGE_MARK_URL/);
-  assert.match(main,/isSiloyBrand \? SILOY_SIGNAGE_MARK_URL : CORPUS_BRAND\.logoUrl/);
-  assert.match(rail,/isSiloyBrand \? SILOY_SIGNAGE_MARK_URL : CORPUS_BRAND\.logoUrl/);
-  assert.match(lockup,/data:image\/jpeg;base64,/);
-  assert.match(lockup,/width="300" height="137"/);
-  assert.doesNotMatch(main,/src=\{CORPUS_BRAND\.logoUrl\}/);
-  assert.doesNotMatch(rail,/src=\{CORPUS_BRAND\.logoUrl\}/);
-});
-
-test('Siloy logo uses the exact supplied-crop JPEG and decodes without corruption',()=>{
-  const fs=require('node:fs');
-  const crypto=require('node:crypto');
-  const path=require('node:path');
-  const svg=fs.readFileSync(path.resolve(__dirname,'../src/app/cards/assets/siloy-signage-mark.svg'),'utf8');
-  const match=/data:image\/jpeg;base64,([A-Za-z0-9+/=]+)/.exec(svg);
-  assert.ok(match,'Siloy mark should embed a cropped JPEG');
-  const bytes=Buffer.from(match[1],'base64');
-  assert.equal(bytes.byteLength,3470);
-  assert.equal(bytes.subarray(0,3).toString('hex'),'ffd8ff');
-  assert.equal(bytes.subarray(bytes.length-2).toString('hex'),'ffd9');
-  assert.equal(crypto.createHash('sha256').update(bytes).digest('hex'),
-    '7e98e00fc00981e538c0da6950abb821427f45738838e1e97d9a413b9d7edd89');
+  const logo=fs.readFileSync(path.resolve(__dirname,'../src/app/cards/assets/siloy-official-logo-black.svg'),'utf8');
+  assert.match(main,/siloy-official-logo-black\\.svg/);
+  assert.match(rail,/siloy-official-logo-black\\.svg/);
+  assert.match(logo,/viewBox="0 0 1000 300"/);
+  assert.match(logo,/<path/);
+  assert.doesNotMatch(main,/siloy-signage-mark\\.svg/);
+  assert.doesNotMatch(rail,/siloy-signage-mark\\.svg/);
 });
