@@ -51,7 +51,21 @@
       "name": "is_billable",
       "label": "Billable",
       "type": "bool",
-      "fieldType": "booleancheckbox"
+      "fieldType": "booleancheckbox",
+      "options": [
+        {
+          "label": "Yes",
+          "value": "true",
+          "displayOrder": 0,
+          "hidden": false
+        },
+        {
+          "label": "No",
+          "value": "false",
+          "displayOrder": 1,
+          "hidden": false
+        }
+      ]
     },
     {
       "name": "type",
