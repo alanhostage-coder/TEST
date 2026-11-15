@@ -40,7 +40,7 @@ jobs:
           set -euo pipefail
           npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund >/dev/null 2>&1
           hs custom-object list-schemas --use-env --no-color > "$RUNNER_TEMP/suki-schemas.txt"
-          object_id="$(grep -F 'siloy_time_entry' "$RUNNER_TEMP/suki-schemas.txt" | grep -oE '2-[0-9]+' | head -1)"
+          object_id="$(grep -F 'siloy_time_entry_multi' "$RUNNER_TEMP/suki-schemas.txt" | grep -oE '2-[0-9]+' | head -1)"
           if ! [[ "$object_id" =~ ^2-[0-9]+$ ]]; then
             echo "::error::Missing siloy_time_entry CRM schema. Run the SUKI suite storage bootstrap first."
             exit 1
