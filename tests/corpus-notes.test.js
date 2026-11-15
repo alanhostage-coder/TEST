@@ -169,10 +169,10 @@ test('Siloy branding uses official supplied vector wordmark instead of photograp
   const main=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
   const rail=fs.readFileSync(require.resolve('../src/app/cards/CorpusQuickRail.jsx'),'utf8');
   const logo=fs.readFileSync(path.resolve(__dirname,'../src/app/cards/assets/siloy-official-logo-black.svg'),'utf8');
-  assert.match(main,/siloy-official-logo-black\\.svg/);
-  assert.match(rail,/siloy-official-logo-black\\.svg/);
+  assert.ok(main.includes('siloy-official-logo-black.svg'));
+  assert.ok(rail.includes('siloy-official-logo-black.svg'));
   assert.match(logo,/viewBox="0 0 1000 300"/);
   assert.match(logo,/<path/);
-  assert.doesNotMatch(main,/siloy-signage-mark\\.svg/);
-  assert.doesNotMatch(rail,/siloy-signage-mark\\.svg/);
+  assert.ok(!main.includes('siloy-signage-mark.svg'));
+  assert.ok(!rail.includes('siloy-signage-mark.svg'));
 });
