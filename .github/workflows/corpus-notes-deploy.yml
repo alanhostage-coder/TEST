@@ -36,8 +36,8 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     env:
-      DEFAULT_ACCOUNT_ID: '145209388'
-      DEFAULT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+      DEFAULT_ACCOUNT_ID: '149783010'
+      DEFAULT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -62,7 +62,7 @@ jobs:
       - name: Verify authorised HubSpot key
         run: |
           if [ -z "$DEFAULT_PERSONAL_ACCESS_KEY" ]; then
-            echo "::error::Missing repository secret HUBSPOT_PERSONAL_ACCESS_KEY."
+            echo "::error::Missing repository secret HUBSPOT_149783010_PERSONAL_ACCESS_KEY."
             exit 1
           fi
       - name: Upload project
@@ -70,20 +70,20 @@ jobs:
         uses: HubSpot/hubspot-project-actions/project-upload@v1.1.0
         with:
           project_dir: './'
-          account_id: '145209388'
-          personal_access_key: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+          account_id: '149783010'
+          personal_access_key: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY }}
       - name: Deploy build if not auto-deployed
         if: steps.upload.outputs.deploy_id == ''
         uses: HubSpot/hubspot-project-actions/project-deploy@v1.1.0
         with:
           deploy_latest_build: true
           project_dir: './'
-          account_id: '145209388'
-          personal_access_key: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
-      - name: Install Corpus Note private app into Product Updates
+          account_id: '149783010'
+          personal_access_key: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY }}
+      - name: Install Corpus Note private app into Siloy UKI Apps
         env:
-          HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
-          HUBSPOT_ACCOUNT_ID: '145209388'
+          HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY }}
+          HUBSPOT_ACCOUNT_ID: '149783010'
         run: |
           npm install -g @hubspot/cli@8.18.0
           # HubSpot 8.18 prompts for an affirmative install confirmation.
@@ -91,8 +91,8 @@ jobs:
           printf 'y\n' | timeout 60s script -q -e -c "hs project install-app --use-env" /dev/null
       - name: Verify HubSpot installation status
         env:
-          HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
-          HUBSPOT_ACCOUNT_ID: '145209388'
+          HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY }}
+          HUBSPOT_ACCOUNT_ID: '149783010'
         run: |
           npm install -g @hubspot/cli@8.18.0
           echo "=== HubSpot build history ==="
