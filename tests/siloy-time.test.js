@@ -150,3 +150,17 @@ test('UAT: draft switching is guarded and official Siloy brand asset is loaded',
  assert.match(ui,/const displayedBrandMark=isSiloyBrand\?SILOY_MARK:CORPUS_BRAND.logoUrl/);
  assert.match(ui,/User-level access control is not yet enabled/);
 });
+
+test('UAT: the date range, daily rows and entry picker cover the same seven days',()=>{
+ const ui=fs.readFileSync('src/app/cards/SiloyTimeCard.jsx','utf8');
+ assert.match(ui,/const NAMES=\['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'\]/);
+ assert.match(ui,/uk\(shift\(week,6\)\)/);
+ assert.match(ui,/options=\{days\.map/);
+});
+
+test('UAT: partial saves close the form and provide a warning with the existing record link',()=>{
+ const ui=fs.readFileSync('src/app/cards/SiloyTimeCard.jsx','utf8');
+ assert.match(ui,/setReceipt\(\{id:out\.entryId,partial:Boolean\(out\.partial\)\}\);\s*setDirty\(false\);setOpen\(false\);setForm\(blank\(form\.date\)\);/);
+ assert.match(ui,/receipt\.partial\?'warning':'success'/);
+ assert.match(ui,/receipt\.id\}>Open Time Log/);
+});

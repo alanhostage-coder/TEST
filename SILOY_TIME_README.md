@@ -4,7 +4,7 @@
 
 Product Update pilot portal: 145209388. The app uses the EXISTING (STT) Time Logs custom object 2-143515197 associated to Contacts and native Projects (0-970). It does not use the Siloy Notes object or functions.
 
-Functions: Monday-Friday timesheets, previous/next navigation, 8h/40h utilisation cues, billable hours, project selection, editable entries, HubSpot persistence with associations, partial-save warning.
+Functions: Monday–Sunday timesheets, previous/next navigation, 8h/40h utilisation cues, billable hours, project selection, editable entries, HubSpot persistence with associations, and direct links to saved records, including records that still need associations.
 
 Brand: official logo from siloy.com/brand public identity detection and consistent Siloy pastel rail. Native HubSpot card styling does not permit arbitrary CSS.
 
