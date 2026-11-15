@@ -24,13 +24,20 @@ jobs:
             exit 1
           fi
           npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund >/dev/null 2>&1
-          if hs project list --use-env --json >"$RUNNER_TEMP/surface-access.json" 2>"$RUNNER_TEMP/surface-access.err"; then
+          if hs project list --use-env --no-color >"$RUNNER_TEMP/surface-access.json" 2>"$RUNNER_TEMP/surface-access.err"; then
             echo 'HubSpot accepted a read-only Projects request scoped to account 149783010.'
           else
-            if grep -Eiq '401|403|unauthor|invalid|scope|permission|access key' "$RUNNER_TEMP/surface-access.json" "$RUNNER_TEMP/surface-access.err"; then
+            if grep -Eqi 'No projects found for account.*149783010' "$RUNNER_TEMP/surface-access.json" "$RUNNER_TEMP/surface-access.err"; then
+              echo 'HubSpot accepted the request and returned an empty project list for account 149783010.'
+              exit 0
+            fi
+            if grep -Eiq '401|403|unauthor|invalid|scope|permission|access key|authentication|does not match|does not have access' "$RUNNER_TEMP/surface-access.json" "$RUNNER_TEMP/surface-access.err"; then
               echo 'HubSpot did not accept the credential for Projects in account 149783010.'
             else
               echo 'The CLI could not verify Projects access in account 149783010.'
+              for signal in Cloudflare 'rate limit' 'not found' 'ETIMEDOUT' 'config file'; do
+                if grep -Fiq "$signal" "$RUNNER_TEMP/surface-access.json" "$RUNNER_TEMP/surface-access.err"; then printf 'Diagnostic: %s\n' "$signal"; fi
+              done
             fi
             exit 1
           fi
