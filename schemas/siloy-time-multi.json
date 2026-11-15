@@ -1,0 +1,92 @@
+{
+  "name": "siloy_time_entry_multi",
+  "labels": {
+    "singular": "Siloy Time Entry (Suite)",
+    "plural": "Siloy Time Entries (Suite)"
+  },
+  "description": "Time records associated with contacts and projects for Siloy Time.",
+  "primaryDisplayProperty": "description",
+  "secondaryDisplayProperties": [
+    "start_time",
+    "total_hours_spent"
+  ],
+  "requiredProperties": [
+    "description"
+  ],
+  "searchableProperties": [
+    "description"
+  ],
+  "properties": [
+    {
+      "name": "description",
+      "label": "Description",
+      "type": "string",
+      "fieldType": "textarea"
+    },
+    {
+      "name": "start_time",
+      "label": "Start time",
+      "type": "datetime",
+      "fieldType": "date"
+    },
+    {
+      "name": "end_time",
+      "label": "End time",
+      "type": "datetime",
+      "fieldType": "date"
+    },
+    {
+      "name": "total_hours_spent",
+      "label": "Hours spent",
+      "type": "number",
+      "fieldType": "number"
+    },
+    {
+      "name": "total_minutes_spent",
+      "label": "Minutes spent",
+      "type": "number",
+      "fieldType": "number"
+    },
+    {
+      "name": "is_billable",
+      "label": "Billable",
+      "type": "bool",
+      "fieldType": "booleancheckbox",
+      "options": [
+        {
+          "label": "Yes",
+          "value": "true",
+          "displayOrder": 0,
+          "hidden": false
+        },
+        {
+          "label": "No",
+          "value": "false",
+          "displayOrder": 1,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "name": "type",
+      "label": "Entry type",
+      "type": "enumeration",
+      "fieldType": "select",
+      "options": [
+        {
+          "label": "Manual",
+          "value": "manual",
+          "displayOrder": 0,
+          "hidden": false
+        }
+      ]
+    }
+  ],
+  "associatedObjects": [
+    "COMPANY",
+    "CONTACT",
+    "DEAL",
+    "TICKET",
+    "0-970"
+  ]
+}
