@@ -58,7 +58,7 @@ jobs:
           grep -q 'data:image/svg+xml' src/app/cards/brand-banner.js
           grep -q 'Siloy UKI' src/app/cards/CorpusNoteCard.jsx
       - name: Run tests
-        run: node --test tests/corpus-notes.test.js
+        run: node --test tests/*.test.js
       - name: Verify authorised HubSpot key
         run: |
           if [ -z "$DEFAULT_PERSONAL_ACCESS_KEY" ]; then
