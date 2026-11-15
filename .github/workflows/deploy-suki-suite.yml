@@ -1,0 +1,133 @@
+name: SUKI one-click native app suite
+on:
+  push:
+    branches: [codex/suki-suite-installer]
+    paths: [.github/workflows/deploy-suki-suite.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: suki-149783010-native-suite
+  cancel-in-progress: false
+jobs:
+  provision:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    outputs:
+      notes_type: ${{ steps.types.outputs.notes_type }}
+      time_type: ${{ steps.types.outputs.time_type }}
+    env:
+      HUBSPOT_ACCOUNT_ID: '149783010'
+      HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Assert the approved portal and credential
+        run: |
+          test "$HUBSPOT_ACCOUNT_ID" = '149783010'
+          test -n "$HUBSPOT_PERSONAL_ACCESS_KEY"
+      - name: Install HubSpot CLI and inspect storage
+        run: |
+          npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund >/dev/null 2>&1
+          hs custom-object list-schemas --use-env --no-color | tee "$RUNNER_TEMP/objects-before.txt"
+      - name: Create missing suite custom objects only
+        run: |
+          set -euo pipefail
+          if ! grep -q 'siloy_note' "$RUNNER_TEMP/objects-before.txt"; then
+            hs custom-object create-schema --path schemas/siloy-note.json --use-env --no-color
+          fi
+          if ! grep -q 'siloy_time_entry' "$RUNNER_TEMP/objects-before.txt"; then
+            hs custom-object create-schema --path schemas/siloy-time.json --use-env --no-color
+          fi
+      - name: Resolve exact per-portal type IDs
+        id: types
+        run: |
+          set -euo pipefail
+          hs custom-object list-schemas --use-env --no-color > "$RUNNER_TEMP/objects-after.txt"
+          cat "$RUNNER_TEMP/objects-after.txt"
+          notes_type="$(grep -F 'siloy_note' "$RUNNER_TEMP/objects-after.txt" | grep -oE '2-[0-9]+' | head -1)"
+          time_type="$(grep -F 'siloy_time_entry' "$RUNNER_TEMP/objects-after.txt" | grep -oE '2-[0-9]+' | head -1)"
+          [[ "$notes_type" =~ ^2-[0-9]+$ ]] || { echo "::error::Siloy Notes schema missing"; exit 1; }
+          [[ "$time_type" =~ ^2-[0-9]+$ ]] || { echo "::error::Siloy Time schema missing"; exit 1; }
+          echo "notes_type=$notes_type" >> "$GITHUB_OUTPUT"
+          echo "time_type=$time_type" >> "$GITHUB_OUTPUT"
+  install:
+    needs: provision
+    runs-on: ubuntu-latest
+    timeout-minutes: 16
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: notes
+            ref: codex/corpus-note-hubspot-card
+            legacy_type: '2-256491528'
+          - app: time
+            ref: codex/siloy-time-enterprise
+            legacy_type: '2-143515197'
+    env:
+      HUBSPOT_ACCOUNT_ID: '149783010'
+      HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
+          path: app-src
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate and brand app source
+        working-directory: app-src
+        env:
+          CORPUS_BRAND_URL: 'https://siloy.com/brand'
+          CORPUS_BRAND_NAME: 'Siloy UKI'
+        run: |
+          set -euo pipefail
+          node scripts/configure-corpus-brand.mjs
+          node --test tests/*.test.js
+      - name: Bind destination object ID to app functions and cards
+        working-directory: app-src
+        env:
+          NOTES_TYPE: ${{ needs.provision.outputs.notes_type }}
+          TIME_TYPE: ${{ needs.provision.outputs.time_type }}
+          APP: ${{ matrix.app }}
+          LEGACY: ${{ matrix.legacy_type }}
+        run: |
+          set -euo pipefail
+          if [ "$APP" = "notes" ]; then resolved="$NOTES_TYPE"; else resolved="$TIME_TYPE"; fi
+          [[ "$resolved" =~ ^2-[0-9]+$ ]]
+          grep -rl "$LEGACY" src/app | xargs -r sed -i "s/$LEGACY/$resolved/g"
+          if grep -rFq "$LEGACY" src/app; then echo '::error::Legacy object reference remains'; exit 1; fi
+          echo "Resolved $APP data object: $resolved"
+      - name: Upload app project to SUKI
+        uses: HubSpot/hubspot-project-actions/project-upload@v1.1.0
+        with:
+          project_dir: './app-src'
+          account_id: '149783010'
+          personal_access_key: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+      - name: Deploy latest app build to SUKI
+        uses: HubSpot/hubspot-project-actions/project-deploy@v1.1.0
+        with:
+          project_dir: './app-src'
+          deploy_latest_build: true
+          account_id: '149783010'
+          personal_access_key: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+      - name: Install if necessary and verify scope installation
+        working-directory: app-src
+        run: |
+          set -euo pipefail
+          npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund >/dev/null 2>&1
+          for attempt in 1 2 3 4; do
+            if printf 'y\n' | timeout 70s script -q -e -c "hs project install-app --use-env" /dev/null; then
+              break
+            fi
+            if [ "$attempt" -eq 4 ]; then echo "::error::App installation failed"; exit 1; fi
+            sleep 25
+          done
+          hs project list-builds --use-env --json > "$RUNNER_TEMP/app-build.json"
+          hs project app-install-status --use-env --json > "$RUNNER_TEMP/app-status.json"
+          grep -Eq '"isInstalled"\s*:\s*true' "$RUNNER_TEMP/app-status.json"
+          grep -Eq '"isInstalledWithCurrentScopes"\s*:\s*true' "$RUNNER_TEMP/app-status.json"
+          echo "SUCCESS: ${{ matrix.app }} deployed and installed in SUKI (149783010)"
