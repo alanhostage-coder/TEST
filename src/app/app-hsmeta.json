@@ -12,7 +12,10 @@
         "crm.objects.contacts.read",
         "crm.objects.custom.read",
         "crm.objects.custom.write",
-        "crm.objects.projects.read"
+        "crm.objects.projects.read",
+        "crm.objects.companies.read",
+        "crm.objects.deals.read",
+        "crm.objects.tickets.read"
       ],
       "optionalScopes": [],
       "conditionallyRequiredScopes": []
