@@ -1,0 +1,36 @@
+name: Check Surface deployment access
+on:
+  push:
+    branches: [codex/siloy-surface-portal-check]
+    paths: [.github/workflows/siloy-surface-portal-check.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check read access to Siloy UKI Apps (149783010)
+        env:
+          HUBSPOT_ACCOUNT_ID: '149783010'
+          HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+        run: |
+          if [ -z "$HUBSPOT_PERSONAL_ACCESS_KEY" ]; then
+            echo 'No HubSpot CLI credential is configured in this repository.'
+            exit 1
+          fi
+          npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund >/dev/null 2>&1
+          if hs project list --use-env --json >"$RUNNER_TEMP/surface-access.json" 2>"$RUNNER_TEMP/surface-access.err"; then
+            echo 'HubSpot accepted a read-only Projects request scoped to account 149783010.'
+          else
+            if rg -qi '401|403|unauthor|invalid|scope|permission|access key' "$RUNNER_TEMP/surface-access.json" "$RUNNER_TEMP/surface-access.err"; then
+              echo 'HubSpot did not accept the credential for Projects in account 149783010.'
+            else
+              echo 'The CLI could not verify Projects access in account 149783010.'
+            fi
+            exit 1
+          fi
