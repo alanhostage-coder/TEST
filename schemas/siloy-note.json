@@ -1,0 +1,111 @@
+{
+  "name": "siloy_note",
+  "labels": {
+    "singular": "Siloy Note",
+    "plural": "Siloy Notes"
+  },
+  "description": "Internal-only structured notes, decisions, risks and follow-up records managed by Siloy Notes.",
+  "primaryDisplayProperty": "note_title",
+  "secondaryDisplayProperties": [
+    "note_type",
+    "note_date"
+  ],
+  "requiredProperties": [
+    "note_title",
+    "internal_notes"
+  ],
+  "searchableProperties": [
+    "note_title"
+  ],
+  "properties": [
+    {
+      "name": "note_title",
+      "label": "Note title",
+      "type": "string",
+      "fieldType": "text"
+    },
+    {
+      "name": "note_type",
+      "label": "Note type",
+      "type": "enumeration",
+      "fieldType": "select",
+      "options": [
+        {
+          "label": "Meeting",
+          "value": "meeting",
+          "displayOrder": 0,
+          "hidden": false
+        },
+        {
+          "label": "Call",
+          "value": "call",
+          "displayOrder": 1,
+          "hidden": false
+        },
+        {
+          "label": "Discovery",
+          "value": "discovery",
+          "displayOrder": 2,
+          "hidden": false
+        },
+        {
+          "label": "Handover",
+          "value": "handover",
+          "displayOrder": 3,
+          "hidden": false
+        },
+        {
+          "label": "Internal update",
+          "value": "internal_update",
+          "displayOrder": 4,
+          "hidden": false
+        }
+      ]
+    },
+    {
+      "name": "note_date",
+      "label": "Note date",
+      "type": "date",
+      "fieldType": "date"
+    },
+    {
+      "name": "internal_notes",
+      "label": "Internal notes",
+      "type": "string",
+      "fieldType": "textarea"
+    },
+    {
+      "name": "meeting_activity_id",
+      "label": "Meeting activity ID",
+      "type": "string",
+      "fieldType": "text"
+    },
+    {
+      "name": "decisions",
+      "label": "Decisions",
+      "type": "string",
+      "fieldType": "textarea"
+    },
+    {
+      "name": "risks",
+      "label": "Risks",
+      "type": "string",
+      "fieldType": "textarea"
+    },
+    {
+      "name": "next_steps",
+      "label": "Next steps",
+      "type": "string",
+      "fieldType": "textarea"
+    },
+    {
+      "name": "followup_date",
+      "label": "Follow-up date",
+      "type": "date",
+      "fieldType": "date"
+    }
+  ],
+  "associatedObjects": [
+    "COMPANY"
+  ]
+}
