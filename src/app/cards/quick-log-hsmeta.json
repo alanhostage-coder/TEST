@@ -1,0 +1,15 @@
+{
+  "uid": "siloy_time_quick_log_multiobject",
+  "type": "card",
+  "config": {
+    "name": "Siloy Time | Quick Log",
+    "location": "crm.record.sidebar",
+    "entrypoint": "/app/cards/SiloyQuickTime.jsx",
+    "objectTypes": [
+      "companies",
+      "contacts",
+      "deals",
+      "tickets"
+    ]
+  }
+}
