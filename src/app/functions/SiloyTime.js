@@ -2,6 +2,7 @@
 /* Siloy Time, independent of Siloy Notes. POC model: 2-143515197 (STT Time Logs). */
 const TYPE=process.env.SILOY_TIME_OBJECT_TYPE||'2-143515197';
 const PROJECT='0-970',API='https://api.hubapi.com';
+const RECORD_TYPES=new Set(['contacts','companies','deals','tickets']);
 const FIELDS=['start_time','end_time','total_hours_spent','total_minutes_spent','description','is_billable','type','hs_object_id'];
 const validId=v=>/^\d{1,20}$/.test(String(v||''));
 function date(s){if(!/^\d{4}-\d{2}-\d{2}$/.test(String(s||'')))return null;const d=new Date(s+'T00:00:00Z');return Number.isFinite(d.getTime())&&d.toISOString().slice(0,10)===s?s:null;}
@@ -39,10 +40,10 @@ async function projects(token){
  }
  return result.sort((a,b)=>a.name.localeCompare(b.name));
 }
-async function load(token,contactId,week){
+async function load(token,contactId,week,recordType='contacts'){
  const from=monday(week);if(!from)return fail(400,'Invalid week.');
  const to=new Date(Date.parse(from+'T00:00:00Z')+7*86400000).toISOString().slice(0,10);
- const allIds=await ids(token,'contacts',contactId,TYPE),entries=[];
+ const allIds=await ids(token,recordType,contactId,TYPE),entries=[];
  for(let pos=0;pos<allIds.length;pos+=100){
   const d=await api(token,'/crm/v3/objects/'+TYPE+'/batch/read',{method:'POST',body:{inputs:allIds.slice(pos,pos+100).map(id=>({id})),properties:FIELDS}});
   for(const r of d.results||[]){
@@ -64,34 +65,40 @@ async function load(token,contactId,week){
  entries.sort((a,b)=>a.date.localeCompare(b.date)||a.start.localeCompare(b.start));
  return ok({entries,projects:projectList,projectsError,truncated:allIds.length>=1000});
 }
-async function save(token,contactId,params){
+async function save(token,contactId,params,recordType='contacts'){
  const input=params.entry||{},props=properties(input);
- if(params.action==='create'){
+ if(params.action==='create'||params.action==='quickCreate'){
   const projectId=String(input.projectId||'');
-  if(!validId(projectId))return fail(400,'Choose a HubSpot Project.');
-  await api(token,'/crm/v3/objects/'+PROJECT+'/'+projectId+'?properties=hs_name');
+  if(params.action==='create'&&!validId(projectId))return fail(400,'Choose a HubSpot Project.');
+  if(params.action==='quickCreate'&&!String(input.description||'').trim())return fail(400,'Describe the work.');
+  if(projectId&&!validId(projectId))return fail(400,'Invalid HubSpot Project.');
+  if(projectId)await api(token,'/crm/v3/objects/'+PROJECT+'/'+projectId+'?properties=hs_name');
   const r=await api(token,'/crm/v3/objects/'+TYPE,{method:'POST',body:{properties:props}});
   if(!validId(r.id))return fail(502,'Time Log ID missing.');
   try{
-   await api(token,'/crm/v4/objects/'+TYPE+'/'+r.id+'/associations/default/contacts/'+contactId,{method:'PUT'});
-   await api(token,'/crm/v4/objects/'+TYPE+'/'+r.id+'/associations/default/'+PROJECT+'/'+projectId,{method:'PUT'});
+   await api(token,'/crm/v4/objects/'+TYPE+'/'+r.id+'/associations/default/'+recordType+'/'+contactId,{method:'PUT'});
+   if(projectId)await api(token,'/crm/v4/objects/'+TYPE+'/'+r.id+'/associations/default/'+PROJECT+'/'+projectId,{method:'PUT'});
   }catch(e){return fail(207,'Log '+r.id+' was saved but association failed. Do not retry blindly.',{partial:true,entryId:String(r.id)});}
   return ok({entryId:String(r.id)});
  }
  const entryId=String(input.id||'');
  if(!validId(entryId))return fail(400,'Invalid entry ID.');
- if(!(await ids(token,TYPE,entryId,'contacts',2)).includes(contactId))return fail(403,'Entry is not linked to this Contact.');
+ if(!(await ids(token,TYPE,entryId,recordType,2)).includes(contactId))return fail(403,'Entry is not linked to this Contact.');
  await api(token,'/crm/v3/objects/'+TYPE+'/'+entryId,{method:'PATCH',body:{properties:props}});
  return ok({entryId});
 }
 exports.main=async context=>{
- const token=process.env.PRIVATE_APP_ACCESS_TOKEN,p=context?.parameters||{},contactId=String(p.contactId||'');
+ const token=process.env.PRIVATE_APP_ACCESS_TOKEN,p=context?.parameters||{};
+ const recordType=String(p.recordType||'contacts').toLowerCase();
+ const recordId=String(p.recordId||p.contactId||'');
  if(!token)return fail(503,'App not installed.');
- if(!validId(contactId))return fail(400,'Open a Contact record.');
+ if(!RECORD_TYPES.has(recordType))return fail(400,'Unsupported CRM object type.');
+ if(!validId(recordId))return fail(400,'Open a valid CRM record.');
  try{
-  if(p.action==='load')return await load(token,contactId,p.week);
-  if(p.action==='create'||p.action==='update')return await save(token,contactId,p);
+  if(p.action==='load')return await load(token,recordId,p.week,recordType);
+  if(p.action==='create'||p.action==='quickCreate'||p.action==='update')
+    return await save(token,recordId,p,recordType);
   return fail(400,'Unsupported action.');
  }catch(e){return fail(e.status>=400&&e.status<500?e.status:502,String(e.message||e).slice(0,260));}
 };
-exports._test={date,monday,duration,properties,validId};
+exports._test={date,monday,duration,properties,validId,RECORD_TYPES,load,save};
