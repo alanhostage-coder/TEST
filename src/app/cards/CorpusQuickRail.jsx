@@ -11,6 +11,8 @@ const isSiloyBrand = /^https:\/\/(?:www\.)?siloy\.com(?:\/|$)/i.test(CORPUS_BRAN
 const SILOY_SIGNAGE_MARK_URL =
   'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-official-logo-black.svg';
 const displayedBrandMark = isSiloyBrand ? SILOY_SIGNAGE_MARK_URL : CORPUS_BRAND.logoUrl;
+const RECORDS = {'0-2':'companies','0-1':'contacts','0-3':'deals','0-5':'tickets'};
+const LABELS = {companies:'Company',contacts:'Contact',deals:'Deal',tickets:'Ticket'};
 
 function day(value) {
   if (!value) return null;
@@ -37,6 +39,8 @@ hubspot.extend(({ context, actions }) => (
 
 function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
   const companyId = String(context?.crm?.objectId || '');
+  const recordType = RECORDS[String(context?.crm?.objectTypeId || '0-2')] || '';
+  const recordLabel = LABELS[recordType] || 'CRM record';
   const portalId = String(context?.portal?.id || '145209388');
   const [notes, setNotes] = useState([]);
   const [filter, setFilter] = useState('due');
@@ -51,11 +55,11 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
   const [saveIssue, setSaveIssue] = useState('');
   const saveInFlight = React.useRef(false);
   const reload = useCallback(async () => {
-    if (!/^\d+$/.test(companyId)) { setLoading(false); setError('Open a Company record.'); return; }
+    if (!recordType || !/^\d+$/.test(companyId)) { setLoading(false); setError('Open a supported CRM record.'); return; }
     setLoading(true);
     try {
       const result = unwrap(await hubspot.serverless('corpus_notes_api', {
-        parameters: { action: 'list', companyId }
+        parameters: { action: 'list', recordType, recordId: companyId }
       }));
       if (!result.success) throw new Error(result.error || 'Unable to read linked notes.');
       setNotes(result.notes || []);
@@ -63,7 +67,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
     } catch (e) {
       setError(String(e.message || e));
     } finally { setLoading(false); }
-  }, [companyId]);
+  }, [companyId, recordType]);
   useEffect(() => { reload(); }, [reload]);
   const due = notes.filter(isDue);
   const risks = notes.filter(note => clean(note.risks));
@@ -78,7 +82,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       if (typeof copyTextToClipboard !== 'function') throw new Error('Clipboard not available.');
       await copyTextToClipboard([
         'Siloy Notes · INTERNAL draft backup',
-        'Company record ID: ' + companyId,
+        recordLabel + ' record ID: ' + companyId,
         'Title: ' + (title.trim() || 'Internal update · ' + new Date().toLocaleDateString('en-GB')),
         'Internal note: ' + body
       ].join('\n'));
@@ -93,8 +97,8 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
     setSaveIssue('');
     const defaultTitle = 'Internal update · ' + new Date().toLocaleDateString('en-GB');
     const titleToSave = title.trim() || defaultTitle;
-    if (!/^\d+$/.test(companyId)) {
-      setSaveIssue('Open a Company record to save this note.');
+    if (!recordType || !/^\d+$/.test(companyId)) {
+      setSaveIssue('Open a supported CRM record to save this note.');
       return;
     }
     if (!body.trim()) {
@@ -107,7 +111,8 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       const result = unwrap(await hubspot.serverless('corpus_notes_api', {
         parameters: {
           action: 'create',
-          companyId,
+          recordType,
+          recordId: companyId,
           note: {
             note_title: titleToSave,
             internal_notes: body.trim(),
@@ -122,7 +127,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
         setTitle('');
         setBody('');
         setComposer(false);
-        addAlert({type:'danger', title:'Saved without Company link',message:'Open the saved note to complete the association.'});
+        addAlert({type:'danger', title:'Saved without CRM record link',message:'Open the saved note to complete the association.'});
         return;
       }
       if (!result.success || !result.noteId) throw new Error(result.error || 'HubSpot did not confirm the note was saved.');
@@ -132,7 +137,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       setBody('');
       setComposer(false);
       setFilter('all');
-      addAlert({type:'success',title:'Internal note saved',message:'Saved to this Company.'});
+      addAlert({type:'success',title:'Internal note saved',message:'Saved to this ' + recordLabel + '.'});
       // Save is confirmed. Do not keep the save button busy while history refreshes.
       void reload();
     } catch(e) {
@@ -166,7 +171,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       <Flex direction="row" gap="small" wrap="wrap">
         <Tag variant="warning">Internal only</Tag>
       </Flex>
-      <Text variant="microcopy">Quick capture and follow-up cues for this Company. Nothing is written to meeting invitations.</Text>
+      <Text variant="microcopy">Quick capture and follow-up cues for this {recordLabel}. Nothing is written to meeting invitations.</Text>
       <Divider />
       <Button onClick={() => setComposer(v => !v)}>
         {composer ? 'Close quick capture' : '+ Quick internal note'}
@@ -178,7 +183,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
             disabled={busy} onChange={v => { setTitle(v); setSaveIssue(''); }} placeholder="Auto-generated if empty" />
           <TextArea name="quickBody" label="Internal note" value={body}
             disabled={busy} onChange={v => { setBody(v); setSaveIssue(''); }} rows={3} />
-          <Text variant="microcopy">Linked only to the current Company. For decisions, risks and dates, use the full Siloy Notes workspace.</Text>
+          <Text variant="microcopy">Linked to the current {recordLabel}. For decisions, risks and follow-ups, use the full Siloy Notes workspace.</Text>
           {saveIssue ? <Text>{saveIssue}</Text> : null}
           <Button onClick={save} disabled={busy}>
             {busy ? 'Saving…' : 'Save internal note'}
@@ -194,7 +199,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       ) : null}
       {savedId ? (
         <Flex direction="column" gap="small">
-          {associationNeeded ? <Tag variant="warning">Created. Company link needed.</Tag> : null}
+          {associationNeeded ? <Tag variant="warning">Created. CRM record link needed.</Tag> : null}
           <Link href={url(savedId)}>Open saved note</Link>
         </Flex>
       ) : null}
