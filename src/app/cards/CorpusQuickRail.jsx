@@ -9,7 +9,7 @@ const SILOY_COLOUR_RAIL_URL =
   'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-colour-rail.svg';
 const isSiloyBrand = /^https:\/\/(?:www\.)?siloy\.com(?:\/|$)/i.test(CORPUS_BRAND.websiteUrl || '');
 const SILOY_SIGNAGE_MARK_URL =
-  'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-signage-mark.svg';
+  'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-official-logo-black.svg';
 const displayedBrandMark = isSiloyBrand ? SILOY_SIGNAGE_MARK_URL : CORPUS_BRAND.logoUrl;
 
 function day(value) {
@@ -151,8 +151,8 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       <Flex direction="row" align="center" gap="small" wrap="wrap">
         {displayedBrandMark ? (
           <Image src={displayedBrandMark}
-            alt={isSiloyBrand ? 'Siloy' : CORPUS_BRAND.name + ' brand mark'}
-            width={118} />
+            alt={isSiloyBrand ? 'Official Siloy wordmark' : CORPUS_BRAND.name + ' brand mark'}
+            width={132} />
         ) : null}
         <Flex direction="column" gap="small">
           <Heading>Siloy Notes</Heading>
