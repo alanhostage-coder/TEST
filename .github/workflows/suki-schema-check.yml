@@ -2,7 +2,7 @@ name: Provision SUKI custom-object storage
 on:
   push:
     branches: [codex/siloy-surface-portal-check]
-    paths: [.github/workflows/suki-schema-check.yml]
+    paths: [.github/workflows/suki-schema-check.yml, 'schemas/**']
   workflow_dispatch:
 permissions:
   contents: read
@@ -40,4 +40,9 @@ jobs:
             hs custom-object create-schema --path schemas/siloy-time.json --use-env --no-color
           fi
       - name: Verify SUKI schema object IDs
-        run: hs custom-object list-schemas --use-env --no-color
+        run: |
+          set -euo pipefail
+          hs custom-object list-schemas --use-env --no-color > "$RUNNER_TEMP/verified-schemas.txt"
+          cat "$RUNNER_TEMP/verified-schemas.txt"
+          grep -q 'siloy_note' "$RUNNER_TEMP/verified-schemas.txt" || { echo "::error::Siloy Notes schema missing"; exit 1; }
+          grep -q 'siloy_time_entry' "$RUNNER_TEMP/verified-schemas.txt" || { echo "::error::Siloy Time schema missing"; exit 1; }
