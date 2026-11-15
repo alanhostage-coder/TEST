@@ -1,0 +1,28 @@
+name: SUKI storage schema permissions check
+on:
+  push:
+    branches: [codex/siloy-surface-portal-check]
+    paths: [.github/workflows/suki-schema-check.yml]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      HUBSPOT_ACCOUNT_ID: '149783010'
+      HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+    steps:
+      - name: Read-only custom object access diagnostic
+        run: |
+          npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund >/dev/null 2>&1
+          echo "=== Read only: custom object schema help ==="
+          hs custom-object list-schemas --help | head -45
+          echo "=== Read only: SUKI object schemas ==="
+          if hs custom-object list-schemas --use-env --no-color; then
+            echo 'SUKI schema read succeeded'
+          else
+            echo 'SUKI schema read not available with this Projects credential'
+            exit 1
+          fi
