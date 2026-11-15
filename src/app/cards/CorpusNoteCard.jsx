@@ -14,6 +14,8 @@ const SILOY_SIGNAGE_MARK_URL =
   'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-official-logo-black.svg';
 const displayedBrandMark = isSiloyBrand ? SILOY_SIGNAGE_MARK_URL : CORPUS_BRAND.logoUrl;
 
+const RECORDS = {'0-2':'companies','0-1':'contacts','0-3':'deals','0-5':'tickets'};
+const LABELS = {companies:'Company',contacts:'Contact',deals:'Deal',tickets:'Ticket'};
 const OPTIONS = [
   { label: 'Meeting', value: 'meeting' },
   { label: 'Call', value: 'call' },
@@ -76,6 +78,8 @@ hubspot.extend(({ context, actions }) => (
 ));
 function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
   const companyId = String(context?.crm?.objectId || '');
+  const recordType = RECORDS[String(context?.crm?.objectTypeId || '0-2')] || '';
+  const recordLabel = LABELS[recordType] || 'CRM record';
   const portalId = String(context?.portal?.id || '145209388');
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -128,7 +132,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
     '/record/2-256491528/' + id;
   const recoveryText = () => [
     'Siloy Notes · INTERNAL draft backup',
-    'Company record ID: ' + companyId,
+    recordLabel + ' record ID: ' + companyId,
     'Title: ' + effectiveTitle,
     'Type: ' + noteTypeLabel,
     'Note date: ' + ukDate,
@@ -169,15 +173,15 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
   };
 
   const reload = useCallback(async () => {
-    if (!/^\d+$/.test(companyId)) {
+    if (!recordType || !/^\d+$/.test(companyId)) {
       setLoading(false);
-      setError('Open a Company record to use Siloy Notes.');
+      setError('Open a supported CRM record to use Siloy Notes.');
       return;
     }
     setLoading(true);
     try {
       const result = unwrap(await hubspot.serverless('corpus_notes_api', {
-        parameters: { action: 'list', companyId }
+        parameters: { action: 'list', recordType, recordId: companyId }
       }));
       if (!result.success) throw new Error(result.error || 'Could not load notes.');
       setNotes(result.notes || []);
@@ -188,7 +192,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
     } finally {
       setLoading(false);
     }
-  }, [companyId]);
+  }, [companyId, recordType]);
 
   useEffect(() => { reload(); }, [reload]);
 
@@ -199,8 +203,8 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
     const followDate = ukFollowup ? ukToISO(ukFollowup) : '';
     const activityId = String(form.meeting_activity_id || '').trim();
     let problem = '';
-    if (!/^\d+$/.test(companyId)) {
-      problem = 'Open a Company record to save your note.';
+    if (!recordType || !/^\d+$/.test(companyId)) {
+      problem = 'Open a supported CRM record to save your note.';
     } else if (!form.internal_notes.trim()) {
       problem = 'Add your internal notes before saving. A title is optional.';
     } else if (!noteDate) {
@@ -224,7 +228,8 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
       const result = unwrap(await hubspot.serverless('corpus_notes_api', {
         parameters: {
           action: 'create',
-          companyId,
+          recordType,
+          recordId: companyId,
           note: { ...form, note_title: effectiveTitle, note_date: noteDate, followup_date: followDate }
         }
       }));
@@ -241,7 +246,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
         setFocusWriting(false);
         addAlert({
           type: 'danger', title: 'Note created, but not linked',
-          message: 'Open the saved record and associate this Company. Do not save again or you could create a duplicate.'
+          message: 'Open the saved record and associate this ' + recordLabel + '. Do not save again or you could create a duplicate.'
         });
         return;
       }
@@ -259,7 +264,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
       setFocusWriting(false);
       addAlert({
         type: 'success', title: 'Internal note saved',
-        message: 'Your note is linked to this Company.'
+        message: 'Your note is linked to this ' + recordLabel + '.'
       });
       // Saving and refreshing history are separate operations. The save is already confirmed;
       // a slow or failed history refresh must not turn it into an apparent save failure.
@@ -302,7 +307,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
           ) : null}
         </Flex>
       </Tile>
-      <Text variant="microcopy">Notes are saved on this Company and kept out of meeting invitations. This pilot uses app-level permissions. Restrict access to authorised staff.</Text>
+      <Text variant="microcopy">Notes are saved on this {recordLabel} and kept out of meeting invitations. This pilot uses app-level permissions. Restrict access to authorised staff.</Text>
       <Flex direction="row" wrap="wrap" gap="small">
         <Button variant="secondary" onClick={() => { setComposerOpen(true); setReceipt(null); }}>
           Write a note
@@ -323,8 +328,8 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
           </Tag>
           <Heading>{receipt.title}</Heading>
           <Text>{receipt.linked
-            ? 'Your note was saved and linked to this Company.'
-            : 'The note exists, but the Company link failed. Open the record and associate the Company. Do not save the same note again.'}</Text>
+            ? 'Your note was saved and linked to this ' + recordLabel + '.'
+            : 'The note exists, but the ' + recordLabel + ' link failed. Open the record and repair the association. Do not save the same note again.'}</Text>
           <Flex direction="row" gap="small" wrap="wrap">
             <Link href={noteUrl(receipt.id)}>Open saved note</Link>
             <Button variant="secondary" onClick={() => { setReceipt(null); setComposerOpen(true); }}>
@@ -410,7 +415,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
             ) : null}
           </>
         ) : (
-          <Text variant="microcopy">Select New note to open the editor. You can review the Company history below.</Text>
+          <Text variant="microcopy">Select New note to open the editor. Review this {recordLabel} history below.</Text>
         )}
       </Tile>
 
@@ -420,7 +425,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
       <Tile>
         <Flex direction="row" justify="between" gap="small" wrap="wrap" align="center">
           <Flex direction="row" gap="small" align="center" wrap="wrap">
-            <Heading>Company notes and follow-ups</Heading>
+            <Heading>{recordLabel} notes and follow-ups</Heading>
           </Flex>
           <Button variant="secondary" onClick={reload} disabled={loading}>
             {loading ? 'Refreshing…' : 'Refresh'}
@@ -450,7 +455,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
               <Button variant={historyFilter === 'actions' ? 'primary' : 'secondary'}
                 onClick={() => { setHistoryFilter('actions'); setHistoryExpanded(true); }}>Next actions ({nextActionCount})</Button>
             </Flex>
-            {visibleNotes.length === 0 ? <Text>No notes match this filter. Choose All to see the full Company history.</Text> : null}
+            {visibleNotes.length === 0 ? <Text>No notes match this filter. Choose All to see the full record history.</Text> : null}
             {visibleNotes.slice(0, historyExpanded ? visibleNotes.length : 3).map(note => (
               <React.Fragment key={note.id}>
                 <Divider />
