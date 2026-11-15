@@ -17,6 +17,8 @@ jobs:
       - name: Read-only custom object access diagnostic
         run: |
           npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund >/dev/null 2>&1
+          echo "=== Read only: custom object creation help ==="
+          hs custom-object create-schema --help | head -70
           echo "=== Read only: custom object schema help ==="
           hs custom-object list-schemas --help | head -45
           echo "=== Read only: SUKI object schemas ==="
