@@ -1,0 +1,65 @@
+name: SUKI verify deployed app components
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 */6 * * *'
+permissions:
+  contents: read
+jobs:
+  health:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - app: notes
+            ref: codex/corpus-note-hubspot-card
+            expected_cards: 'corpus_note_company_card,corpus_notes_quick_rail'
+            expected_function: 'corpus_notes_api'
+          - app: time
+            ref: codex/siloy-time-enterprise
+            expected_cards: 'siloy_time_contact_card,siloy_time_quick_log_multiobject'
+            expected_function: 'siloy_time_api'
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      HUBSPOT_ACCOUNT_ID: '149783010'
+      HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+      APP_NAME: ${{ matrix.app }}
+      EXPECTED_CARDS: ${{ matrix.expected_cards }}
+      EXPECTED_FUNCTION: ${{ matrix.expected_function }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ matrix.ref }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Restrict diagnostic to SUKI portal
+        run: |
+          test "$HUBSPOT_ACCOUNT_ID" = '149783010'
+          test -n "$HUBSPOT_PERSONAL_ACCESS_KEY"
+      - name: Read current HubSpot project build and app installation
+        run: |
+          npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund >/dev/null 2>&1
+          hs project list-builds --use-env --json > "$RUNNER_TEMP/builds.json"
+          hs project app-install-status --use-env --json > "$RUNNER_TEMP/installation.json"
+          node - "$RUNNER_TEMP/builds.json" "$RUNNER_TEMP/installation.json" <<'NODE'
+          const fs = require('node:fs');
+          const builds = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')).results || [];
+          const installed = JSON.parse(fs.readFileSync(process.argv[3], 'utf8'));
+          const current = builds.find(b=>b.isDeployed===true);
+          if (!current) throw new Error('No deployed build found in SUKI');
+          console.log('App:',process.env.APP_NAME,'Deployed build:',current.buildId,'Status:',current.status);
+          if (current.status !== 'SUCCESS') throw new Error('Deployed build is not successful');
+          for (const name of [...process.env.EXPECTED_CARDS.split(','),process.env.EXPECTED_FUNCTION]) {
+            const component=(current.subbuildStatuses || []).find(s=>s.buildName===name);
+            if (!component) throw new Error('Deployed build missing component: '+name);
+            console.log(name, component.status);
+            if (component.status !== 'SUCCESS') throw new Error('Component failed: '+name+' '+(component.errorMessage || ''));
+          }
+          if (installed.accountId !== 149783010 || installed.isInstalled !== true ||
+              installed.isInstalledWithCurrentScopes !== true)
+            throw new Error('Application not installed with current scopes in SUKI');
+          console.log('HubSpot app install and component checks passed.');
+          console.log('RECORD LAYOUT ACTIVATION IS A SEPARATE MANUAL STEP AND HAS NOT BEEN VERIFIED.');
+          NODE
