@@ -22,8 +22,8 @@ It checks the SUKI credential, creates missing `siloy_note` and `siloy_time_entr
 
 **Reference object IDs, November 2026 only:**
 
-- Siloy Notes `siloy_note`: `2-256646328`
-- Siloy Time `siloy_time_entry`: `2-256646413`
+- Siloy Notes initial legacy object `siloy_note`: `2-256646328`
+- Siloy Time initial legacy object `siloy_time_entry`: `2-256646413`
 
 Source branches remain independent:
 - `codex/corpus-note-hubspot-card`
@@ -87,3 +87,20 @@ Record deliverables by customer and portal: product and source version, build/de
 - Record the exact target HubSpot portal ID, app installation success, deployed build ID, record type, card layout placement, test record URL, actual create/read UAT results and permissions review.
 - A successful CI install job is **not** proof that the app card was added to the CRM layout or that a custom-object association works.
 - For SUKI on 15 November 2026, both native apps were installed and schemas created. The reference portal had **0 Contact records** at the point of validation. Siloy Time therefore needed a Contact record and layout activation before it could appear.
+
+## SUKI universal records and quick actions, 15 November 2026
+
+The original CRM custom objects have no records and are preserved without deletion, but **the live app deployment must use these new, tested universal schemas**:
+
+- Siloy Notes `siloy_note_multi`: `2-256648074` (Company, Contact, Deal, Ticket, Project associations)
+- Siloy Time `siloy_time_entry_multi`: `2-256648076` (Company, Contact, Deal, Ticket, Project associations)
+
+The independent app workflows and the one-click suite workflow resolve these names in SUKI, then replace old IDs **within the build workspace only**. The Time weekly timesheet remains a Contact tab and maintains its existing Project-required form. A new sidebar card `Siloy Time | Quick Log` works on Company, Contact, Deal and Ticket record pages: quick entry is associated with the current record and may optionally reference a Project. Both cards save to one Time object.
+
+Siloy Notes' full workspace and quick capture sidebar apply to Company, Contact, Deal and Ticket record pages with association-aware backend calls. Original editor/decision/risk/follow-up features are preserved.
+
+**Important layout step:** CRM > Companies > open a Company > Customize > Default view > right sidebar > Card library > App > add **Siloy Time | Quick Log**, and save. Repeat placement for Contacts, Deals and Tickets as desired; add Siloy Notes cards where relevant. A successful project installation alone never adds the card to customer views.
+
+**UAT:** verify a saved quick log against a Company appears when reloading the Company sidebar. Verify the original timesheet still works on Contacts. Confirm Company, Contact, Deal, Ticket and Project association definitions in Data Model; do not represent a successful mocked unit test as live data-creation UAT.
+
+**Security:** current static app tokens are app-level; the caller-supplied record IDs are not a substitute for user-level record authorization. Restrict internal rollout to authorised users and complete user-level access controls before selling confidentiality-sensitive use cases.
