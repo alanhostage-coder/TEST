@@ -32,6 +32,21 @@ jobs:
             echo "::error::Missing HUBSPOT_149783010_PERSONAL_ACCESS_KEY repository secret"
             exit 1
           fi
+      - name: Bind Time object ID to this customer portal
+        env:
+          HUBSPOT_ACCOUNT_ID: '149783010'
+          HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+        run: |
+          set -euo pipefail
+          npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund >/dev/null 2>&1
+          hs custom-object list-schemas --use-env --no-color > "$RUNNER_TEMP/suki-schemas.txt"
+          object_id="$(grep -F 'siloy_time_entry' "$RUNNER_TEMP/suki-schemas.txt" | grep -oE '2-[0-9]+' | head -1)"
+          if ! [[ "$object_id" =~ ^2-[0-9]+$ ]]; then
+            echo "::error::Missing siloy_time_entry CRM schema. Run the SUKI suite storage bootstrap first."
+            exit 1
+          fi
+          echo "Binding Time object type $object_id for SUKI 149783010"
+          grep -rl '2-143515197' src/app | xargs -r sed -i "s/2-143515197/$object_id/g"
       - name: Upload isolated Siloy Time project
         id: upload
         uses: HubSpot/hubspot-project-actions/project-upload@v1.1.0
