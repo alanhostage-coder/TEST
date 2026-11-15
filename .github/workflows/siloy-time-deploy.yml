@@ -25,7 +25,7 @@ jobs:
       - name: Validate code and timesheet behaviour
         run: |
           node --check src/app/functions/SiloyTime.js
-          node --test tests/siloy-time.test.js
+          node --test tests/*.test.js
       - name: Verify authorised HubSpot key
         run: |
           if [ -z "$DEFAULT_PERSONAL_ACCESS_KEY" ]; then
