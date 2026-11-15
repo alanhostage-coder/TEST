@@ -27,7 +27,7 @@ jobs:
           if hs project list --use-env --json >"$RUNNER_TEMP/surface-access.json" 2>"$RUNNER_TEMP/surface-access.err"; then
             echo 'HubSpot accepted a read-only Projects request scoped to account 149783010.'
           else
-            if rg -qi '401|403|unauthor|invalid|scope|permission|access key' "$RUNNER_TEMP/surface-access.json" "$RUNNER_TEMP/surface-access.err"; then
+            if grep -Eiq '401|403|unauthor|invalid|scope|permission|access key' "$RUNNER_TEMP/surface-access.json" "$RUNNER_TEMP/surface-access.err"; then
               echo 'HubSpot did not accept the credential for Projects in account 149783010.'
             else
               echo 'The CLI could not verify Projects access in account 149783010.'
