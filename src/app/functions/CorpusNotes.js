@@ -6,6 +6,7 @@
  * PRIVATE_APP_ACCESS_TOKEN is app-wide; configure CRM record access accordingly.
  */
 const TYPE = '2-256491528';
+const RECORD_TYPES = new Set(['companies','contacts','deals','tickets']);
 const API = 'https://api.hubapi.com';
 const FIELDS = ['note_title', 'note_type', 'note_date', 'internal_notes',
   'meeting_activity_id', 'decisions', 'risks', 'next_steps', 'followup_date',
@@ -53,11 +54,11 @@ async function api(token, path, options = {}) {
   }
   return data;
 }
-async function listNotes(token, companyId) {
+async function listNotes(token, companyId, recordType = 'companies') {
   const ids = [];
   let after;
   for (let page = 0; page < 5; page++) {
-    const path = '/crm/v4/objects/companies/' + companyId + '/associations/' + TYPE +
+    const path = '/crm/v4/objects/' + recordType + '/' + companyId + '/associations/' + TYPE +
       '?limit=100' + (after ? '&after=' + encodeURIComponent(after) : '');
     const associations = await api(token, path);
     for (const item of associations.results || []) {
@@ -88,7 +89,7 @@ async function listNotes(token, companyId) {
     truncated: Boolean(after || ids.length > 100)
   };
 }
-async function createNote(token, companyId, input) {
+async function createNote(token, companyId, input, recordType = 'companies') {
   const title = clean(input.note_title, 255);
   const details = clean(input.internal_notes);
   const type = clean(input.note_type, 40);
@@ -121,27 +122,29 @@ async function createNote(token, companyId, input) {
   if (!isRecordId(created.id)) return fail(502, 'HubSpot did not return a note ID.');
   try {
     await api(token, '/crm/v4/objects/' + TYPE + '/' + created.id +
-      '/associations/default/companies/' + companyId, { method: 'PUT' });
+      '/associations/default/' + recordType + '/' + companyId, { method: 'PUT' });
   } catch (error) {
     return {
       statusCode: 207,
       body: {
         success: false, partial: true, noteId: created.id,
-        error: 'Note ' + created.id + ' was created but its Company association failed: ' + error.message
+        error: 'Note ' + created.id + ' was created but its CRM record association failed: ' + error.message
       }
     };
   }
-  return ok({ noteId: created.id, linkedCompanyId: companyId });
+  return ok({ noteId: created.id, linkedCompanyId: companyId, linkedRecordId: companyId, linkedRecordType: recordType });
 }
 exports.main = async (context = {}) => {
   const token = process.env.PRIVATE_APP_ACCESS_TOKEN;
   if (!token) return fail(503, 'App access token is missing. Install this app.');
   const params = context.parameters || {};
-  const companyId = String(params.companyId || '');
-  if (!isRecordId(companyId)) return fail(400, 'Valid company record required.');
+  const recordType = String(params.recordType || 'companies').toLowerCase();
+  const companyId = String(params.recordId || params.companyId || '');
+  if (!RECORD_TYPES.has(recordType)) return fail(400, 'Unsupported CRM record type.');
+  if (!isRecordId(companyId)) return fail(400, 'Valid CRM record required.');
   try {
-    if (params.action === 'list') return ok(await listNotes(token, companyId));
-    if (params.action === 'create') return await createNote(token, companyId, params.note || {});
+    if (params.action === 'list') return ok(await listNotes(token, companyId, recordType));
+    if (params.action === 'create') return await createNote(token, companyId, params.note || {}, recordType);
     return fail(400, 'Unsupported action.');
   } catch (error) {
     const status = error.status >= 400 && error.status < 500 ? error.status : 502;
@@ -150,4 +153,4 @@ exports.main = async (context = {}) => {
       : String(error.message || 'Unexpected error').slice(0, 260));
   }
 };
-exports._test = { isRecordId, dateMs, clean, listNotes, createNote, FIELDS, TYPE };
+exports._test = { isRecordId, dateMs, clean, listNotes, createNote, FIELDS, TYPE, RECORD_TYPES };
