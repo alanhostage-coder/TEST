@@ -1,4 +1,4 @@
-name: SUKI storage schema permissions check
+name: Provision SUKI custom-object storage
 on:
   push:
     branches: [codex/siloy-surface-portal-check]
@@ -7,24 +7,37 @@ on:
 permissions:
   contents: read
 jobs:
-  check:
+  provision:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     env:
       HUBSPOT_ACCOUNT_ID: '149783010'
       HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
     steps:
-      - name: Read-only custom object access diagnostic
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Ensure SUKI only
         run: |
-          npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund >/dev/null 2>&1
-          echo "=== Read only: custom object creation help ==="
-          hs custom-object create-schema --help | head -70
-          echo "=== Read only: custom object schema help ==="
-          hs custom-object list-schemas --help | head -45
-          echo "=== Read only: SUKI object schemas ==="
-          if hs custom-object list-schemas --use-env --no-color; then
-            echo 'SUKI schema read succeeded'
+          test "$HUBSPOT_ACCOUNT_ID" = '149783010'
+          test -n "$HUBSPOT_PERSONAL_ACCESS_KEY"
+      - name: Install official HubSpot CLI
+        run: npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund
+      - name: Inspect current SUKI object schemas
+        run: hs custom-object list-schemas --use-env --no-color | tee "$RUNNER_TEMP/suki-schemas.txt"
+      - name: Provision isolated Siloy Notes and Time object definitions
+        run: |
+          set -euo pipefail
+          if grep -q 'siloy_note' "$RUNNER_TEMP/suki-schemas.txt"; then
+            echo 'Siloy Notes schema already exists'
           else
-            echo 'SUKI schema read not available with this Projects credential'
-            exit 1
+            hs custom-object create-schema --path schemas/siloy-note.json --use-env --no-color
           fi
+          if grep -q 'siloy_time_entry' "$RUNNER_TEMP/suki-schemas.txt"; then
+            echo 'Siloy Time schema already exists'
+          else
+            hs custom-object create-schema --path schemas/siloy-time.json --use-env --no-color
+          fi
+      - name: Verify SUKI schema object IDs
+        run: hs custom-object list-schemas --use-env --no-color
