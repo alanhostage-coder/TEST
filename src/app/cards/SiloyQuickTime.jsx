@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { hubspot, Heading, Text, Input, TextArea, Select, Button, Flex, Tile, Tag, Image, Link, Divider, LoadingSpinner } from '@hubspot/ui-extensions';
+import { hubspot, Heading, Text, Input, TextArea, Select, Button, Flex, Tile, Tag, Tooltip, Image, Link, Divider, LoadingSpinner } from '@hubspot/ui-extensions';
 import { CORPUS_BRAND } from './brand-config';
 
 const MARK = 'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/siloy-time-enterprise/src/app/cards/assets/siloy-time-header.svg';
@@ -132,6 +132,7 @@ function SiloyQuickTime({ context, addAlert }) {
           disabled={saving} placeholder="0.5"/>
         <Flex direction="row" align="center" gap="small" wrap="wrap">
           <Text variant="microcopy">Quick durations</Text>
+          <Tag variant="info" overlay={<Tooltip>Presets are in hours: 0.25 is 15 minutes, 0.5 is 30 minutes. You can type a different quarter-hour duration above.</Tooltip>}>ⓘ</Tag>
           {['0.25','0.5','1','2'].map(value => (
             <Button key={value} variant="secondary" disabled={saving} onClick={() => setHours(value)}>{value} h</Button>
           ))}
@@ -158,10 +159,10 @@ function SiloyQuickTime({ context, addAlert }) {
       <Tile>
         <Flex direction="row" align="center" justify="between" gap="small" wrap="wrap">
           <Heading>Week at a glance</Heading>
-          <Tag variant="info">{fmt(total)} total</Tag>
+          <Tag variant="info" overlay={<Tooltip>Sum of entries associated with this record for the current Monday-to-Sunday week.</Tooltip>}>{fmt(total)} total</Tag>
         </Flex>
         <Flex direction="row" align="center" gap="small" wrap="wrap">
-          <Tag variant="default">{fmt(billableHours)} billable</Tag>
+          <Tag variant={billableHours>0?'success':'default'} overlay={<Tooltip>These hours were marked billable when logged; they are not invoice totals.</Tooltip>}>{fmt(billableHours)} billable</Tag>
           <Button variant="secondary" disabled={loading} onClick={()=>setWeekOpen(v=>!v)}>
             {weekOpen?'Hide daily breakdown':'View daily breakdown'}
           </Button>

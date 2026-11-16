@@ -250,3 +250,14 @@ test('Time entries prioritise work description and allow one-tap durations',()=>
  assert.match(ui,/onClick=\{\(\)=>update\('hours',value\)\}/);
  assert.doesNotMatch(ui,/Project unassigned/);
 });
+
+
+test('Timesheet explains record-scoped totals and optional Project with native tooltips',()=>{
+ const ui=fs.readFileSync('src/app/cards/SiloyTimeCard.jsx','utf8');
+ assert.match(ui,/,Tag,Tooltip,/);
+ assert.match(ui,/overlay=\{<Tooltip placement="bottom">Totals include entries linked to this CRM record/);
+ assert.match(ui,/Billable hours are entries marked Billable/);
+ assert.match(ui,/variant=\{billable>0\?'success':'default'\}/);
+ assert.match(ui,/Project field is optional/);
+ assert.match(ui,/in 15-minute increments/);
+});
