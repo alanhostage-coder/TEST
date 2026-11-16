@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   hubspot, Heading, Text, Input, TextArea, Select, Button, Link,
-  Divider, LoadingSpinner, Flex, Tile, Tag, Tooltip, Image
+  Divider, LoadingSpinner, Flex, Tile, Tag, Tooltip, Icon, Image
 } from '@hubspot/ui-extensions';
 import { CORPUS_BRAND } from './brand-config';
 
@@ -294,7 +294,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
           </Flex>
         </Flex>
         <Flex direction="row" wrap="wrap" gap="small">
-          <Tag variant="warning" overlay={<Tooltip placement="bottom">Notes are not sent to meeting invitations. Visibility still depends on HubSpot CRM and app permissions.</Tooltip>}>Internal only ⓘ</Tag>
+          <Tag variant="warning" overlay={<Tooltip placement="bottom">Notes are not sent to meeting invitations. Visibility still depends on HubSpot CRM and app permissions.</Tooltip>}><Icon name="info" screenReaderText="Internal notes help" /> Internal only</Tag>
           {CORPUS_BRAND.name !== 'Siloy UKI' ? (
             <Tag variant="default">{CORPUS_BRAND.name} workspace</Tag>
           ) : null}
@@ -351,7 +351,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
               <Button variant="secondary" onClick={() => setDraftProtected(v => !v)} disabled={saving}>
                 {draftProtected ? 'Unlock editor' : 'Protect draft'}
               </Button>
-              {draftProtected ? <Tag variant="warning" overlay={<Tooltip>Protect draft only pauses editing on this card. It is not a confidentiality or CRM permission control.</Tooltip>}>Editing paused ⓘ</Tag> : null}
+              {draftProtected ? <Tag variant="warning" overlay={<Tooltip>Protect draft only pauses editing on this card. It is not a confidentiality or CRM permission control.</Tooltip>}><Icon name="info" screenReaderText="Draft protection help" /> Editing paused</Tag> : null}
             </Flex>
             {draftProtected ? <Text variant="microcopy">Editing is paused, but you can still save your note. Unlock the editor to make changes. This is not a security control.</Text> : null}
             <Input name="noteTitle" label="Title (optional)" disabled={draftProtected || saving} value={form.note_title}
@@ -419,7 +419,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
         <Flex direction="row" justify="between" gap="small" wrap="wrap" align="center">
           <Flex direction="row" gap="small" align="center" wrap="wrap">
             <Heading>{recordLabel} notes and follow-ups</Heading>
-            <Tag variant="info" overlay={<Tooltip>History and counts cover the notes loaded for this CRM record; a follow-up date does not create a HubSpot Task.</Tooltip>}>ⓘ</Tag>
+            <Tag variant="info" overlay={<Tooltip>History and counts cover the notes loaded for this CRM record; a follow-up date does not create a HubSpot Task.</Tooltip>}><Icon name="info" screenReaderText="Additional information" /> Help</Tag>
           </Flex>
           <Button variant="secondary" onClick={reload} disabled={loading}>
             {loading ? 'Refreshing…' : 'Refresh'}

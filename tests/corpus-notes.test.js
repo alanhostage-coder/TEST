@@ -229,3 +229,12 @@ test('Native tooltips explain permissions, actions and statuses without custom C
  assert.match(main,/<Button variant="primary" onClick=\{save\}/);
  assert.match(rail,/<Button variant="primary" onClick=\{save\}/);
 });
+
+test('help icons are native and no unreliable circled-i text remains',()=>{
+ const fs=require('node:fs');
+ for (const component of ['CorpusNoteCard.jsx','CorpusQuickRail.jsx']) {
+  const ui=fs.readFileSync(require.resolve('../src/app/cards/'+component),'utf8');
+  assert.match(ui,/<Icon name="info" screenReaderText=/);
+  assert.doesNotMatch(ui,/ⓘ/);
+ }
+});
