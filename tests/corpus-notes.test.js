@@ -247,12 +247,13 @@ test('Both Notes cards show readable text rather than broken circled-i glyphs',(
  }
 });
 
-test('Saved notes direct users to the native attachment control',()=>{
+test('Saved note attachment target uses the HubSpot CrmRecord contract',()=>{
  const fs=require('node:fs');
  const ui=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
- assert.match(ui,/Attachments → Add/);
+ assert.match(ui,/attachToRecord=\{\{ objectType: NOTE_TYPE_ID, objectId: id \}\}/);
+ assert.match(ui,/Number.isSafeInteger\(id\)/);
  assert.match(ui,/noteUrl=\{noteUrl\(receipt.id\)\}/);
  assert.match(ui,/noteUrl=\{noteUrl\(note.id\)\}/);
- assert.doesNotMatch(ui,/Recently uploaded to this note|<FileUpload/);
+ assert.doesNotMatch(ui,/Recently uploaded to this note|objectTypeId: NOTE_TYPE_ID/);
 });
 

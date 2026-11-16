@@ -4,6 +4,7 @@ import {
   Divider, LoadingSpinner, Flex, Tile, Tag, Tooltip, Image
 } from '@hubspot/ui-extensions';
 import { CORPUS_BRAND } from './brand-config';
+import { FileUpload } from '@hubspot/ui-extensions/experimental';
 
 // A public brand-only asset, never a people photograph or arbitrary website hero.
 // Native CRM UI extensions do not support arbitrary CSS hex-colour borders.
@@ -11,6 +12,7 @@ const isSiloyBrand = /^https:\/\/(?:www\.)?siloy\.com(?:\/|$)/i.test(CORPUS_BRAN
 const SILOY_HEADER_URL = 'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-notes-header.svg';
 const displayedBrandMark = isSiloyBrand ? SILOY_HEADER_URL : CORPUS_BRAND.logoUrl;
 
+const NOTE_TYPE_ID = '2-256491528'; // Bound to the portal's Notes object at deployment.
 const RECORDS = {'0-2':'companies','0-1':'contacts','0-3':'deals','0-5':'tickets'};
 const LABELS = {companies:'Company',contacts:'Contact',deals:'Deal',tickets:'Ticket'};
 const OPTIONS = [
@@ -70,14 +72,27 @@ function readable(value, limit = 600) {
 }
 
 
-// Use the saved record's native attachment control until the beta component
-// can confirm both file upload and the attachment operation reliably.
+// FileUpload reports file uploads separately from attachment success. Its own
+// status/error UI remains visible; do not claim a successful link on onChange.
+class AttachmentBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { failed: false }; }
+  static getDerivedStateFromError() { return { failed: true }; }
+  render() {
+    return this.state.failed
+      ? <Text>File upload is unavailable here. Open the saved note to add files.</Text>
+      : this.props.children;
+  }
+}
 function NoteFileUploader({ noteId, noteUrl }) {
-  if (!/^\d{1,20}$/.test(String(noteId))) return null;
+  const id = Number(noteId);
+  if (!/^\d{1,20}$/.test(String(noteId)) || !Number.isSafeInteger(id)) return null;
   return <Tile>
     <Heading>Add files to this Siloy Note</Heading>
-    <Text>Open this note and use Attachments → Add. Choose a file from your computer or one already uploaded to HubSpot.</Text>
-    <Link href={noteUrl}>Open this Note to add files</Link>
+    <Text variant="microcopy">Files are uploaded to this HubSpot portal. Check the saved note's Attachments to confirm they are linked.</Text>
+    <AttachmentBoundary>
+      <FileUpload fileLimit={5} attachToRecord={{ objectType: NOTE_TYPE_ID, objectId: id }} />
+    </AttachmentBoundary>
+    <Link href={noteUrl}>Open this Note to check attachments</Link>
   </Tile>;
 }
 
