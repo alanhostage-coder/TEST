@@ -7,12 +7,9 @@ import { CORPUS_BRAND } from './brand-config';
 
 // A public brand-only asset, never a people photograph or arbitrary website hero.
 // Native CRM UI extensions do not support arbitrary CSS hex-colour borders.
-const SILOY_COLOUR_RAIL_URL =
-  'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-colour-rail.svg';
 const isSiloyBrand = /^https:\/\/(?:www\.)?siloy\.com(?:\/|$)/i.test(CORPUS_BRAND.websiteUrl || '');
-const SILOY_SIGNAGE_MARK_URL =
-  'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-official-logo-black.svg';
-const displayedBrandMark = isSiloyBrand ? SILOY_SIGNAGE_MARK_URL : CORPUS_BRAND.logoUrl;
+const SILOY_HEADER_URL = 'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-notes-header.svg';
+const displayedBrandMark = isSiloyBrand ? SILOY_HEADER_URL : CORPUS_BRAND.logoUrl;
 
 const RECORDS = {'0-2':'companies','0-1':'contacts','0-3':'deals','0-5':'tickets'};
 const LABELS = {companies:'Company',contacts:'Contact',deals:'Deal',tickets:'Ticket'};
@@ -288,18 +285,14 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
         <Flex direction="row" align="center" gap="small" wrap="wrap">
           {displayedBrandMark ? (
             <Image src={displayedBrandMark}
-              alt={isSiloyBrand ? 'Official Siloy wordmark' : CORPUS_BRAND.name + ' brand mark'}
-              width={148} />
+              alt={isSiloyBrand ? 'Siloy Notes' : CORPUS_BRAND.name + ' brand mark'}
+              width={900} />
           ) : null}
           <Flex direction="column" gap="small">
-            <Heading>Siloy Notes</Heading>
-            <Text variant="microcopy">Internal notes · by Siloy UKI</Text>
+
+            <Text variant="microcopy">Internal notes</Text>
           </Flex>
         </Flex>
-        {isSiloyBrand ? (
-          <Image src={SILOY_COLOUR_RAIL_URL}
-            alt="Siloy brand accent colours: powder blue, yellow and mint" width={900} />
-        ) : null}
         <Flex direction="row" wrap="wrap" gap="small">
           <Tag variant="warning">Internal only</Tag>
           {CORPUS_BRAND.name !== 'Siloy UKI' ? (
@@ -309,7 +302,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
       </Tile>
       <Text variant="microcopy">Notes are saved on this {recordLabel} and kept out of meeting invitations. This pilot uses app-level permissions. Restrict access to authorised staff.</Text>
       <Flex direction="row" wrap="wrap" gap="small">
-        <Button variant="secondary" onClick={() => { setComposerOpen(true); setReceipt(null); }}>
+        <Button variant="primary" onClick={() => { setComposerOpen(true); setReceipt(null); }}>
           Write a note
         </Button>
         <Button variant="secondary" onClick={() => { setHistoryFilter('due'); setHistoryExpanded(true); setFocusWriting(false); }}>

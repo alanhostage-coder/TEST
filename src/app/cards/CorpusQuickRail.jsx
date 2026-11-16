@@ -5,12 +5,9 @@ import {
 } from '@hubspot/ui-extensions';
 import { CORPUS_BRAND } from './brand-config';
 
-const SILOY_COLOUR_RAIL_URL =
-  'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-colour-rail.svg';
 const isSiloyBrand = /^https:\/\/(?:www\.)?siloy\.com(?:\/|$)/i.test(CORPUS_BRAND.websiteUrl || '');
-const SILOY_SIGNAGE_MARK_URL =
-  'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-official-logo-black.svg';
-const displayedBrandMark = isSiloyBrand ? SILOY_SIGNAGE_MARK_URL : CORPUS_BRAND.logoUrl;
+const SILOY_HEADER_URL = 'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/corpus-note-hubspot-card/src/app/cards/assets/siloy-notes-header.svg';
+const displayedBrandMark = isSiloyBrand ? SILOY_HEADER_URL : CORPUS_BRAND.logoUrl;
 const RECORDS = {'0-2':'companies','0-1':'contacts','0-3':'deals','0-5':'tickets'};
 const LABELS = {companies:'Company',contacts:'Contact',deals:'Deal',tickets:'Ticket'};
 
@@ -156,18 +153,14 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       <Flex direction="row" align="center" gap="small" wrap="wrap">
         {displayedBrandMark ? (
           <Image src={displayedBrandMark}
-            alt={isSiloyBrand ? 'Official Siloy wordmark' : CORPUS_BRAND.name + ' brand mark'}
-            width={132} />
+            alt={isSiloyBrand ? 'Siloy Notes' : CORPUS_BRAND.name + ' brand mark'}
+            width={300} />
         ) : null}
         <Flex direction="column" gap="small">
-          <Heading>Siloy Notes</Heading>
-          <Text variant="microcopy">by Siloy UKI</Text>
+
+          <Text variant="microcopy">Quick notes</Text>
         </Flex>
       </Flex>
-      {isSiloyBrand ? (
-        <Image src={SILOY_COLOUR_RAIL_URL} width={250}
-          alt="Siloy blue, yellow and mint accent" />
-      ) : null}
       <Flex direction="row" gap="small" wrap="wrap">
         <Tag variant="warning">Internal only</Tag>
       </Flex>

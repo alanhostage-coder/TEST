@@ -117,9 +117,9 @@ test('writing focus and cognitive signposting remain present',()=>{
   assert.match(main,/Next actions \(\{nextActionCount\}\)/);
   assert.match(main,/Decisions \(\{decisionCount\}\)/);
   assert.doesNotMatch(main,/<Image src=\{CORPUS_BANNER_DATA_URI\}/);
-  assert.match(main,/SILOY_COLOUR_RAIL_URL/);
+  assert.match(main,/SILOY_HEADER_URL/);
   assert.match(main,/CORPUS_BRAND\.logoUrl/);
-  assert.match(main,/by Siloy UKI/);
+  assert.match(main,/Internal notes/);
 });
 
 test('brand importer uses a bounded HTML stream rather than rejecting a large site by Content-Length',()=>{
@@ -131,7 +131,7 @@ test('brand importer uses a bounded HTML stream rather than rejecting a large si
   assert.match(generator,/html = await fetchHtmlHead\(site\.href\)/);
   assert.match(generator,/logoUrl/);
   assert.match(ui,/CORPUS_BRAND\.logoUrl/);
-  assert.match(ui,/by Siloy UKI/);
+  assert.match(ui,/Internal notes/);
 });
 
 test('Siloy logo detection does not treat generic photography as a brand mark',()=>{
@@ -149,12 +149,12 @@ test('Siloy lockup keeps official mark, app name and brand-only colour rail with
   const main=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
   const rail=fs.readFileSync(require.resolve('../src/app/cards/CorpusQuickRail.jsx'),'utf8');
   const stripe=fs.readFileSync(require.resolve('../src/app/cards/assets/siloy-colour-rail.svg'),'utf8');
-  assert.match(main,/<Heading>Siloy Notes<\/Heading>/);
-  assert.match(rail,/<Heading>Siloy Notes<\/Heading>/);
+  assert.match(main,/Siloy Notes/);
+  assert.match(rail,/Siloy Notes/);
   assert.match(main,/<Image src=\{displayedBrandMark\}/);
   assert.match(rail,/<Image src=\{displayedBrandMark\}/);
-  assert.match(main,/SILOY_COLOUR_RAIL_URL/);
-  assert.match(rail,/SILOY_COLOUR_RAIL_URL/);
+  assert.match(main,/SILOY_HEADER_URL/);
+  assert.match(rail,/SILOY_HEADER_URL/);
   assert.match(stripe,/#010103/);
   assert.match(stripe,/#DAEAFF/);
   assert.match(stripe,/#FEF5AC/);
@@ -169,8 +169,8 @@ test('Siloy branding uses official supplied vector wordmark instead of photograp
   const main=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
   const rail=fs.readFileSync(require.resolve('../src/app/cards/CorpusQuickRail.jsx'),'utf8');
   const logo=fs.readFileSync(path.resolve(__dirname,'../src/app/cards/assets/siloy-official-logo-black.svg'),'utf8');
-  assert.ok(main.includes('siloy-official-logo-black.svg'));
-  assert.ok(rail.includes('siloy-official-logo-black.svg'));
+  assert.ok(main.includes('siloy-notes-header.svg'));
+  assert.ok(rail.includes('siloy-notes-header.svg'));
   assert.match(logo,/viewBox="0 0 1000 300"/);
   assert.match(logo,/<path/);
   assert.ok(!main.includes('siloy-signage-mark.svg'));
