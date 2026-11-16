@@ -77,12 +77,12 @@ async function save(token,contactId,params,recordType='contacts'){
   try{
    await api(token,'/crm/v4/objects/'+TYPE+'/'+r.id+'/associations/default/'+recordType+'/'+contactId,{method:'PUT'});
    if(projectId)await api(token,'/crm/v4/objects/'+TYPE+'/'+r.id+'/associations/default/'+PROJECT+'/'+projectId,{method:'PUT'});
-  }catch(e){return fail(207,'Log '+r.id+' was saved but association failed. Do not retry blindly.',{partial:true,entryId:String(r.id)});}
+  }catch(e){return fail(207,'Log '+r.id+' was saved but association failed. Do not retry blindly.',{partial:true,entryId:String(r.id),objectTypeId:TYPE});}
   return ok({entryId:String(r.id)});
  }
  const entryId=String(input.id||'');
  if(!validId(entryId))return fail(400,'Invalid entry ID.');
- if(!(await ids(token,TYPE,entryId,recordType,2)).includes(contactId))return fail(403,'Entry is not linked to this Contact.');
+ if(!(await ids(token,TYPE,entryId,recordType,2)).includes(contactId))return fail(403,'Entry is not linked to this CRM record.');
  await api(token,'/crm/v3/objects/'+TYPE+'/'+entryId,{method:'PATCH',body:{properties:props}});
  return ok({entryId});
 }

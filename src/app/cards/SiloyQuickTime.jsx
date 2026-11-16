@@ -130,6 +130,12 @@ function SiloyQuickTime({ context, addAlert }) {
           onChange={setDescription} disabled={saving} placeholder="What did you work on?"/>
         <Input label="Hours" name="quickTimeHours" value={hours} onChange={setHours}
           disabled={saving} placeholder="0.5"/>
+        <Flex direction="row" align="center" gap="small" wrap="wrap">
+          <Text variant="microcopy">Quick durations</Text>
+          {['0.25','0.5','1','2'].map(value => (
+            <Button key={value} variant="secondary" disabled={saving} onClick={() => setHours(value)}>{value} h</Button>
+          ))}
+        </Flex>
         <Button variant="secondary" disabled={saving} onClick={() => setAdvanced(x => !x)}>
           {advanced ? 'Hide details' : 'More details (optional)'}
         </Button>

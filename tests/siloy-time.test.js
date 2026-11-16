@@ -97,6 +97,7 @@ test('UAT: partial association failure returns existing Time Log ID for safe rec
    entry:{date:'2026-11-13',start:'09:00',hours:'1',projectId:'20001'}}});
   assert.equal(result.body.partial,true);
   assert.equal(result.body.entryId,'777001');
+  assert.equal(result.body.objectTypeId,'2-143515197');
   assert.equal(result.statusCode,207);
  }finally{
   global.fetch=previous;
@@ -238,4 +239,14 @@ test('Full weekly form creates a Company-linked entry without requiring Project'
   if(prevToken===undefined)delete process.env.PRIVATE_APP_ACCESS_TOKEN;
   else process.env.PRIVATE_APP_ACCESS_TOKEN=prevToken;
  }
+});
+
+
+test('Time entries prioritise work description and allow one-tap durations',()=>{
+ const ui=fs.readFileSync('src/app/cards/SiloyTimeCard.jsx','utf8');
+ assert.match(ui,/Describe the work carried out/);
+ assert.match(ui,/e\.description\|\|'Time entry'/);
+ assert.match(ui,/Quick durations/);
+ assert.match(ui,/onClick=\{\(\)=>update\('hours',value\)\}/);
+ assert.doesNotMatch(ui,/Project unassigned/);
 });

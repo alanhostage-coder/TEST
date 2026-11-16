@@ -105,3 +105,11 @@ test('Quick Log prioritises capture and keeps the daily breakdown optional',()=>
  assert.match(ui,/setDate\(day\.date\); setAdvanced\(true\)/);
  assert.match(ui,/Recent entries · this week/);
 });
+
+
+test('Quick Log has direct quarter, half, one and two hour controls',()=>{
+ const ui=fs.readFileSync('src/app/cards/SiloyQuickTime.jsx','utf8');
+ assert.match(ui,/Quick durations/);
+ assert.match(ui,/\['0\.25','0\.5','1','2'\]\.map/);
+ assert.match(ui,/onClick=\{\(\) => setHours\(value\)\}/);
+});

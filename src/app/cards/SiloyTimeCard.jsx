@@ -73,6 +73,7 @@ function TimeCard({context,alert}){
   if(pending.current)return;
   let issue='';
   if(!recordType||!/^\d+$/.test(recordId))issue='Open a supported CRM record first.';
+  else if(!String(form.description||'').trim())issue='Describe the work carried out.';
   else if(!days.some(d=>d.date===form.date))issue='Choose a day in this week.';
   else if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(form.start))issue='Enter start time as HH:MM.';
   else if(!Number.isFinite(Number(form.hours))||Number(form.hours)<0.25||Number(form.hours)>16||Math.abs(Number(form.hours)*4-Math.round(Number(form.hours)*4))>0.0001)issue='Hours must be 0.25 to 16, in 15-minute increments.';
@@ -140,8 +141,8 @@ function TimeCard({context,alert}){
      </Flex>
      {items.map(e=><Flex key={e.id} direction="row" gap="small" justify="between" align="center" wrap="wrap">
        <Flex direction="column" gap="small">
-        <Text>{projects.find(p=>p.id===e.projectId)?.name||'Project unassigned'} · {display(e.hours)}</Text>
-        <Text variant="microcopy">{e.start} · {e.billable?'Billable':'Non-billable'}{e.description?' · '+e.description:''}</Text>
+        <Text>{e.description||'Time entry'} · {display(e.hours)}</Text>
+        <Text variant="microcopy">{e.start} · {e.billable?'Billable':'Non-billable'}{e.projectId?' · '+(projects.find(p=>p.id===e.projectId)?.name||'Linked Project'):''}</Text>
        </Flex>
        <Button variant="secondary" disabled={saving} onClick={()=>edit(e)}>Edit</Button>
       </Flex>)}
@@ -168,6 +169,10 @@ function TimeCard({context,alert}){
     <Flex direction="row" gap="small" wrap="wrap">
      <Input label="Start time (HH:MM)" disabled={saving} value={form.start} onChange={v=>update('start',v)}/>
      <Input label="Hours" disabled={saving} value={form.hours} onChange={v=>update('hours',v)}/>
+    </Flex>
+    <Flex direction="row" gap="small" align="center" wrap="wrap">
+     <Text variant="microcopy">Quick durations</Text>
+     {['0.25','0.5','1','2'].map(value=><Button key={value} variant="secondary" disabled={saving} onClick={()=>update('hours',value)}>{value} h</Button>)}
     </Flex>
     <Select label="Billing" disabled={saving} value={form.billable} onChange={v=>update('billable',v)}
      options={[{label:'Billable',value:'true'},{label:'Non-billable',value:'false'}]}/>
