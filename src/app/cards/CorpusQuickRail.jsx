@@ -163,7 +163,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
         </Flex>
       </Flex>
       <Flex direction="row" gap="small" wrap="wrap">
-        <Tag variant="warning" overlay={<Tooltip placement="bottom">This captures CRM-internal notes, not meeting invitation text. Check CRM and app permissions before adding confidential material.</Tooltip>}>Internal only ⓘ</Tag>
+        <Tag variant="warning" overlay={<Tooltip placement="bottom">This captures CRM-internal notes, not meeting invitation text. Check CRM and app permissions before adding confidential material.</Tooltip>}>Internal only</Tag>
       </Flex>
       <Text variant="microcopy">Quick capture and follow-up cues for this {recordLabel}. Nothing is written to meeting invitations.</Text>
       <Divider />
@@ -198,7 +198,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       <Divider />
       <Flex direction="row" gap="small" align="center" wrap="wrap">
         <Heading>Notes at a glance</Heading>
-        <Tag variant="info" overlay={<Tooltip>These cues are calculated from saved Notes linked to this CRM record. They are not notifications or HubSpot Tasks.</Tooltip>}>ⓘ</Tag>
+        <Tag variant="info" overlay={<Tooltip>These cues are calculated from saved Notes linked to this CRM record. They are not notifications or HubSpot Tasks.</Tooltip>}>About cues</Tag>
       </Flex>
       <Flex direction="row" gap="small" wrap="wrap">
         <Button variant={filter === 'due' ? 'primary' : 'secondary'}

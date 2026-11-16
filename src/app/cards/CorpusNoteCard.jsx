@@ -98,7 +98,6 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
   const [historyFilter, setHistoryFilter] = useState('all');
   const [historyQuery, setHistoryQuery] = useState('');
   const [focusWriting, setFocusWriting] = useState(false);
-  const [voiceHelpOpen, setVoiceHelpOpen] = useState(false);
   const noteTypeLabel = OPTIONS.find(option => option.value === form.note_type)?.label || 'Internal note';
   const suggestedTitle = noteTypeLabel + ' · ' + (ukDate || isoToUK(today()));
   const effectiveTitle = form.note_title.trim() || suggestedTitle;
@@ -295,7 +294,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
           </Flex>
         </Flex>
         <Flex direction="row" wrap="wrap" gap="small">
-          <Tag variant="warning" overlay={<Tooltip placement="bottom">Notes are not sent to meeting invitations. Visibility still depends on HubSpot CRM and app permissions.</Tooltip>}>Internal only ⓘ</Tag>
+          <Tag variant="warning" overlay={<Tooltip placement="bottom">Notes are not sent to meeting invitations. Visibility still depends on HubSpot CRM and app permissions.</Tooltip>}>Internal only</Tag>
           {CORPUS_BRAND.name !== 'Siloy UKI' ? (
             <Tag variant="default">{CORPUS_BRAND.name} workspace</Tag>
           ) : null}
@@ -352,7 +351,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
               <Button variant="secondary" onClick={() => setDraftProtected(v => !v)} disabled={saving}>
                 {draftProtected ? 'Unlock editor' : 'Protect draft'}
               </Button>
-              {draftProtected ? <Tag variant="warning" overlay={<Tooltip>Protect draft only pauses editing on this card. It is not a confidentiality or CRM permission control.</Tooltip>}>Editing paused ⓘ</Tag> : null}
+              {draftProtected ? <Tag variant="warning" overlay={<Tooltip>Protect draft only pauses editing on this card. It is not a confidentiality or CRM permission control.</Tooltip>}>Editing paused</Tag> : null}
             </Flex>
             {draftProtected ? <Text variant="microcopy">Editing is paused, but you can still save your note. Unlock the editor to make changes. This is not a security control.</Text> : null}
             <Input name="noteTitle" label="Title (optional)" disabled={draftProtected || saving} value={form.note_title}
@@ -364,20 +363,6 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
             <TextArea name="noteBody" label="Your internal notes" required rows={5} disabled={draftProtected || saving}
               value={form.internal_notes} onChange={v => set('internal_notes', v)}
               placeholder="What happened, what matters, and what needs attention..." />
-            <Flex direction="row" gap="small" align="center" wrap="wrap">
-              <Button variant="secondary" disabled={saving} onClick={() => setVoiceHelpOpen(v => !v)}>
-                {voiceHelpOpen ? 'Hide voice typing help' : 'Voice typing'}
-              </Button>
-              <Text variant="microcopy">Use your device's microphone to dictate directly into the note.</Text>
-            </Flex>
-            {voiceHelpOpen ? <Tile>
-              <Heading>Speak your note</Heading>
-              <Text>1. Click inside the Your internal notes field above.</Text>
-              <Text>2. Windows: press Windows key + H, then speak after the listening prompt.</Text>
-              <Text>Mac: use the Dictation shortcut configured in System Settings. On a phone or tablet, tap the microphone on your keyboard.</Text>
-              <Text>3. Review the transcription, edit it if needed, then select Save internal note.</Text>
-              <Text variant="microcopy">This uses your device's voice typing. The button does not start recording or save automatically. Your operating system may process speech online, so follow your organisation's policy for confidential notes.</Text>
-            </Tile> : null}
             {dirty ? <Tag variant="default">Unsaved changes</Tag> : null}
             <Divider />
             <Button variant="secondary" overlay={<Tooltip placement="right">Add structured decisions, risks and follow-up actions so they can be found using the history filters.</Tooltip>} onClick={() => setDetailsOpen(v => !v)}>
@@ -434,7 +419,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
         <Flex direction="row" justify="between" gap="small" wrap="wrap" align="center">
           <Flex direction="row" gap="small" align="center" wrap="wrap">
             <Heading>{recordLabel} notes and follow-ups</Heading>
-            <Tag variant="info" overlay={<Tooltip>History and counts cover the notes loaded for this CRM record; a follow-up date does not create a HubSpot Task.</Tooltip>}>ⓘ</Tag>
+            <Tag variant="info" overlay={<Tooltip>History and counts cover the notes loaded for this CRM record; a follow-up date does not create a HubSpot Task.</Tooltip>}>About history</Tag>
           </Flex>
           <Button variant="secondary" onClick={reload} disabled={loading}>
             {loading ? 'Refreshing…' : 'Refresh'}

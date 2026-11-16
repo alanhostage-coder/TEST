@@ -230,15 +230,19 @@ test('Native tooltips explain permissions, actions and statuses without custom C
  assert.match(rail,/<Button variant="primary" onClick=\{save\}/);
 });
 
-test('Main Notes form offers safe voice typing guidance without changing its save workflow',()=>{
+test('Main Notes field stays clean without a misleading voice-typing help panel',()=>{
  const fs=require('node:fs');
  const ui=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
- assert.match(ui,/const \[voiceHelpOpen, setVoiceHelpOpen\] = useState\(false\)/);
- assert.match(ui,/setVoiceHelpOpen\(v => !v\)/);
- assert.match(ui,/Windows key \+ H/);
- assert.match(ui,/microphone on your keyboard/);
- assert.match(ui,/The button does not start recording or save automatically/);
+ assert.doesNotMatch(ui,/voiceHelpOpen|Windows key \+ H/);
  assert.match(ui,/value=\{form.internal_notes\} onChange=\{v => set\('internal_notes', v\)\}/);
  assert.match(ui,/note: \{ \.\.\.form, note_title: effectiveTitle/);
  assert.doesNotMatch(ui,/navigator\.mediaDevices|getUserMedia|SpeechRecognition|AudioRecorder|window\./);
+});
+test('Both Notes cards show readable text rather than broken circled-i glyphs',()=>{
+ const fs=require('node:fs');
+ for(const name of ['CorpusNoteCard.jsx','CorpusQuickRail.jsx']){
+  const ui=fs.readFileSync(require.resolve('../src/app/cards/'+name),'utf8');
+  assert.doesNotMatch(ui,/ⓘ|<Icon name="info"/);
+  assert.match(ui,/overlay=\{<Tooltip/);
+ }
 });
