@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   hubspot, Heading, Text, Tag, Divider, Button, Input,
-  TextArea, Flex, Link, LoadingSpinner, Tag, Tooltip, Icon, Image
+  TextArea, Flex, Link, LoadingSpinner, Tile, Image, Tooltip, Icon
 } from '@hubspot/ui-extensions';
 import { CORPUS_BRAND } from './brand-config';
 
