@@ -67,8 +67,9 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
   }, [companyId, recordType]);
   useEffect(() => { reload(); }, [reload]);
   const due = notes.filter(isDue);
+  const followups = notes.filter(note => day(note.followup_date) !== null);
   const risks = notes.filter(note => clean(note.risks));
-  const current = filter === 'due' ? due : filter === 'risks' ? risks : notes;
+  const current = filter === 'due' ? due : filter === 'followups' ? followups : filter === 'risks' ? risks : notes;
   const copyQuickDraft = async () => {
     if (!title.trim() && !body.trim()) {
       addAlert({ type: 'info', title: 'Nothing to copy yet',
@@ -166,9 +167,10 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       </Flex>
       <Text variant="microcopy">Quick capture and follow-up cues for this {recordLabel}. Nothing is written to meeting invitations.</Text>
       <Divider />
-      <Button onClick={() => setComposer(v => !v)}>
+      <Button disabled={busy} onClick={() => setComposer(v => !v)}>
         {composer ? 'Keep draft and close' : 'New internal note'}
       </Button>
+      {!composer && (title.trim() || body.trim()) ? <Tag variant="warning">Unsaved draft retained until refresh</Tag> : null}
       {composer ? (
         <Tile>
           <Heading>Quick capture</Heading>
@@ -183,9 +185,6 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
           </Button>
           <Button variant="secondary" onClick={copyQuickDraft} disabled={busy}>
             Copy draft
-          </Button>
-          <Button variant="secondary" onClick={() => setComposer(false)} disabled={busy}>
-            Keep draft and close
           </Button>
           <Text variant="microcopy">Copy draft places text on your device clipboard. No automatic recovery after refreshing the page.</Text>
         </Tile>
@@ -203,6 +202,8 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       <Flex direction="row" gap="small" wrap="wrap">
         <Button variant={filter === 'due' ? 'primary' : 'secondary'}
           onClick={() => setFilter('due')}>Due ({due.length})</Button>
+        <Button variant={filter === 'followups' ? 'primary' : 'secondary'}
+          onClick={() => setFilter('followups')}>Follow-ups ({followups.length})</Button>
         <Button variant={filter === 'risks' ? 'primary' : 'secondary'}
           onClick={() => setFilter('risks')}>Risks ({risks.length})</Button>
         <Button variant={filter === 'all' ? 'primary' : 'secondary'}
@@ -211,7 +212,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       {loading ? <LoadingSpinner label="Loading Siloy Notes" /> : null}
       {error ? <Text>{error}</Text> : null}
       {!loading && !error && current.length === 0 ? (
-        <Text variant="microcopy">{filter === 'due' ? 'No follow-ups due.' : filter === 'risks' ? 'No notes with risks.' : 'No saved notes yet.'}</Text>
+        <Text variant="microcopy">{filter === 'due' ? 'No follow-ups due.' : filter === 'followups' ? 'No follow-ups recorded.' : filter === 'risks' ? 'No notes with risks.' : 'No saved notes yet.'}</Text>
       ) : null}
       {!loading && !error ? current.slice(0, 3).map(note => (
         <React.Fragment key={note.id}>
@@ -221,6 +222,9 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
             {isDue(note) ? 'Follow-up due · ' : ''}
             {clean(note.next_steps || note.risks || note.internal_notes).slice(0,110)}
           </Text>
+          {day(note.followup_date) !== null ? (
+            <Text variant="microcopy">Follow-up: {new Date(day(note.followup_date)).toLocaleDateString('en-GB',{timeZone:'UTC'})}</Text>
+          ) : null}
         </React.Fragment>
       )) : null}
       {current.length > 3 ? <Text variant="microcopy">{current.length - 3} more in the full workspace.</Text> : null}

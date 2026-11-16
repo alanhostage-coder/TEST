@@ -431,7 +431,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
         ) : null}
         {!loading && !error && notes.length > 0 ? (
           <>
-            <Text variant="microcopy">{notes.length}{truncated ? '+' : ''} saved notes · {dueCount} follow-ups due · {riskCount} with risks</Text>
+            <Text variant="microcopy">{notes.length}{truncated ? '+' : ''} saved {notes.length===1?'note':'notes'} · {dueCount} follow-ups due · {riskCount} with risks</Text>
             <Input name="historySearch" label="Find in loaded notes" value={historyQuery}
               onChange={setHistoryQuery} placeholder="Search titles, decisions, risks or actions" />
             <Flex direction="row" gap="small" wrap="wrap">
@@ -454,7 +454,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
                 <Divider />
                 <Heading>{note.note_title || 'Untitled internal note'}</Heading>
                 <Flex direction="row" gap="small" wrap="wrap">
-                  <Tag variant="default">{note.note_type || 'Internal'}</Tag>
+                  <Tag variant="default">{OPTIONS.find(option=>option.value===note.note_type)?.label || 'Internal'}</Tag>
                   {hasDueFollowup(note) ? <Tag variant="warning">Follow-up due</Tag> : null}
                   <Text variant="microcopy">{isoToUK(note.note_date || note.hs_createdate)}</Text>
                 </Flex>

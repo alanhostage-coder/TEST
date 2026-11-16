@@ -195,3 +195,20 @@ test('Notes rail defaults to useful recent notes and has clear no-alert states',
   assert.match(rail,/No notes with risks/);
   assert.match(rail,/Saved and linked/);
 });
+
+
+test('Notes sidebar surfaces upcoming follow-ups, readable dates and retained drafts',()=>{
+  const fs=require('node:fs');
+  const rail=fs.readFileSync(require.resolve('../src/app/cards/CorpusQuickRail.jsx'),'utf8');
+  assert.match(rail,/const followups = notes.filter/);
+  assert.match(rail,/Follow-ups \(\{followups.length\}\)/);
+  assert.match(rail,/Follow-up: \{new Date\(day\(note.followup_date\)\)/);
+  assert.match(rail,/Unsaved draft retained until refresh/);
+  assert.match(rail,/disabled=\{busy\} onClick=\{\(\) => setComposer/);
+});
+test('Main Notes history uses singular grammar and friendly note-type labels',()=>{
+  const fs=require('node:fs');
+  const main=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
+  assert.match(main,/saved \{notes.length===1\?'note':'notes'\}/);
+  assert.match(main,/OPTIONS.find\(option=>option.value===note.note_type\)/);
+});
