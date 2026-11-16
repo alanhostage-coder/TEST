@@ -262,8 +262,8 @@ test('Timesheet explains record-scoped totals and optional Project with native t
  assert.match(ui,/in 15-minute increments/);
 });
 
-test('Full timesheet uses a native accessible information icon rather than a corrupted text glyph',()=>{
+test('Timesheet uses readable tooltip labels in place of unreliable icon glyphs',()=>{
  const ui=fs.readFileSync('src/app/cards/SiloyTimeCard.jsx','utf8');
- assert.match(ui,/<Icon name="info" screenReaderText=/);
- assert.doesNotMatch(ui,/ⓘ/);
+ for(const label of ['About totals','About projects','About durations'])assert.match(ui,new RegExp(label));
+ assert.doesNotMatch(ui,/ⓘ|<Icon/);
 });

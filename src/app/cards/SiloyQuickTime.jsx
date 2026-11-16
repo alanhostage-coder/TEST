@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { hubspot, Heading, Text, Input, TextArea, Select, Button, Flex, Tile, Tag, Tooltip, Icon, Image, Link, Divider, LoadingSpinner } from '@hubspot/ui-extensions';
+import { hubspot, Heading, Text, Input, TextArea, Select, Button, Flex, Tile, Tag, Tooltip, Image, Link, Divider, LoadingSpinner } from '@hubspot/ui-extensions';
 import { CORPUS_BRAND } from './brand-config';
 
 const MARK = 'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/siloy-time-enterprise/src/app/cards/assets/siloy-time-header.svg';
@@ -132,7 +132,7 @@ function SiloyQuickTime({ context, addAlert }) {
           disabled={saving} placeholder="0.5"/>
         <Flex direction="row" align="center" gap="small" wrap="wrap">
           <Text variant="microcopy">Quick durations</Text>
-          <Tag variant="info" overlay={<Tooltip>Presets are in hours: 0.25 is 15 minutes, 0.5 is 30 minutes. You can type a different quarter-hour duration above.</Tooltip>}><Icon name="info" screenReaderText="Help"/> Help</Tag>
+          <Tag variant="info" overlay={<Tooltip>Presets are in hours: 0.25 is 15 minutes, 0.5 is 30 minutes. You can type a different quarter-hour duration above.</Tooltip>}>About durations</Tag>
           {['0.25','0.5','1','2'].map(value => (
             <Button key={value} variant="secondary" disabled={saving} onClick={() => setHours(value)}>{value} h</Button>
           ))}

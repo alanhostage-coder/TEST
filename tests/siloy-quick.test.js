@@ -117,15 +117,16 @@ test('Quick Log has direct quarter, half, one and two hour controls',()=>{
 
 test('Quick Log gives contextual hover-help without changing primary save action',()=>{
  const ui=fs.readFileSync('src/app/cards/SiloyQuickTime.jsx','utf8');
- assert.match(ui,/, Tag, Tooltip, Icon, Image,/);
+ assert.match(ui,/, Tag, Tooltip, Image,/);
  assert.match(ui,/0.25 is 15 minutes/);
  assert.match(ui,/Sum of entries associated with this record/);
  assert.match(ui,/variant=\{billableHours>0\?'success':'default'\}/);
  assert.match(ui,/variant="primary" disabled=\{saving \|\| loading \|\| !description.trim\(\)\}/);
 });
 
-test('Quick time logger uses native information icons with readable help labels',()=>{
+test('Quick Time uses readable help labels and retains hover explanations',()=>{
  const ui=fs.readFileSync('src/app/cards/SiloyQuickTime.jsx','utf8');
- assert.match(ui,/<Icon name="info" screenReaderText=/);
- assert.doesNotMatch(ui,/ⓘ/);
+ assert.match(ui,/>About durations<\/Tag>/);
+ assert.match(ui,/0\.25 is 15 minutes/);
+ assert.doesNotMatch(ui,/ⓘ|<Icon/);
 });
