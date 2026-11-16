@@ -1,0 +1,56 @@
+name: SUKI remove unused legacy objects
+on:
+  push:
+    branches: [codex/suki-suite-installer]
+    paths: [.github/workflows/suki-legacy-cleanup.yml]
+permissions:
+  contents: read
+concurrency:
+  group: suki-149783010-native-suite
+  cancel-in-progress: false
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify account, empty objects, and archive obsolete schemas
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund @hubspot/local-dev-lib@latest >/dev/null
+          node --input-type=module <<'NODE'
+          import { getAccessToken } from '@hubspot/local-dev-lib/lib/personalAccessKey';
+          const auth = await getAccessToken(process.env.HUBSPOT_PERSONAL_ACCESS_KEY, undefined, 149783010);
+          if (Number(auth.portalId) !== 149783010) throw Error('Wrong HubSpot portal');
+          async function req(path, options={}) {
+            const r = await fetch('https://api.hubapi.com' + path, {
+              ...options, headers: { Authorization: 'Bearer ' + auth.accessToken, ...(options.headers||{}) }
+            });
+            if (!r.ok) throw Error(options.method + ' ' + path + ': HTTP ' + r.status + ' ' + (await r.text()).slice(0,1000));
+            return r.status===204 ? null : await r.json();
+          }
+          const old = [['2-256646328','p149783010_siloy_note'],['2-256646413','p149783010_siloy_time_entry']];
+          const keep = [['2-256648074','p149783010_siloy_note_multi'],['2-256648076','p149783010_siloy_time_entry_multi']];
+          for (const [id,name] of [...old,...keep]) {
+            const s=await req('/crm/v3/schemas/'+id);
+            if (s.objectTypeId!==id || (s.fullyQualifiedName!==name && s.name!==name && 'p149783010_'+s.name!==name)) throw Error('Schema identity mismatch: '+id);
+          }
+          for (const [id] of old) {
+            for (const archived of [false,true]) {
+              const page=await req('/crm/v3/objects/'+id+'?limit=1&archived='+archived);
+              if ((page.results||[]).length || page.paging?.next) throw Error('Records found for '+id+' archived='+archived);
+            }
+          }
+          for (const [id] of old) {
+            await req('/crm/v3/schemas/'+id, {method:'DELETE'});
+            console.log('Archived obsolete empty schema',id);
+          }
+          for (const [id] of keep) {
+            const s=await req('/crm/v3/schemas/'+id);
+            console.log('Verified active suite schema',id,s.labels?.plural);
+          }
+          NODE
