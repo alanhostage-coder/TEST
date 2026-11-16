@@ -23,7 +23,7 @@ jobs:
           set -euo pipefail
           npm install --no-audit --no-fund @hubspot/local-dev-lib@latest >/dev/null
           node --input-type=module <<'NODE'
-          import { getAccessToken } from '@hubspot/local-dev-lib/lib/personalAccessKey';
+          import { getAccessToken } from '@hubspot/local-dev-lib/personalAccessKey';
           const auth = await getAccessToken(process.env.HUBSPOT_PERSONAL_ACCESS_KEY, undefined, 149783010);
           if (Number(auth.portalId) !== 149783010) throw Error('Wrong HubSpot portal');
           async function req(path, options={}) {
