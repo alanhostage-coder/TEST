@@ -94,3 +94,14 @@ test('Quick Log uses the object ID reported by the portal-bound API for saved-re
  assert.match(ui,/objectTypeId: out.objectTypeId/);
  assert.doesNotMatch(ui,/record\/2-143515197/);
 });
+
+
+test('Quick Log prioritises capture and keeps the daily breakdown optional',()=>{
+ const ui=fs.readFileSync('src/app/cards/SiloyQuickTime.jsx','utf8');
+ assert.match(ui,/const \[weekOpen, setWeekOpen\] = useState\(false\)/);
+ assert.match(ui,/const \[recentOpen, setRecentOpen\] = useState\(true\)/);
+ assert.match(ui,/<Heading>Quick capture<\/Heading>/);
+ assert.match(ui,/weekOpen \? <>/);
+ assert.match(ui,/setDate\(day\.date\); setAdvanced\(true\)/);
+ assert.match(ui,/Recent entries · this week/);
+});

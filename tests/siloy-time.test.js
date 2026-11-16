@@ -207,3 +207,35 @@ test('Weekly timesheet saves and edits using the selected Company association',a
   else process.env.PRIVATE_APP_ACCESS_TOKEN=prevToken;
  }
 });
+
+
+test('Weekly timesheet has optional Project, correct record-scoped totals and guarded clearing',()=>{
+ const ui=fs.readFileSync('src/app/cards/SiloyTimeCard.jsx','utf8');
+ assert.match(ui,/\[open,setOpen\]=useState\(false\)/);
+ assert.match(ui,/<Heading>Week at a glance<\/Heading>/);
+ assert.match(ui,/Project \(optional\)/);
+ assert.match(ui,/dirty&&!resetArmed/);
+ assert.doesNotMatch(ui,/\/ 40 h|\/ 8 h|Choose a HubSpot Project/);
+});
+test('Full weekly form creates a Company-linked entry without requiring Project',async()=>{
+ const api=require('../src/app/functions/SiloyTime.js');
+ const prevFetch=global.fetch,prevToken=process.env.PRIVATE_APP_ACCESS_TOKEN;
+ process.env.PRIVATE_APP_ACCESS_TOKEN='mock-uat';
+ const calls=[];
+ global.fetch=async(url,opt={})=>{
+  calls.push({url:String(url),method:opt.method||'GET'});
+  return {ok:true,status:200,json:async()=>opt.method==='POST'?{id:'888001'}:{}};
+ };
+ try{
+  const result=await api.main({parameters:{action:'create',recordType:'companies',recordId:'467489667321',
+    entry:{date:'2026-11-16',start:'09:00',hours:'0.5',description:'Company time entry',billable:false}}});
+  assert.equal(result.body.success,true);
+  assert.equal(result.body.entryId,'888001');
+  assert.deepEqual(calls.map(x=>x.method),['POST','PUT']);
+  assert.match(calls[1].url,/associations\/default\/companies\/467489667321/);
+ }finally{
+  global.fetch=prevFetch;
+  if(prevToken===undefined)delete process.env.PRIVATE_APP_ACCESS_TOKEN;
+  else process.env.PRIVATE_APP_ACCESS_TOKEN=prevToken;
+ }
+});

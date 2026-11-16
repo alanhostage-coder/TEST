@@ -69,7 +69,6 @@ async function save(token,contactId,params,recordType='contacts'){
  const input=params.entry||{},props=properties(input);
  if(params.action==='create'||params.action==='quickCreate'){
   const projectId=String(input.projectId||'');
-  if(params.action==='create'&&!validId(projectId))return fail(400,'Choose a HubSpot Project.');
   if(params.action==='quickCreate'&&!String(input.description||'').trim())return fail(400,'Describe the work.');
   if(projectId&&!validId(projectId))return fail(400,'Invalid HubSpot Project.');
   if(projectId)await api(token,'/crm/v3/objects/'+PROJECT+'/'+projectId+'?properties=hs_name');

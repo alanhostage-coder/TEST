@@ -24,14 +24,15 @@ function TimeCard({context,alert}){
  const [rows,setRows]=useState([]),[projects,setProjects]=useState([]);
  const [projectsError,setProjectsError]=useState(''),[error,setError]=useState('');
  const [loading,setLoading]=useState(true),[saving,setSaving]=useState(false);
- const [receipt,setReceipt]=useState(null),[open,setOpen]=useState(true),[dirty,setDirty]=useState(false);
+ const [receipt,setReceipt]=useState(null),[open,setOpen]=useState(false),[dirty,setDirty]=useState(false);
+ const [resetArmed,setResetArmed]=useState(false);
  const [form,setForm]=useState(()=>blank(monday(iso(new Date()))));
  const [truncated,setTruncated]=useState(false);
  const pending=useRef(false);
  const latestLoad=useRef(0);
  const days=NAMES.map((name,i)=>({name,date:shift(week,i)}));
  const hours=total(rows),billable=total(rows.filter(r=>r.billable));
- const update=(k,v)=>{setForm(old=>({...old,[k]:v}));setDirty(true);setError('');};
+ const update=(k,v)=>{setForm(old=>({...old,[k]:v}));setDirty(true);setResetArmed(false);setError('');};
  const reload=useCallback(async()=>{
   const request=++latestLoad.current;
   if(!recordType||!/^\d+$/.test(recordId)){setError('Open a supported CRM record to use Siloy Time.');setLoading(false);return;}
@@ -48,13 +49,13 @@ function TimeCard({context,alert}){
  useEffect(()=>{reload();},[reload]);
  const fresh=date=>{
   if(dirty){alert({type:'warning',title:'Unsaved time',message:'Save or clear the form before adding another entry.'});return;}
-  setForm(blank(date));setDirty(false);setOpen(true);
+  setForm(blank(date));setDirty(false);setResetArmed(false);setOpen(true);
  };
  const edit=row=>{
   if(dirty){alert({type:'warning',title:'Unsaved time',message:'Save or clear the form before editing a different entry.'});return;}
   setForm({id:row.id,date:row.date,start:row.start||'09:00',projectId:row.projectId,
    hours:String(row.hours||1),description:row.description||'',billable:String(row.billable)});
-  setDirty(false);setError('');setOpen(true);
+  setDirty(false);setResetArmed(false);setError('');setOpen(true);
  };
  const navigate=n=>{
   if(dirty){alert({type:'warning',title:'Unsaved time',message:'Save or clear the form before changing weeks.'});return;}
@@ -62,13 +63,16 @@ function TimeCard({context,alert}){
   if(target===week)return;
   latestLoad.current++;
   setLoading(true);setRows([]);setTruncated(false);setError('');
-  setWeek(target);setForm(blank(target));setOpen(false);
+  setWeek(target);setForm(blank(target));setOpen(false);setResetArmed(false);
+ };
+ const clear=()=>{
+  if(dirty&&!resetArmed){setResetArmed(true);return;}
+  setForm(blank(form.date));setDirty(false);setResetArmed(false);setError('');
  };
  const save=async()=>{
   if(pending.current)return;
   let issue='';
   if(!recordType||!/^\d+$/.test(recordId))issue='Open a supported CRM record first.';
-  else if(!form.id&&!/^\d+$/.test(form.projectId))issue='Choose a HubSpot Project.';
   else if(!days.some(d=>d.date===form.date))issue='Choose a day in this week.';
   else if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(form.start))issue='Enter start time as HH:MM.';
   else if(!Number.isFinite(Number(form.hours))||Number(form.hours)<0.25||Number(form.hours)>16||Math.abs(Number(form.hours)*4-Math.round(Number(form.hours)*4))>0.0001)issue='Hours must be 0.25 to 16, in 15-minute increments.';
@@ -80,7 +84,7 @@ function TimeCard({context,alert}){
    }}));
    if((!out.success&&!out.partial)||!out.entryId)throw new Error(out.error||'Save not confirmed.');
    setReceipt({id:out.entryId,partial:Boolean(out.partial),objectTypeId:out.objectTypeId||''});
-   setDirty(false);setOpen(false);setForm(blank(form.date));
+   setDirty(false);setResetArmed(false);setOpen(false);setForm(blank(form.date));
    alert(out.partial
     ?{type:'warning',title:'Time Log created',message:'Open the saved record to review its CRM and Project links.'}
     :{type:'success',title:'Time saved',message:'The timesheet entry is saved.'});
@@ -91,18 +95,18 @@ function TimeCard({context,alert}){
  return <>
   <Tile>
    <Flex direction="row" gap="medium" align="center" wrap="wrap">
-    {displayedBrandMark?<Image src={displayedBrandMark} alt="Siloy Time" width={900}/>:null}
+    {displayedBrandMark?<Image src={displayedBrandMark} alt="Siloy Time" width={440}/>:null}
     <Flex direction="column" gap="small">
 
      <Text variant="microcopy">Weekly timesheet</Text>
     </Flex>
    </Flex>
   </Tile>
-  <Text>Log project work and keep track of the week without leaving HubSpot.</Text>
+  <Text variant="microcopy">Time linked to this {LABELS[recordType]||'CRM record'} · Monday to Sunday</Text>
   <Divider/>
   <Tile>
    <Flex direction="row" gap="small" justify="between" align="center" wrap="wrap">
-    <Heading>Your week</Heading>
+    <Heading>Week at a glance</Heading>
     <Flex direction="row" gap="small" wrap="wrap">
      <Button variant="secondary" disabled={saving} onClick={()=>navigate(-1)}>Previous</Button>
      <Button variant="secondary" disabled={saving} onClick={()=>navigate(0)}>This week</Button>
@@ -111,9 +115,9 @@ function TimeCard({context,alert}){
    </Flex>
    <Text>{uk(week)} to {uk(shift(week,6))}</Text>
    <Flex direction="row" gap="small" wrap="wrap">
-    <Tag variant={hours>=40?'success':'info'}>{display(hours)} / 40 h</Tag>
+    <Tag variant="info">{display(hours)} total</Tag>
     <Tag variant="default">{display(billable)} billable</Tag>
-    <Tag variant="default">{rows.length} entries</Tag>
+    <Tag variant="default">{rows.length} {rows.length===1?'entry':'entries'}</Tag>
    </Flex>
    {loading?<LoadingSpinner label="Loading time records"/>:null}
    {error?<Text>{error}</Text>:null}
@@ -131,16 +135,16 @@ function TimeCard({context,alert}){
     return <React.Fragment key={d.date}>
      <Flex direction="row" gap="small" justify="between" align="center" wrap="wrap">
       <Text>{d.name} · {uk(d.date)}</Text>
-      <Tag variant={used>=8?'success':'default'}>{display(used)} / 8 h</Tag>
+      <Tag variant="default">{display(used)}</Tag>
       <Button variant="secondary" disabled={saving} onClick={()=>fresh(d.date)}>Add time</Button>
      </Flex>
-     {items.length?items.map(e=><Flex key={e.id} direction="row" gap="small" justify="between" align="center" wrap="wrap">
+     {items.map(e=><Flex key={e.id} direction="row" gap="small" justify="between" align="center" wrap="wrap">
        <Flex direction="column" gap="small">
         <Text>{projects.find(p=>p.id===e.projectId)?.name||'Project unassigned'} · {display(e.hours)}</Text>
         <Text variant="microcopy">{e.start} · {e.billable?'Billable':'Non-billable'}{e.description?' · '+e.description:''}</Text>
        </Flex>
        <Button variant="secondary" disabled={saving} onClick={()=>edit(e)}>Edit</Button>
-      </Flex>):<Text variant="microcopy">No entries yet</Text>}
+      </Flex>)}
      <Divider/>
     </React.Fragment>;
    })}
@@ -148,6 +152,7 @@ function TimeCard({context,alert}){
   <Tile>
    <Flex direction="row" gap="small" justify="between" align="center" wrap="wrap">
     <Heading>{form.id?'Edit entry':'Record time'}</Heading>
+    {!open&&dirty?<Tag variant="warning">Draft retained</Tag>:null}
     <Button variant="secondary" onClick={()=>setOpen(v=>!v)}>{open?'Hide form':'Open form'}</Button>
    </Flex>
    {receipt?<Flex direction="row" gap="small" align="center" wrap="wrap">
@@ -156,8 +161,8 @@ function TimeCard({context,alert}){
    </Flex>:null}
    {open?<>
     <Select label="Day" disabled={saving} options={days.map(d=>({label:d.name+' · '+uk(d.date),value:d.date}))} value={form.date} onChange={v=>update('date',v)}/>
-    <Select label="HubSpot Project" value={form.projectId} onChange={v=>update('projectId',v)}
-     options={[{label:'Select a project',value:''},...projects.map(p=>({label:p.name,value:p.id}))]}
+    <Select label="Project (optional)" value={form.projectId} onChange={v=>update('projectId',v)}
+     options={[{label:'No Project',value:''},...projects.map(p=>({label:p.name,value:p.id}))]}
      disabled={saving||Boolean(form.id)}/>
     {form.id?<Text variant="microcopy">Project assignment cannot be changed when editing. Use a new entry for another project.</Text>:null}
     <Flex direction="row" gap="small" wrap="wrap">
@@ -169,9 +174,9 @@ function TimeCard({context,alert}){
     <TextArea label="Work carried out" disabled={saving} value={form.description} onChange={v=>update('description',v)}/>
     <Flex direction="row" gap="small" wrap="wrap">
      <Button variant="primary" disabled={saving||loading} onClick={save}>{saving?'Saving...':form.id?'Save changes':'Save time'}</Button>
-     <Button variant="secondary" disabled={saving} onClick={()=>{setForm(blank(form.date));setDirty(false);setError('');}}>Clear form</Button>
+     <Button variant="secondary" disabled={saving} onClick={clear}>{dirty&&resetArmed?'Confirm clear':'Clear form'}</Button>
     </Flex>
-    <Text variant="microcopy">Stored as a Siloy Time entry linked to this {LABELS[recordType]||'CRM record'} and to a HubSpot Project. User-level access control is not yet enabled. Administrators must restrict this pilot to authorised staff.</Text>
+    <Text variant="microcopy">Stored as a Siloy Time entry linked to this {LABELS[recordType]||'CRM record'}. A HubSpot Project link is optional. User-level access control is not yet enabled. Administrators must restrict this pilot to authorised staff.</Text>
    </>:null}
   </Tile>
  </>;

@@ -30,6 +30,8 @@ function SiloyQuickTime({ context, addAlert }) {
   const [projectId, setProjectId] = useState('');
   const [billable, setBillable] = useState('false');
   const [advanced, setAdvanced] = useState(false);
+  const [weekOpen, setWeekOpen] = useState(false);
+  const [recentOpen, setRecentOpen] = useState(true);
   const [projects, setProjects] = useState([]);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -110,23 +112,8 @@ function SiloyQuickTime({ context, addAlert }) {
           <Text variant="microcopy">Quick time log</Text>
         </Flex>
       </Flex>
-      <Text variant="microcopy">Add time against this {LABELS[recordType] || 'record'}. Appears in the same Siloy Time history as the weekly timesheet.</Text>
-      {loading ? <LoadingSpinner label="Loading time log"/> : <Tag variant="info">{fmt(total)} logged this week</Tag>}
-      <Tile>
-        <Flex direction="row" align="center" justify="between" gap="small" wrap="wrap">
-          <Heading>Weekly timesheet</Heading>
-          <Tag variant="info">{fmt(total)} total</Tag>
-        </Flex>
-        <Text variant="microcopy">Weekly overview · Monday to Sunday</Text>
-        <Tag variant="default">{fmt(billableHours)} billable</Tag>
-        {weekDays.map(day => (
-          <Flex key={day.date} direction="row" align="center" justify="between" gap="small" wrap="wrap">
-            <Text>{day.name} · {day.date.slice(8,10)}/{day.date.slice(5,7)}</Text>
-            <Tag variant="default">{fmt(day.hours)}</Tag>
-            <Button variant="secondary" disabled={saving} onClick={() => { setDate(day.date); setAdvanced(true); }}>Log</Button>
-          </Flex>
-        ))}
-      </Tile>
+      <Text variant="microcopy">Log time against this {LABELS[recordType] || 'record'}. Project is optional.</Text>
+      {loading ? <LoadingSpinner label="Loading time log"/> : null}
       {error ? <Text>{error}</Text> : null}
       {receipt ? (
         <Flex direction="column" gap="small">
@@ -137,6 +124,8 @@ function SiloyQuickTime({ context, addAlert }) {
         </Flex>
       ) : null}
       <Tile>
+        <Heading>Quick capture</Heading>
+        <Text variant="microcopy">{date===today()?'Today':date.slice(8,10)+'/'+date.slice(5,7)+'/'+date.slice(0,4)} · {fmt(total)} logged this week</Text>
         <TextArea label="Work carried out" name="quickTimeDescription" rows={2} value={description}
           onChange={setDescription} disabled={saving} placeholder="What did you work on?"/>
         <Input label="Hours" name="quickTimeHours" value={hours} onChange={setHours}
@@ -160,18 +149,43 @@ function SiloyQuickTime({ context, addAlert }) {
           {saving ? 'Saving…' : 'Save time'}
         </Button>
       </Tile>
+      <Tile>
+        <Flex direction="row" align="center" justify="between" gap="small" wrap="wrap">
+          <Heading>Week at a glance</Heading>
+          <Tag variant="info">{fmt(total)} total</Tag>
+        </Flex>
+        <Flex direction="row" align="center" gap="small" wrap="wrap">
+          <Tag variant="default">{fmt(billableHours)} billable</Tag>
+          <Button variant="secondary" disabled={loading} onClick={()=>setWeekOpen(v=>!v)}>
+            {weekOpen?'Hide daily breakdown':'View daily breakdown'}
+          </Button>
+        </Flex>
+        {weekOpen ? <>
+          <Text variant="microcopy">Weekly overview · Monday to Sunday</Text>
+          {weekDays.map(day => (
+            <Flex key={day.date} direction="row" align="center" justify="between" gap="small" wrap="wrap">
+              <Text>{day.name} · {day.date.slice(8,10)}/{day.date.slice(5,7)}</Text>
+              <Tag variant="default">{fmt(day.hours)}</Tag>
+              <Button variant="secondary" disabled={saving} onClick={() => { setDate(day.date); setAdvanced(true); }}>Log</Button>
+            </Flex>
+          ))}
+        </> : null}
+      </Tile>
       <Divider/>
       <Flex direction="row" justify="between" align="center" gap="small">
         <Text variant="microcopy">Recent entries · this week</Text>
+        <Button variant="secondary" disabled={loading || saving} onClick={()=>setRecentOpen(v=>!v)}>
+          {recentOpen?'Hide recent':'Show recent'}
+        </Button>
         <Button variant="secondary" disabled={loading || saving} onClick={reload}>Refresh</Button>
       </Flex>
-      {entries.slice(-3).reverse().map(e => (
+      {recentOpen ? entries.slice(-3).reverse().map(e => (
         <Flex key={e.id} direction="row" gap="small" justify="between" align="center">
           <Text>{(e.description || 'Time entry').slice(0,65)}</Text>
           <Tag variant="default">{fmt(e.hours)}</Tag>
         </Flex>
-      ))}
-      {!entries.length && !loading ? <Text variant="microcopy">No entries for this record yet.</Text> : null}
+      )) : null}
+      {recentOpen && !entries.length && !loading ? <Text variant="microcopy">No time logged for this record this week.</Text> : null}
       <Text variant="microcopy">App-level access permissions apply. Restrict this pilot to authorised users.</Text>
     </>
   );
