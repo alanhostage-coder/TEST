@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   hubspot, Heading, Text, Input, TextArea, Select, Button, Link,
-  Divider, LoadingSpinner, Flex, Tile, Tag, Image
+  Divider, LoadingSpinner, Flex, Tile, Tag, Tooltip, Image
 } from '@hubspot/ui-extensions';
 import { CORPUS_BRAND } from './brand-config';
 
@@ -294,7 +294,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
           </Flex>
         </Flex>
         <Flex direction="row" wrap="wrap" gap="small">
-          <Tag variant="warning">Internal only</Tag>
+          <Tag variant="warning" overlay={<Tooltip placement="bottom">Notes are not sent to meeting invitations. Visibility still depends on HubSpot CRM and app permissions.</Tooltip>}>Internal only ⓘ</Tag>
           {CORPUS_BRAND.name !== 'Siloy UKI' ? (
             <Tag variant="default">{CORPUS_BRAND.name} workspace</Tag>
           ) : null}
@@ -302,7 +302,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
       </Tile>
       <Text variant="microcopy">Private CRM notes on this {recordLabel}. Never included in meeting invitations. Access follows app and CRM permissions.</Text>
       <Flex direction="row" wrap="wrap" gap="small">
-        <Button variant="primary" onClick={() => { setComposerOpen(true); setReceipt(null); }}>
+        <Button variant={composerOpen ? "secondary" : "primary"} onClick={() => { setComposerOpen(true); setReceipt(null); }}>
           Write a note
         </Button>
         <Button variant="secondary" onClick={() => { setHistoryFilter('due'); setHistoryExpanded(true); setFocusWriting(false); }}>
@@ -351,7 +351,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
               <Button variant="secondary" onClick={() => setDraftProtected(v => !v)} disabled={saving}>
                 {draftProtected ? 'Unlock editor' : 'Protect draft'}
               </Button>
-              {draftProtected ? <Tag variant="warning">Editing paused</Tag> : null}
+              {draftProtected ? <Tag variant="warning" overlay={<Tooltip>Protect draft only pauses editing on this card. It is not a confidentiality or CRM permission control.</Tooltip>}>Editing paused ⓘ</Tag> : null}
             </Flex>
             {draftProtected ? <Text variant="microcopy">Editing is paused, but you can still save your note. Unlock the editor to make changes. This is not a security control.</Text> : null}
             <Input name="noteTitle" label="Title (optional)" disabled={draftProtected || saving} value={form.note_title}
@@ -365,7 +365,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
               placeholder="What happened, what matters, and what needs attention..." />
             {dirty ? <Tag variant="default">Unsaved changes</Tag> : null}
             <Divider />
-            <Button variant="secondary" onClick={() => setDetailsOpen(v => !v)}>
+            <Button variant="secondary" overlay={<Tooltip placement="right">Add structured decisions, risks and follow-up actions so they can be found using the history filters.</Tooltip>} onClick={() => setDetailsOpen(v => !v)}>
               {detailsOpen ? 'Hide context' : 'Add decisions, risks or next steps'}
             </Button>
             {detailsOpen ? (
@@ -392,7 +392,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
             <Divider />
             {saveIssue ? <Text>{saveIssue}</Text> : null}
             <Flex direction="row" gap="small" wrap="wrap">
-              <Button onClick={save} disabled={saving}>
+              <Button variant="primary" onClick={save} disabled={saving}>
                 {saving ? 'Saving note…' : 'Save internal note'}
               </Button>
               <Button variant="secondary" onClick={copyDraft} disabled={saving}>
@@ -419,6 +419,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
         <Flex direction="row" justify="between" gap="small" wrap="wrap" align="center">
           <Flex direction="row" gap="small" align="center" wrap="wrap">
             <Heading>{recordLabel} notes and follow-ups</Heading>
+            <Tag variant="info" overlay={<Tooltip>History and counts cover the notes loaded for this CRM record; a follow-up date does not create a HubSpot Task.</Tooltip>}>ⓘ</Tag>
           </Flex>
           <Button variant="secondary" onClick={reload} disabled={loading}>
             {loading ? 'Refreshing…' : 'Refresh'}
@@ -455,7 +456,8 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
                 <Heading>{note.note_title || 'Untitled internal note'}</Heading>
                 <Flex direction="row" gap="small" wrap="wrap">
                   <Tag variant="default">{OPTIONS.find(option=>option.value===note.note_type)?.label || 'Internal'}</Tag>
-                  {hasDueFollowup(note) ? <Tag variant="warning">Follow-up due</Tag> : null}
+                  {hasDueFollowup(note) ? <Tag variant="warning" overlay={<Tooltip>This follow-up is scheduled for today or an earlier date.</Tooltip>}>Follow-up due</Tag> : null}
+                  {note.risks ? <Tag variant="warning" overlay={<Tooltip>This note contains a risk or concern recorded by a user.</Tooltip>}>Risk noted</Tag> : null}
                   <Text variant="microcopy">{isoToUK(note.note_date || note.hs_createdate)}</Text>
                 </Flex>
                 <Text>{readable(note.internal_notes, 240)}</Text>

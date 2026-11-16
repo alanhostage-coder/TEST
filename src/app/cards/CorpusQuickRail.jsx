@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   hubspot, Heading, Text, Tag, Divider, Button, Input,
-  TextArea, Flex, Link, LoadingSpinner, Tile, Image
+  TextArea, Flex, Link, LoadingSpinner, Tile, Image, Tooltip
 } from '@hubspot/ui-extensions';
 import { CORPUS_BRAND } from './brand-config';
 
@@ -163,11 +163,11 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
         </Flex>
       </Flex>
       <Flex direction="row" gap="small" wrap="wrap">
-        <Tag variant="warning">Internal only</Tag>
+        <Tag variant="warning" overlay={<Tooltip placement="bottom">This captures CRM-internal notes, not meeting invitation text. Check CRM and app permissions before adding confidential material.</Tooltip>}>Internal only ⓘ</Tag>
       </Flex>
       <Text variant="microcopy">Quick capture and follow-up cues for this {recordLabel}. Nothing is written to meeting invitations.</Text>
       <Divider />
-      <Button disabled={busy} onClick={() => setComposer(v => !v)}>
+      <Button variant={composer ? "secondary" : "primary"} disabled={busy} onClick={() => setComposer(v => !v)}>
         {composer ? 'Keep draft and close' : 'New internal note'}
       </Button>
       {!composer && (title.trim() || body.trim()) ? <Tag variant="warning">Unsaved draft retained until refresh</Tag> : null}
@@ -180,7 +180,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
             disabled={busy} onChange={v => { setBody(v); setSaveIssue(''); }} rows={3} />
           <Text variant="microcopy">Linked to the current {recordLabel}. For decisions, risks and follow-ups, use the full Siloy Notes workspace.</Text>
           {saveIssue ? <Text>{saveIssue}</Text> : null}
-          <Button onClick={save} disabled={busy}>
+          <Button variant="primary" onClick={save} disabled={busy}>
             {busy ? 'Saving…' : 'Save internal note'}
           </Button>
           <Button variant="secondary" onClick={copyQuickDraft} disabled={busy}>
@@ -198,13 +198,17 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       <Divider />
       <Flex direction="row" gap="small" align="center" wrap="wrap">
         <Heading>Notes at a glance</Heading>
+        <Tag variant="info" overlay={<Tooltip>These cues are calculated from saved Notes linked to this CRM record. They are not notifications or HubSpot Tasks.</Tooltip>}>ⓘ</Tag>
       </Flex>
       <Flex direction="row" gap="small" wrap="wrap">
         <Button variant={filter === 'due' ? 'primary' : 'secondary'}
+          overlay={<Tooltip>Follow-ups due today or earlier.</Tooltip>}
           onClick={() => setFilter('due')}>Due ({due.length})</Button>
         <Button variant={filter === 'followups' ? 'primary' : 'secondary'}
+          overlay={<Tooltip>All dated follow-ups, including future dates.</Tooltip>}
           onClick={() => setFilter('followups')}>Follow-ups ({followups.length})</Button>
         <Button variant={filter === 'risks' ? 'primary' : 'secondary'}
+          overlay={<Tooltip>Notes with a recorded risk or concern.</Tooltip>}
           onClick={() => setFilter('risks')}>Risks ({risks.length})</Button>
         <Button variant={filter === 'all' ? 'primary' : 'secondary'}
           onClick={() => setFilter('all')}>All ({notes.length})</Button>
