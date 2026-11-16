@@ -1,5 +1,5 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
-import {hubspot,Heading,Text,Input,TextArea,Select,Button,Divider,Flex,Tile,Tag,Tooltip,Image,Link,LoadingSpinner} from '@hubspot/ui-extensions';
+import {hubspot,Heading,Text,Input,TextArea,Select,Button,Divider,Flex,Tile,Tag,Tooltip,Image,Link,LoadingSpinner,Table,TableHead,TableHeader,TableBody,TableRow,TableCell} from '@hubspot/ui-extensions';
 import {CORPUS_BRAND} from './brand-config';
 const isSiloyBrand=/^https:\/\/(?:www\.)?siloy\.com(?:\/|$)/i.test(CORPUS_BRAND.websiteUrl||'');
 const SILOY_HEADER='https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/siloy-time-enterprise/src/app/cards/assets/siloy-time-header.svg';
@@ -132,24 +132,32 @@ function TimeCard({context,alert}){
     <Heading>Daily allocation</Heading>
     <Button variant="secondary" disabled={loading} onClick={reload}>Refresh</Button>
    </Flex>
-   {days.map(d=>{
-    const items=rows.filter(row=>row.date===d.date),used=total(items);
-    return <React.Fragment key={d.date}>
-     <Flex direction="row" gap="small" justify="between" align="center" wrap="wrap">
-      <Text>{d.name} · {uk(d.date)}</Text>
-      <Tag variant="default">{display(used)}</Tag>
-      <Button variant="secondary" disabled={saving} onClick={()=>fresh(d.date)}>Add time</Button>
-     </Flex>
-     {items.map(e=><Flex key={e.id} direction="row" gap="small" justify="between" align="center" wrap="wrap">
-       <Flex direction="column" gap="small">
-        <Text>{e.description||'Time entry'} · {display(e.hours)}</Text>
-        <Text variant="microcopy">{e.start} · {e.billable?'Billable':'Non-billable'}{e.projectId?' · '+(projects.find(p=>p.id===e.projectId)?.name||'Linked Project'):''}</Text>
-       </Flex>
-       <Button variant="secondary" disabled={saving} onClick={()=>edit(e)}>Edit</Button>
-      </Flex>)}
-     <Divider/>
-    </React.Fragment>;
-   })}
+   <Table bordered={false} density="compact">
+    <TableHead><TableRow>
+     <TableHeader>Day</TableHeader><TableHeader>Work</TableHeader>
+     <TableHeader align="right">Hours</TableHeader><TableHeader>Action</TableHeader>
+    </TableRow></TableHead>
+    <TableBody>
+     {days.flatMap(d=>{
+      const items=rows.filter(row=>row.date===d.date),used=total(items);
+      return [
+       <TableRow key={d.date}>
+        <TableCell><Text>{d.name} · {uk(d.date)}</Text></TableCell>
+        <TableCell><Text variant="microcopy">{items.length ? 'Day total' : 'No entries'}</Text></TableCell>
+        <TableCell align="right"><Text>{display(used)}</Text></TableCell>
+        <TableCell><Button variant="secondary" disabled={saving} onClick={()=>fresh(d.date)}>Add time</Button></TableCell>
+       </TableRow>,
+       ...items.map(e=><TableRow key={e.id}>
+        <TableCell><Text variant="microcopy">{e.start}</Text></TableCell>
+        <TableCell><Text>{e.description||'Time entry'}</Text>
+         <Text variant="microcopy">{e.billable?'Billable':'Non-billable'}{e.projectId?' · '+(projects.find(p=>p.id===e.projectId)?.name||'Linked Project'):''}</Text></TableCell>
+        <TableCell align="right"><Text>{display(e.hours)}</Text></TableCell>
+        <TableCell><Button variant="secondary" disabled={saving} onClick={()=>edit(e)}>Edit</Button></TableCell>
+       </TableRow>)
+      ];
+     })}
+    </TableBody>
+   </Table>
   </Tile>
   <Tile>
    <Flex direction="row" gap="small" justify="between" align="center" wrap="wrap">
