@@ -247,25 +247,12 @@ test('Both Notes cards show readable text rather than broken circled-i glyphs',(
  }
 });
 
-test('Saved Notes use portal-bound native uploader attached to the specific custom Note record',()=>{
+test('Saved notes direct users to the native attachment control',()=>{
  const fs=require('node:fs');
  const ui=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
- assert.match(ui,/FileUpload, FileViewer.*ui-extensions\/experimental/);
- assert.match(ui,/class AttachmentBoundary extends React.Component/);
- assert.match(ui,/const NOTE_TYPE_ID = '2-256491528'/);
- assert.match(ui,/attachToRecord=\{\{ objectTypeId: NOTE_TYPE_ID, objectId: Number\(noteId\) \}\}/);
- assert.match(ui,/<FileUpload fileLimit=\{5\}/);
- assert.match(ui,/<FileViewer key=\{fileId\} fileId=\{fileId\}/);
- assert.match(ui,/<NoteFileUploader key=\{receipt.id\} noteId=\{receipt.id\}/);
- assert.match(ui,/<NoteFileUploader key=\{note.id\} noteId=\{note.id\}/);
- assert.match(ui,/Open saved Note record/);
- assert.doesNotMatch(ui,/attachToRecord=\{\{ objectTypeId:.*companyId/);
-});
-test('Attachment uploader is not shown for unsaved drafts or unlinked notes',()=>{
- const fs=require('node:fs');
- const ui=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
- assert.match(ui,/receipt.linked \? <NoteFileUploader/);
- assert.match(ui,/attachmentNoteId === String\(note.id\) \?/);
- assert.match(ui,/File upload is unavailable here/);
+ assert.match(ui,/Attachments → Add/);
+ assert.match(ui,/noteUrl=\{noteUrl\(receipt.id\)\}/);
+ assert.match(ui,/noteUrl=\{noteUrl\(note.id\)\}/);
+ assert.doesNotMatch(ui,/Recently uploaded to this note|<FileUpload/);
 });
 

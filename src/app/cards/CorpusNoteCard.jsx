@@ -4,7 +4,6 @@ import {
   Divider, LoadingSpinner, Flex, Tile, Tag, Tooltip, Image
 } from '@hubspot/ui-extensions';
 import { CORPUS_BRAND } from './brand-config';
-import { FileUpload, FileViewer } from '@hubspot/ui-extensions/experimental';
 
 // A public brand-only asset, never a people photograph or arbitrary website hero.
 // Native CRM UI extensions do not support arbitrary CSS hex-colour borders.
@@ -14,7 +13,6 @@ const displayedBrandMark = isSiloyBrand ? SILOY_HEADER_URL : CORPUS_BRAND.logoUr
 
 const RECORDS = {'0-2':'companies','0-1':'contacts','0-3':'deals','0-5':'tickets'};
 const LABELS = {companies:'Company',contacts:'Contact',deals:'Deal',tickets:'Ticket'};
-const NOTE_TYPE_ID = '2-256491528'; // Replaced with this portal's real type ID at deployment.
 const OPTIONS = [
   { label: 'Meeting', value: 'meeting' },
   { label: 'Call', value: 'call' },
@@ -72,49 +70,15 @@ function readable(value, limit = 600) {
 }
 
 
-// The beta controls are isolated behind an explicit Add files click.
-// A broken beta renderer must not remove the rest of the Notes workspace.
-class AttachmentBoundary extends React.Component {
-  constructor(props) { super(props); this.state = { failed: false }; }
-  static getDerivedStateFromError() { return { failed: true }; }
-  render() {
-    if (this.state.failed) {
-      return <Text>File upload is unavailable here. Open the saved Siloy Note record to attach files instead.</Text>;
-    }
-    return this.props.children;
-  }
-}
-function NoteFileUploader({ noteId }) {
-  const [uploaded, setUploaded] = useState([]);
-  if (!/^\d{1,20}$/.test(String(noteId)) || !FileUpload) {
-    return <Text>Direct upload is unavailable. Use the saved Siloy Note record's Attachments section.</Text>;
-  }
-  const onUpload = value => {
-    const files = Array.isArray(value) ? value : value ? [value] : [];
-    setUploaded(files.filter(file => file && /^\d+$/.test(String(file.id || file.fileId || ''))));
-  };
-  return (
-    <AttachmentBoundary>
-      <Tile>
-        <Heading>Add files to this Siloy Note</Heading>
-        <Text variant="microcopy">Uploads are stored in this HubSpot portal and attached to this saved Siloy Note. Review file permissions before uploading confidential material.</Text>
-        <FileUpload fileLimit={5}
-          attachToRecord={{ objectTypeId: NOTE_TYPE_ID, objectId: Number(noteId) }}
-          onChange={onUpload} />
-        {uploaded.length > 0 ? (
-          <Flex direction="column" gap="small">
-            <Text>Recently uploaded to this note</Text>
-            {uploaded.map(file => {
-              const fileId = Number(file.id || file.fileId);
-              return FileViewer ? <FileViewer key={fileId} fileId={fileId} /> :
-                <Text key={fileId}>{file.name || 'Uploaded file'} · ID {fileId}</Text>;
-            })}
-          </Flex>
-        ) : null}
-        <Text variant="microcopy">Previously attached files are available on the saved Note record.</Text>
-      </Tile>
-    </AttachmentBoundary>
-  );
+// Use the saved record's native attachment control until the beta component
+// can confirm both file upload and the attachment operation reliably.
+function NoteFileUploader({ noteId, noteUrl }) {
+  if (!/^\d{1,20}$/.test(String(noteId))) return null;
+  return <Tile>
+    <Heading>Add files to this Siloy Note</Heading>
+    <Text>Open this note and use Attachments → Add. Choose a file from your computer or one already uploaded to HubSpot.</Text>
+    <Link href={noteUrl}>Open this Note to add files</Link>
+  </Tile>;
 }
 
 hubspot.extend(({ context, actions }) => (
@@ -373,7 +337,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
             ? 'Your note was saved and linked to this ' + recordLabel + '.'
             : 'The note exists, but the ' + recordLabel + ' link failed. Open the record and repair the association. Do not save the same note again.'}</Text>
           <Text variant="microcopy">The note is saved. You can now attach documents or images to this Note, not the parent CRM record.</Text>
-          {receipt.linked ? <NoteFileUploader key={receipt.id} noteId={receipt.id} /> : null}
+          {receipt.linked ? <NoteFileUploader key={receipt.id} noteId={receipt.id} noteUrl={noteUrl(receipt.id)} /> : null}
           <Flex direction="row" gap="small" wrap="wrap">
             <Link href={noteUrl(receipt.id)}>Open saved Note record</Link>
             <Button variant="secondary" onClick={() => { setReceipt(null); setComposerOpen(true); }}>
@@ -523,7 +487,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
                   <Link href={noteUrl(note.id)}>Open saved Note record</Link>
                 </Flex>
                 {attachmentNoteId === String(note.id) ? (
-                  <NoteFileUploader key={note.id} noteId={note.id} />
+                  <NoteFileUploader key={note.id} noteId={note.id} noteUrl={noteUrl(note.id)} />
                 ) : null}
               </React.Fragment>
             ))}
