@@ -4,6 +4,9 @@ on:
     branches:
       - codex/siloy-time-enterprise
   workflow_dispatch:
+concurrency:
+  group: suki-149783010-native-suite
+  cancel-in-progress: false
 permissions:
   contents: read
 jobs:
@@ -69,7 +72,7 @@ jobs:
         run: |
           npm install -g @hubspot/cli@8.18.0
           echo "=== Build status ==="
-          hs project list-builds --use-env --json
+          hs project list-builds --use-env --json || true # BUILDING can return exit 2; diagnostic only
           for attempt in 1 2 3 4; do
             echo "=== Installation attempt $attempt ==="
             if printf 'y\n' | timeout 70s script -q -e -c "hs project install-app --use-env" /dev/null; then

@@ -16,7 +16,7 @@ function display(v){return Math.round(v*100)/100+' h';}
 hubspot.extend(({context,actions})=><TimeCard context={context} alert={actions.addAlert}/>);
 function TimeCard({context,alert}){
  const contactId=String(context?.crm?.objectId||'');
- const portalId=String(context?.portal?.id||'145209388');
+ const portalId=String(context?.portal?.id||'149783010');
  const [week,setWeek]=useState(()=>monday(iso(new Date())));
  const [rows,setRows]=useState([]),[projects,setProjects]=useState([]);
  const [projectsError,setProjectsError]=useState(''),[error,setError]=useState('');

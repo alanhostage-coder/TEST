@@ -93,6 +93,14 @@ function SiloyQuickTime({ context, addAlert }) {
   };
 
   const total = entries.reduce((sum,e) => sum + Number(e.hours || 0), 0);
+  const weekStart = monday(today());
+  const weekDays = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'].map((name,index) => {
+    const day = new Date(weekStart + 'T00:00:00Z');
+    day.setUTCDate(day.getUTCDate() + index);
+    const value = day.toISOString().slice(0,10);
+    return { name, date: value, hours: entries.filter(entry => entry.date === value).reduce((sum,entry) => sum + Number(entry.hours || 0), 0) };
+  });
+  const billableHours = entries.filter(entry => entry.billable).reduce((sum,entry) => sum + Number(entry.hours || 0), 0);
   return (
     <>
       <Flex direction="row" align="center" gap="small" wrap="wrap">
@@ -104,6 +112,21 @@ function SiloyQuickTime({ context, addAlert }) {
       </Flex>
       <Text variant="microcopy">Add time against this {LABELS[recordType] || 'record'}. Appears in the same Siloy Time history as the weekly timesheet.</Text>
       {loading ? <LoadingSpinner label="Loading time log"/> : <Tag variant="info">{fmt(total)} logged this week</Tag>}
+      <Tile>
+        <Flex direction="row" align="center" justify="between" gap="small" wrap="wrap">
+          <Heading>Weekly timesheet</Heading>
+          <Tag variant="info">{fmt(total)} total</Tag>
+        </Flex>
+        <Text variant="microcopy">Weekly overview · Monday to Sunday</Text>
+        <Tag variant="default">{fmt(billableHours)} billable</Tag>
+        {weekDays.map(day => (
+          <Flex key={day.date} direction="row" align="center" justify="between" gap="small" wrap="wrap">
+            <Text>{day.name} · {day.date.slice(8,10)}/{day.date.slice(5,7)}</Text>
+            <Tag variant="default">{fmt(day.hours)}</Tag>
+            <Button variant="secondary" disabled={saving} onClick={() => { setDate(day.date); setAdvanced(true); }}>Log</Button>
+          </Flex>
+        ))}
+      </Tile>
       {error ? <Text>{error}</Text> : null}
       {receipt ? (
         <Flex direction="column" gap="small">

@@ -13,6 +13,9 @@ test('Siloy Time quick log is a right sidebar card for core CRM records',()=>{
  assert.match(ui,/recordType, recordId/);
  assert.match(ui,/siloy_time_api/);
  assert.match(ui,/Quick time log/);
+ assert.match(ui,/Weekly overview · Monday to Sunday/);
+ assert.match(ui,/weekDays\.map\(day/);
+ assert.match(ui,/setDate\(day\.date\)/);
  assert.match(weekly,/"crm.record.tab"/);
  assert.match(weekly,/"contacts"/);
 });
