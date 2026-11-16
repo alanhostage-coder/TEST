@@ -6,7 +6,7 @@ const fs=require('node:fs');
 test('Siloy Time quick log is a right sidebar card for core CRM records',()=>{
  const meta=JSON.parse(fs.readFileSync('src/app/cards/quick-log-hsmeta.json','utf8'));
  const ui=fs.readFileSync('src/app/cards/SiloyQuickTime.jsx','utf8');
- const weekly=fs.readFileSync('src/app/cards/card-hsmeta.json','utf8');
+ const weekly=JSON.parse(fs.readFileSync('src/app/cards/card-hsmeta.json','utf8'));
  assert.equal(meta.config.location,'crm.record.sidebar');
  assert.deepEqual(meta.config.objectTypes,['companies','contacts','deals','tickets']);
  assert.match(ui,/action: 'quickCreate'/);
