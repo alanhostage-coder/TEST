@@ -16,7 +16,7 @@ test('Siloy Time quick log is a right sidebar card for core CRM records',()=>{
  assert.match(ui,/Weekly overview · Monday to Sunday/);
  assert.match(ui,/weekDays\.map\(day/);
  assert.match(ui,/setDate\(day\.date\)/);
- assert.match(weekly,/"crm.record.tab"/);
+ assert.equal(weekly.config.location,'crm.record.tab');
  assert.deepEqual(weekly.config.objectTypes,['companies','contacts','deals','tickets']);
 });
 test('Quick log can create one entry on Company without requiring a Project',async()=>{
