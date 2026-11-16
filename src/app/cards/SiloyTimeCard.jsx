@@ -1,5 +1,5 @@
 import React,{useCallback,useEffect,useRef,useState} from 'react';
-import {hubspot,Heading,Text,Input,TextArea,Select,Button,Divider,Flex,Tile,Tag,Tooltip,Image,Link,LoadingSpinner} from '@hubspot/ui-extensions';
+import {hubspot,Heading,Text,Input,TextArea,Select,Button,Divider,Flex,Tile,Tag,Tooltip,Icon,Image,Link,LoadingSpinner} from '@hubspot/ui-extensions';
 import {CORPUS_BRAND} from './brand-config';
 const isSiloyBrand=/^https:\/\/(?:www\.)?siloy\.com(?:\/|$)/i.test(CORPUS_BRAND.websiteUrl||'');
 const SILOY_HEADER='https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/siloy-time-enterprise/src/app/cards/assets/siloy-time-header.svg';
@@ -108,7 +108,7 @@ function TimeCard({context,alert}){
   <Tile>
    <Flex direction="row" gap="small" justify="between" align="center" wrap="wrap">
     <Heading>Week at a glance</Heading>
-    <Tag variant="info" overlay={<Tooltip placement="bottom">Totals include entries linked to this CRM record for the selected week. They are not individual utilisation targets.</Tooltip>}>ⓘ</Tag>
+    <Tag variant="info" overlay={<Tooltip placement="bottom">Totals include entries linked to this CRM record for the selected week. They are not individual utilisation targets.</Tooltip>}><Icon name="info" screenReaderText="Help"/> Help</Tag>
     <Flex direction="row" gap="small" wrap="wrap">
      <Button variant="secondary" disabled={saving} onClick={()=>navigate(-1)}>Previous</Button>
      <Button variant="secondary" disabled={saving} onClick={()=>navigate(0)}>This week</Button>
@@ -166,7 +166,7 @@ function TimeCard({context,alert}){
     <Select label="Project (optional)" value={form.projectId} onChange={v=>update('projectId',v)}
      options={[{label:'No Project',value:''},...projects.map(p=>({label:p.name,value:p.id}))]}
      disabled={saving||Boolean(form.id)}/>
-    <Tag variant="info" overlay={<Tooltip>The Project field is optional. This time entry is linked to the current CRM record whether or not a Project is chosen.</Tooltip>}>ⓘ Project link</Tag>
+    <Tag variant="info" overlay={<Tooltip>The Project field is optional. This time entry is linked to the current CRM record whether or not a Project is chosen.</Tooltip>}><Icon name="info" screenReaderText="Project help"/> Project help</Tag>
     {form.id?<Text variant="microcopy">Project assignment cannot be changed when editing. Use a new entry for another project.</Text>:null}
     <Flex direction="row" gap="small" wrap="wrap">
      <Input label="Start time (HH:MM)" disabled={saving} value={form.start} onChange={v=>update('start',v)}/>
@@ -174,7 +174,7 @@ function TimeCard({context,alert}){
     </Flex>
     <Flex direction="row" gap="small" align="center" wrap="wrap">
      <Text variant="microcopy">Quick durations</Text>
-     <Tag variant="info" overlay={<Tooltip>Choose a preset or enter a custom duration in 15-minute increments.</Tooltip>}>ⓘ</Tag>
+     <Tag variant="info" overlay={<Tooltip>Choose a preset or enter a custom duration in 15-minute increments.</Tooltip>}><Icon name="info" screenReaderText="Help"/> Help</Tag>
      {['0.25','0.5','1','2'].map(value=><Button key={value} variant="secondary" disabled={saving} onClick={()=>update('hours',value)}>{value} h</Button>)}
     </Flex>
     <Select label="Billing" disabled={saving} value={form.billable} onChange={v=>update('billable',v)}

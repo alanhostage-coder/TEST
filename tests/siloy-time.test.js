@@ -261,3 +261,9 @@ test('Timesheet explains record-scoped totals and optional Project with native t
  assert.match(ui,/Project field is optional/);
  assert.match(ui,/in 15-minute increments/);
 });
+
+test('Full timesheet uses a native accessible information icon rather than a corrupted text glyph',()=>{
+ const ui=fs.readFileSync('src/app/cards/SiloyTimeCard.jsx','utf8');
+ assert.match(ui,/<Icon name="info" screenReaderText=/);
+ assert.doesNotMatch(ui,/ⓘ/);
+});

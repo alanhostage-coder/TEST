@@ -123,3 +123,9 @@ test('Quick Log gives contextual hover-help without changing primary save action
  assert.match(ui,/variant=\{billableHours>0\?'success':'default'\}/);
  assert.match(ui,/variant="primary" disabled=\{saving \|\| loading \|\| !description.trim\(\)\}/);
 });
+
+test('Quick time logger uses native information icons with readable help labels',()=>{
+ const ui=fs.readFileSync('src/app/cards/SiloyQuickTime.jsx','utf8');
+ assert.match(ui,/<Icon name="info" screenReaderText=/);
+ assert.doesNotMatch(ui,/ⓘ/);
+});
