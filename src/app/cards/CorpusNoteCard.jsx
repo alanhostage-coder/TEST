@@ -98,6 +98,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
   const [historyFilter, setHistoryFilter] = useState('all');
   const [historyQuery, setHistoryQuery] = useState('');
   const [focusWriting, setFocusWriting] = useState(false);
+  const [voiceHelpOpen, setVoiceHelpOpen] = useState(false);
   const noteTypeLabel = OPTIONS.find(option => option.value === form.note_type)?.label || 'Internal note';
   const suggestedTitle = noteTypeLabel + ' · ' + (ukDate || isoToUK(today()));
   const effectiveTitle = form.note_title.trim() || suggestedTitle;
@@ -363,6 +364,20 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
             <TextArea name="noteBody" label="Your internal notes" required rows={5} disabled={draftProtected || saving}
               value={form.internal_notes} onChange={v => set('internal_notes', v)}
               placeholder="What happened, what matters, and what needs attention..." />
+            <Flex direction="row" gap="small" align="center" wrap="wrap">
+              <Button variant="secondary" disabled={saving} onClick={() => setVoiceHelpOpen(v => !v)}>
+                {voiceHelpOpen ? 'Hide voice typing help' : 'Voice typing'}
+              </Button>
+              <Text variant="microcopy">Use your device's microphone to dictate directly into the note.</Text>
+            </Flex>
+            {voiceHelpOpen ? <Tile>
+              <Heading>Speak your note</Heading>
+              <Text>1. Click inside the Your internal notes field above.</Text>
+              <Text>2. Windows: press Windows key + H, then speak after the listening prompt.</Text>
+              <Text>Mac: use the Dictation shortcut configured in System Settings. On a phone or tablet, tap the microphone on your keyboard.</Text>
+              <Text>3. Review the transcription, edit it if needed, then select Save internal note.</Text>
+              <Text variant="microcopy">This uses your device's voice typing. The button does not start recording or save automatically. Your operating system may process speech online, so follow your organisation's policy for confidential notes.</Text>
+            </Tile> : null}
             {dirty ? <Tag variant="default">Unsaved changes</Tag> : null}
             <Divider />
             <Button variant="secondary" overlay={<Tooltip placement="right">Add structured decisions, risks and follow-up actions so they can be found using the history filters.</Tooltip>} onClick={() => setDetailsOpen(v => !v)}>
