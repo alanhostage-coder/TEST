@@ -40,7 +40,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
   const recordLabel = LABELS[recordType] || 'CRM record';
   const portalId = String(context?.portal?.id || '145209388');
   const [notes, setNotes] = useState([]);
-  const [filter, setFilter] = useState('due');
+  const [filter, setFilter] = useState('all');
   const [busy, setBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -167,7 +167,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       <Text variant="microcopy">Quick capture and follow-up cues for this {recordLabel}. Nothing is written to meeting invitations.</Text>
       <Divider />
       <Button onClick={() => setComposer(v => !v)}>
-        {composer ? 'Close quick capture' : '+ Quick internal note'}
+        {composer ? 'Keep draft and close' : 'New internal note'}
       </Button>
       {composer ? (
         <Tile>
@@ -192,13 +192,13 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       ) : null}
       {savedId ? (
         <Flex direction="column" gap="small">
-          {associationNeeded ? <Tag variant="warning">Created. CRM record link needed.</Tag> : null}
+          <Tag variant={associationNeeded ? 'warning' : 'success'}>{associationNeeded ? 'Created. CRM link needed.' : 'Saved and linked'}</Tag>
           <Link href={url(savedId)}>Open saved note</Link>
         </Flex>
       ) : null}
       <Divider />
       <Flex direction="row" gap="small" align="center" wrap="wrap">
-        <Heading>What needs attention?</Heading>
+        <Heading>Notes at a glance</Heading>
       </Flex>
       <Flex direction="row" gap="small" wrap="wrap">
         <Button variant={filter === 'due' ? 'primary' : 'secondary'}
@@ -211,7 +211,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
       {loading ? <LoadingSpinner label="Loading Siloy Notes" /> : null}
       {error ? <Text>{error}</Text> : null}
       {!loading && !error && current.length === 0 ? (
-        <Text variant="microcopy">Nothing in this view. Use another quick filter to review notes.</Text>
+        <Text variant="microcopy">{filter === 'due' ? 'No follow-ups due.' : filter === 'risks' ? 'No notes with risks.' : 'No saved notes yet.'}</Text>
       ) : null}
       {!loading && !error ? current.slice(0, 3).map(note => (
         <React.Fragment key={note.id}>

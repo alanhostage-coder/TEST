@@ -176,3 +176,22 @@ test('Siloy branding uses official supplied vector wordmark instead of photograp
   assert.ok(!main.includes('siloy-signage-mark.svg'));
   assert.ok(!rail.includes('siloy-signage-mark.svg'));
 });
+
+
+test('Refined Notes workspace stays compact until authoring and focus mode opens editor',()=>{
+  const fs=require('node:fs');
+  const main=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
+  assert.match(main,/const \[composerOpen, setComposerOpen\] = useState\(false\)/);
+  assert.match(main,/width=\{440\}/);
+  assert.match(main,/if \(!focusWriting\) setComposerOpen\(true\)/);
+  assert.match(main,/Never included in meeting invitations/);
+});
+test('Notes rail defaults to useful recent notes and has clear no-alert states',()=>{
+  const fs=require('node:fs');
+  const rail=fs.readFileSync(require.resolve('../src/app/cards/CorpusQuickRail.jsx'),'utf8');
+  assert.match(rail,/const \[filter, setFilter\] = useState\('all'\)/);
+  assert.match(rail,/Notes at a glance/);
+  assert.match(rail,/No follow-ups due/);
+  assert.match(rail,/No notes with risks/);
+  assert.match(rail,/Saved and linked/);
+});

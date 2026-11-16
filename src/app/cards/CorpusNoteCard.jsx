@@ -87,7 +87,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
   const [form, setForm] = useState(empty);
   const [ukDate, setUkDate] = useState(isoToUK(today()));
   const [ukFollowup, setUkFollowup] = useState('');
-  const [composerOpen, setComposerOpen] = useState(true);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [receipt, setReceipt] = useState(null);
@@ -286,7 +286,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
           {displayedBrandMark ? (
             <Image src={displayedBrandMark}
               alt={isSiloyBrand ? 'Siloy Notes' : CORPUS_BRAND.name + ' brand mark'}
-              width={900} />
+              width={440} />
           ) : null}
           <Flex direction="column" gap="small">
 
@@ -300,7 +300,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
           ) : null}
         </Flex>
       </Tile>
-      <Text variant="microcopy">Notes are saved on this {recordLabel} and kept out of meeting invitations. This pilot uses app-level permissions. Restrict access to authorised staff.</Text>
+      <Text variant="microcopy">Private CRM notes on this {recordLabel}. Never included in meeting invitations. Access follows app and CRM permissions.</Text>
       <Flex direction="row" wrap="wrap" gap="small">
         <Button variant="primary" onClick={() => { setComposerOpen(true); setReceipt(null); }}>
           Write a note
@@ -308,7 +308,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
         <Button variant="secondary" onClick={() => { setHistoryFilter('due'); setHistoryExpanded(true); setFocusWriting(false); }}>
           Follow-ups due ({dueCount})
         </Button>
-        <Button variant="secondary" onClick={() => setFocusWriting(v => !v)}>
+        <Button variant="secondary" onClick={() => { if (!focusWriting) setComposerOpen(true); setFocusWriting(v => !v); }}>
           {focusWriting ? 'Show history' : 'Focus on writing'}
         </Button>
       </Flex>
