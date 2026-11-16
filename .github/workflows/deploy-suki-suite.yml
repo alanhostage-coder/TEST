@@ -1,4 +1,5 @@
 name: SUKI one-click native app suite
+# Release: Siloy Notes and Time branded headers, 2026-11-16
 on:
   push:
     branches: [codex/suki-suite-installer]
