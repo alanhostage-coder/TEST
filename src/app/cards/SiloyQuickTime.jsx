@@ -2,8 +2,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { hubspot, Heading, Text, Input, TextArea, Select, Button, Flex, Tile, Tag, Image, Link, Divider, LoadingSpinner } from '@hubspot/ui-extensions';
 import { CORPUS_BRAND } from './brand-config';
 
-const MARK = 'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/siloy-time-enterprise/src/app/cards/assets/siloy-official-logo-black.svg';
-const RAIL = 'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/siloy-time-enterprise/src/app/cards/assets/siloy-colour-rail.svg';
+const MARK = 'https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/siloy-time-enterprise/src/app/cards/assets/siloy-time-header.svg';
 const TYPES = { '0-1': 'contacts', '0-2': 'companies', '0-3': 'deals', '0-5': 'tickets' };
 const LABELS = { contacts: 'Contact', companies: 'Company', deals: 'Deal', tickets: 'Ticket' };
 const today = () => new Date().toISOString().slice(0, 10);
@@ -97,13 +96,12 @@ function SiloyQuickTime({ context, addAlert }) {
   return (
     <>
       <Flex direction="row" align="center" gap="small" wrap="wrap">
-        <Image src={MARK} width={124} alt="Official Siloy logo"/>
+        <Image src={MARK} width={300} alt="Siloy Time"/>
         <Flex direction="column" gap="small">
-          <Heading>Siloy Time</Heading>
+
           <Text variant="microcopy">Quick time log</Text>
         </Flex>
       </Flex>
-      <Image src={RAIL} width={270} alt="Siloy brand colour rail"/>
       <Text variant="microcopy">Add time against this {LABELS[recordType] || 'record'}. Appears in the same Siloy Time history as the weekly timesheet.</Text>
       {loading ? <LoadingSpinner label="Loading time log"/> : <Tag variant="info">{fmt(total)} logged this week</Tag>}
       {error ? <Text>{error}</Text> : null}
