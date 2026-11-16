@@ -323,8 +323,9 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
           <Text>{receipt.linked
             ? 'Your note was saved and linked to this ' + recordLabel + '.'
             : 'The note exists, but the ' + recordLabel + ' link failed. Open the record and repair the association. Do not save the same note again.'}</Text>
+          <Text variant="microcopy">To add documents or images, open the saved Siloy Note record and use its native Attachments section. This keeps the files with the specific note, rather than the parent CRM record.</Text>
           <Flex direction="row" gap="small" wrap="wrap">
-            <Link href={noteUrl(receipt.id)}>Open saved note</Link>
+            <Link href={noteUrl(receipt.id)}>Add files to this note</Link>
             <Button variant="secondary" onClick={() => { setReceipt(null); setComposerOpen(true); }}>
               Write another note
             </Button>
@@ -465,7 +466,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
                 {note.risks ? <Text>Risk: {readable(note.risks, 160)}</Text> : null}
                 {note.next_steps ? <Text>Next action: {readable(note.next_steps, 180)}</Text> : null}
                 {hasFollowup(note) ? <Text variant="microcopy">Follow-up: {isoToUK(note.followup_date)}</Text> : null}
-                <Link href={noteUrl(note.id)}>Open full note</Link>
+                <Link href={noteUrl(note.id)}>Open note / Add files</Link>
               </React.Fragment>
             ))}
             {visibleNotes.length > 3 ? (
@@ -484,7 +485,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
       )}
       <Text variant="microcopy">
         Siloy Notes by Siloy UKI · {CORPUS_BRAND.name} workspace.
-        Attachments are managed on each saved note. Verify app and CRM permissions before recording confidential information.
+        File attachments are added through the saved Siloy Note record. Verify app and CRM permissions before recording confidential information.
       </Text>
     </>
   );

@@ -246,3 +246,13 @@ test('Both Notes cards show readable text rather than broken circled-i glyphs',(
   assert.match(ui,/overlay=\{<Tooltip/);
  }
 });
+
+test('Saved note confirmation and history provide a direct link to the exact Note record for attachments',()=>{
+ const fs=require('node:fs');
+ const ui=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
+ assert.match(ui,/<Link href=\{noteUrl\(receipt.id\)\}>Add files to this note<\/Link>/);
+ assert.match(ui,/<Link href=\{noteUrl\(note.id\)\}>Open note \/ Add files<\/Link>/);
+ assert.match(ui,/native Attachments section/);
+ assert.match(ui,/specific note, rather than the parent CRM record/);
+ assert.doesNotMatch(ui,/<input type="file"|FileUpload from/);
+});
