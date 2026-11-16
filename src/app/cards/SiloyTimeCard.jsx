@@ -5,6 +5,8 @@ const isSiloyBrand=/^https:\/\/(?:www\.)?siloy\.com(?:\/|$)/i.test(CORPUS_BRAND.
 const SILOY_HEADER='https://raw.githubusercontent.com/alanhostage-coder/TEST/refs/heads/codex/siloy-time-enterprise/src/app/cards/assets/siloy-time-header.svg';
 const displayedBrandMark=isSiloyBrand?SILOY_HEADER:CORPUS_BRAND.logoUrl;
 const NAMES=['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const TYPES={'0-1':'contacts','0-2':'companies','0-3':'deals','0-5':'tickets'};
+const LABELS={contacts:'Contact',companies:'Company',deals:'Deal',tickets:'Ticket'};
 function iso(d){return d.toISOString().slice(0,10);}
 function monday(v){const d=new Date(v.slice(0,10)+'T00:00:00Z');d.setUTCDate(d.getUTCDate()-(d.getUTCDay()+6)%7);return iso(d);}
 function shift(v,n){const d=new Date(v+'T00:00:00Z');d.setUTCDate(d.getUTCDate()+n);return iso(d);}
@@ -15,7 +17,8 @@ function total(rows){return rows.reduce((sum,e)=>sum+Number(e.hours||0),0);}
 function display(v){return Math.round(v*100)/100+' h';}
 hubspot.extend(({context,actions})=><TimeCard context={context} alert={actions.addAlert}/>);
 function TimeCard({context,alert}){
- const contactId=String(context?.crm?.objectId||'');
+ const recordType=TYPES[String(context?.crm?.objectTypeId||'')]||'';
+ const recordId=String(context?.crm?.objectId||'');
  const portalId=String(context?.portal?.id||'149783010');
  const [week,setWeek]=useState(()=>monday(iso(new Date())));
  const [rows,setRows]=useState([]),[projects,setProjects]=useState([]);
@@ -31,17 +34,17 @@ function TimeCard({context,alert}){
  const update=(k,v)=>{setForm(old=>({...old,[k]:v}));setDirty(true);setError('');};
  const reload=useCallback(async()=>{
   const request=++latestLoad.current;
-  if(!/^\d+$/.test(contactId)){setError('Open a Contact record to use Siloy Time.');setLoading(false);return;}
+  if(!recordType||!/^\d+$/.test(recordId)){setError('Open a supported CRM record to use Siloy Time.');setLoading(false);return;}
   setLoading(true);
   try{
-   const out=unwrap(await hubspot.serverless('siloy_time_api',{parameters:{action:'load',contactId,week}}));
+   const out=unwrap(await hubspot.serverless('siloy_time_api',{parameters:{action:'load',recordType,recordId,week}}));
    if(request!==latestLoad.current)return;
    if(!out.success)throw new Error(out.error||'Unable to load timesheets.');
    setRows(out.entries||[]);setProjects(out.projects||[]);setProjectsError(out.projectsError||'');
    setTruncated(Boolean(out.truncated));setError('');
   }catch(e){if(request===latestLoad.current)setError(String(e.message||e));}
   finally{if(request===latestLoad.current)setLoading(false);}
- },[contactId,week]);
+ },[recordType,recordId,week]);
  useEffect(()=>{reload();},[reload]);
  const fresh=date=>{
   if(dirty){alert({type:'warning',title:'Unsaved time',message:'Save or clear the form before adding another entry.'});return;}
@@ -64,7 +67,7 @@ function TimeCard({context,alert}){
  const save=async()=>{
   if(pending.current)return;
   let issue='';
-  if(!/^\d+$/.test(contactId))issue='Open a Contact first.';
+  if(!recordType||!/^\d+$/.test(recordId))issue='Open a supported CRM record first.';
   else if(!form.id&&!/^\d+$/.test(form.projectId))issue='Choose a HubSpot Project.';
   else if(!days.some(d=>d.date===form.date))issue='Choose a day in this week.';
   else if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(form.start))issue='Enter start time as HH:MM.';
@@ -73,13 +76,13 @@ function TimeCard({context,alert}){
   pending.current=true;setSaving(true);setError('');
   try{
    const out=unwrap(await hubspot.serverless('siloy_time_api',{parameters:{
-    action:form.id?'update':'create',contactId,entry:{...form,billable:form.billable==='true'}
+    action:form.id?'update':'create',recordType,recordId,entry:{...form,billable:form.billable==='true'}
    }}));
    if((!out.success&&!out.partial)||!out.entryId)throw new Error(out.error||'Save not confirmed.');
-   setReceipt({id:out.entryId,partial:Boolean(out.partial)});
+   setReceipt({id:out.entryId,partial:Boolean(out.partial),objectTypeId:out.objectTypeId||''});
    setDirty(false);setOpen(false);setForm(blank(form.date));
    alert(out.partial
-    ?{type:'warning',title:'Time Log created',message:'Open the saved record to review its Contact and Project links.'}
+    ?{type:'warning',title:'Time Log created',message:'Open the saved record to review its CRM and Project links.'}
     :{type:'success',title:'Time saved',message:'The timesheet entry is saved.'});
    void reload();
   }catch(e){const msg=String(e.message||e);setError(msg);alert({type:'danger',title:'Save not confirmed',message:msg});}
@@ -149,7 +152,7 @@ function TimeCard({context,alert}){
    </Flex>
    {receipt?<Flex direction="row" gap="small" align="center" wrap="wrap">
     <Tag variant={receipt.partial?'warning':'success'}>{receipt.partial?'Created. Check record associations.':'Time saved'}</Tag>
-    <Link href={'https://app-eu1.hubspot.com/contacts/'+portalId+'/record/2-143515197/'+receipt.id}>Open Time Log</Link>
+    {/^2-\d+$/.test(receipt.objectTypeId)?<Link href={'https://app-eu1.hubspot.com/contacts/'+portalId+'/record/'+receipt.objectTypeId+'/'+receipt.id}>Open Time Log</Link>:null}
    </Flex>:null}
    {open?<>
     <Select label="Day" disabled={saving} options={days.map(d=>({label:d.name+' · '+uk(d.date),value:d.date}))} value={form.date} onChange={v=>update('date',v)}/>
@@ -168,7 +171,7 @@ function TimeCard({context,alert}){
      <Button variant="primary" disabled={saving||loading} onClick={save}>{saving?'Saving...':form.id?'Save changes':'Save time'}</Button>
      <Button variant="secondary" disabled={saving} onClick={()=>{setForm(blank(form.date));setDirty(false);setError('');}}>Clear form</Button>
     </Flex>
-    <Text variant="microcopy">Stored as an STT Time Log linked to this Contact and to a HubSpot Project. User-level access control is not yet enabled. Administrators must restrict this pilot to authorised staff.</Text>
+    <Text variant="microcopy">Stored as a Siloy Time entry linked to this {LABELS[recordType]||'CRM record'} and to a HubSpot Project. User-level access control is not yet enabled. Administrators must restrict this pilot to authorised staff.</Text>
    </>:null}
   </Tile>
  </>;

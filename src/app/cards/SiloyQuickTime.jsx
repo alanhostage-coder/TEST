@@ -79,7 +79,7 @@ function SiloyQuickTime({ context, addAlert }) {
       }));
       if ((!out.success && !out.partial) || !out.entryId)
         throw new Error(out.error || 'Save not confirmed.');
-      setReceipt({ id: out.entryId, partial: Boolean(out.partial) });
+      setReceipt({ id: out.entryId, partial: Boolean(out.partial), objectTypeId: out.objectTypeId || '' });
       if (out.success) { setDescription(''); setHours('0.5'); }
       addAlert(out.partial
         ? {type: 'warning', title: 'Time entry created', message: 'Check its CRM associations before retrying.'}
@@ -131,7 +131,9 @@ function SiloyQuickTime({ context, addAlert }) {
       {receipt ? (
         <Flex direction="column" gap="small">
           <Tag variant={receipt.partial ? 'warning' : 'success'}>{receipt.partial ? 'Created; review links' : 'Time saved'}</Tag>
-          <Link href={'https://app-eu1.hubspot.com/contacts/' + portalId + '/record/2-143515197/' + receipt.id}>Open time entry</Link>
+          {/^2-\d+$/.test(receipt.objectTypeId) ? (
+          <Link href={'https://app-eu1.hubspot.com/contacts/' + portalId + '/record/' + receipt.objectTypeId + '/' + receipt.id}>Open time entry</Link>
+        ) : null}
         </Flex>
       ) : null}
       <Tile>

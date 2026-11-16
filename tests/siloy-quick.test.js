@@ -17,7 +17,7 @@ test('Siloy Time quick log is a right sidebar card for core CRM records',()=>{
  assert.match(ui,/weekDays\.map\(day/);
  assert.match(ui,/setDate\(day\.date\)/);
  assert.match(weekly,/"crm.record.tab"/);
- assert.match(weekly,/"contacts"/);
+ assert.deepEqual(weekly.config.objectTypes,['companies','contacts','deals','tickets']);
 });
 test('Quick log can create one entry on Company without requiring a Project',async()=>{
  const app=require('../src/app/functions/SiloyTime.js');
@@ -87,4 +87,10 @@ test('Quick log refuses unsupported record types and missing descriptions withou
   if(prevToken===undefined)delete process.env.PRIVATE_APP_ACCESS_TOKEN;
   else process.env.PRIVATE_APP_ACCESS_TOKEN=prevToken;
  }
+});
+
+test('Quick Log uses the object ID reported by the portal-bound API for saved-record links',()=>{
+ const ui=fs.readFileSync('src/app/cards/SiloyQuickTime.jsx','utf8');
+ assert.match(ui,/objectTypeId: out.objectTypeId/);
+ assert.doesNotMatch(ui,/record\/2-143515197/);
 });

@@ -160,7 +160,50 @@ test('UAT: the date range, daily rows and entry picker cover the same seven days
 
 test('UAT: partial saves close the form and provide a warning with the existing record link',()=>{
  const ui=fs.readFileSync('src/app/cards/SiloyTimeCard.jsx','utf8');
- assert.match(ui,/setReceipt\(\{id:out\.entryId,partial:Boolean\(out\.partial\)\}\);\s*setDirty\(false\);setOpen\(false\);setForm\(blank\(form\.date\)\);/);
+ assert.match(ui,/setReceipt\(\{id:out\.entryId,partial:Boolean\(out\.partial\),objectTypeId:out\.objectTypeId\|\|''\}\);\s*setDirty\(false\);setOpen\(false\);setForm\(blank\(form\.date\)\);/);
  assert.match(ui,/receipt\.partial\?'warning':'success'/);
  assert.match(ui,/receipt\.id\}>Open Time Log/);
+});
+
+
+test('Weekly timesheet supports Company, Contact, Deal and Ticket records without changing sidebar placement',()=>{
+ const meta=JSON.parse(fs.readFileSync('src/app/cards/card-hsmeta.json','utf8'));
+ const quick=JSON.parse(fs.readFileSync('src/app/cards/quick-log-hsmeta.json','utf8'));
+ const ui=fs.readFileSync('src/app/cards/SiloyTimeCard.jsx','utf8');
+ assert.deepEqual(meta.config.objectTypes,['companies','contacts','deals','tickets']);
+ assert.equal(meta.config.location,'crm.record.tab');
+ assert.equal(quick.config.location,'crm.record.sidebar');
+ assert.match(ui,/parameters:\{action:'load',recordType,recordId,week\}/);
+ assert.match(ui,/action:form.id\?'update':'create',recordType,recordId/);
+ assert.doesNotMatch(ui,/contactId/);
+ assert.doesNotMatch(ui,/record\/2-143515197/);
+});
+
+test('Weekly timesheet saves and edits using the selected Company association',async()=>{
+ const api=require('../src/app/functions/SiloyTime.js');
+ const prevFetch=global.fetch,prevToken=process.env.PRIVATE_APP_ACCESS_TOKEN;
+ process.env.PRIVATE_APP_ACCESS_TOKEN='mock-uat';
+ const calls=[];
+ global.fetch=async(url,opt={})=>{
+  const target=String(url);calls.push({target,method:opt.method||'GET'});
+  const data=target.includes('/associations/companies')?{results:[{toObjectId:'10001'}]}:
+    opt.method==='POST'&&target.endsWith('/crm/v3/objects/2-143515197')?{id:'777001'}:{};
+  return {ok:true,status:200,json:async()=>data};
+ };
+ try{
+  const created=await api.main({parameters:{action:'create',recordType:'companies',recordId:'10001',
+   entry:{date:'2026-11-13',start:'09:00',hours:'1',projectId:'20001',description:'Weekly work'}}});
+  assert.equal(created.body.success,true);
+  assert.equal(created.body.objectTypeId,'2-143515197');
+  assert.ok(calls.some(c=>c.target.includes('/associations/default/companies/10001')));
+  calls.length=0;
+  const edited=await api.main({parameters:{action:'update',recordType:'companies',recordId:'10001',
+   entry:{id:'777001',date:'2026-11-13',start:'10:00',hours:'1.25',description:'Edited'}}});
+  assert.equal(edited.body.success,true);
+  assert.deepEqual(calls.map(x=>x.method),['GET','PATCH']);
+ }finally{
+  global.fetch=prevFetch;
+  if(prevToken===undefined)delete process.env.PRIVATE_APP_ACCESS_TOKEN;
+  else process.env.PRIVATE_APP_ACCESS_TOKEN=prevToken;
+ }
 });

@@ -14,7 +14,7 @@ function properties(raw){
  const start=Date.parse(d+'T'+time+':00Z');
  return {start_time:new Date(start).toISOString(),end_time:new Date(start+mins*60000).toISOString(),total_hours_spent:String(mins/60),total_minutes_spent:String(mins),description:String(raw.description||'').trim().slice(0,2000),is_billable:String(raw.billable)==='true'?'true':'false',type:'manual'};
 }
-function ok(data){return {statusCode:200,body:{success:true,...data}};}
+function ok(data){return {statusCode:200,body:{success:true,objectTypeId:TYPE,...data}};}
 function fail(statusCode,error,extra={}){return {statusCode,body:{success:false,error,...extra}};}
 async function api(token,path,opt={}){
  const r=await fetch(API+path,{method:opt.method||'GET',headers:{Authorization:'Bearer '+token,'Content-Type':'application/json'},...(opt.body?{body:JSON.stringify(opt.body)}:{})});
