@@ -4,6 +4,7 @@ import {
   Divider, LoadingSpinner, Flex, Tile, Tag, Tooltip, Icon, Image
 } from '@hubspot/ui-extensions';
 import { CORPUS_BRAND } from './brand-config';
+const {appendFormat,previewLines}=require('./note-formatting');
 
 // A public brand-only asset, never a people photograph or arbitrary website hero.
 // Native CRM UI extensions do not support arbitrary CSS hex-colour borders.
@@ -69,6 +70,27 @@ function readable(value, limit = 600) {
   return plain.length > limit ? plain.slice(0, limit).trimEnd() + '…' : plain;
 }
 
+function renderParts(parts) {
+  return parts.map((part,index)=>{
+    if(part.kind==='bold')return <Text key={index} inline format={{fontWeight:'bold'}}>{part.text}</Text>;
+    if(part.kind==='italic')return <Text key={index} inline format={{italic:true}}>{part.text}</Text>;
+    if(part.kind==='link')return <Link key={index} href={{url:part.url,external:true}}>{part.text}</Link>;
+    return <Text key={index} inline>{part.text}</Text>;
+  });
+}
+function NoteFormatPreview({value}) {
+  return <Tile>
+    <Heading>Formatted preview</Heading>
+    {previewLines(value).map((line,index)=>{
+      const body=renderParts(line.parts);
+      if(line.kind==='heading')return <Heading key={index}>{body}</Heading>;
+      if(line.kind==='bullet')return <Text key={index}>• {body}</Text>;
+      if(line.kind==='number')return <Text key={index}>{line.number}. {body}</Text>;
+      return <Text key={index}>{body.length?body:' '}</Text>;
+    })}
+  </Tile>;
+}
+
 hubspot.extend(({ context, actions }) => (
   <CorpusNoteCard context={context} addAlert={actions.addAlert}
     copyTextToClipboard={actions.copyTextToClipboard} />
@@ -98,6 +120,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
   const [historyFilter, setHistoryFilter] = useState('all');
   const [historyQuery, setHistoryQuery] = useState('');
   const [focusWriting, setFocusWriting] = useState(false);
+  const [previewOpen, setPreviewOpen] = useState(false);
   const noteTypeLabel = OPTIONS.find(option => option.value === form.note_type)?.label || 'Internal note';
   const suggestedTitle = noteTypeLabel + ' · ' + (ukDate || isoToUK(today()));
   const effectiveTitle = form.note_title.trim() || suggestedTitle;
@@ -122,6 +145,11 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
     setDirty(true);
     setDiscardArmed(false);
     setForm(old => ({ ...old, [key]: value }));
+  };
+  const addFormatting = kind => {
+    if (draftProtected || saving) return;
+    set('internal_notes',appendFormat(form.internal_notes,kind));
+    setPreviewOpen(true);
   };
   const setDate = value => { setSaveIssue(''); setDirty(true); setUkDate(value); setDiscardArmed(false); };
   const setFollowDate = value => { setSaveIssue(''); setDirty(true); setUkFollowup(value); setDiscardArmed(false); };
@@ -166,6 +194,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
     setDiscardArmed(false);
     setDetailsOpen(false);
     setDraftProtected(false);
+    setPreviewOpen(false);
     setSaveIssue('');
   };
 
@@ -240,6 +269,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
         setDiscardArmed(false);
         setDetailsOpen(false);
         setDraftProtected(false);
+        setPreviewOpen(false);
         setFocusWriting(false);
         addAlert({
           type: 'danger', title: 'Note created, but not linked',
@@ -258,6 +288,7 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
       setDetailsOpen(false);
       setComposerOpen(false);
       setDraftProtected(false);
+      setPreviewOpen(false);
       setFocusWriting(false);
       addAlert({
         type: 'success', title: 'Internal note saved',
@@ -360,9 +391,24 @@ function CorpusNoteCard({ context, addAlert, copyTextToClipboard }) {
             <Select name="noteType" label="Note type" disabled={draftProtected || saving} options={OPTIONS}
               value={form.note_type} onChange={v => set('note_type', v)} />
             <Text variant="microcopy">{WRITING_GUIDES[form.note_type] || WRITING_GUIDES.internal_update}</Text>
-            <TextArea name="noteBody" label="Your internal notes" required rows={5} disabled={draftProtected || saving}
-              value={form.internal_notes} onChange={v => set('internal_notes', v)}
+            <TextArea name="noteBody" label="Your internal notes" required rows={7} disabled={draftProtected || saving}
+              tooltip="Use the formatting buttons for headings, bold, italic, lists and links, then Preview to see the result."
+              value={form.internal_notes} onChange={v => { set('internal_notes',v); setPreviewOpen(false); }}
               placeholder="What happened, what matters, and what needs attention..." />
+            <Flex direction="row" gap="small" wrap="wrap" align="center">
+              <Text variant="microcopy">Formatting</Text>
+              {[
+                {name:'Bold',kind:'bold'}, {name:'Italic',kind:'italic'},
+                {name:'Heading',kind:'heading'}, {name:'Bullets',kind:'bullets'},
+                {name:'Numbers',kind:'numbers'}, {name:'Link',kind:'link'}
+              ].map(item=><Button key={item.kind} variant="secondary" disabled={draftProtected || saving}
+                onClick={()=>addFormatting(item.kind)}>{item.name}</Button>)}
+              <Button variant="secondary" disabled={saving} onClick={()=>setPreviewOpen(v=>!v)}>
+                {previewOpen?'Hide preview':'Preview'}
+              </Button>
+            </Flex>
+            <Text variant="microcopy">Formatting uses Markdown templates. Edit the inserted text as needed, then preview it. Notes continue to save to the same CRM field.</Text>
+            {previewOpen ? <NoteFormatPreview value={form.internal_notes} /> : null}
             {dirty ? <Tag variant="default">Unsaved changes</Tag> : null}
             <Divider />
             <Button variant="secondary" overlay={<Tooltip placement="right">Add structured decisions, risks and follow-up actions so they can be found using the history filters.</Tooltip>} onClick={() => setDetailsOpen(v => !v)}>

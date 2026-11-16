@@ -176,7 +176,7 @@ function CorpusQuickRail({ context, addAlert, copyTextToClipboard }) {
           <Heading>Quick capture</Heading>
           <Input name="quickTitle" label="Note title (optional)" value={title}
             disabled={busy} onChange={v => { setTitle(v); setSaveIssue(''); }} placeholder="Auto-generated if empty" />
-          <TextArea name="quickBody" label="Internal note" value={body}
+          <TextArea name="quickBody" label="Internal note" tooltip="Use the full Notes workspace for formatting, decisions, risks and dated follow-ups." value={body}
             disabled={busy} onChange={v => { setBody(v); setSaveIssue(''); }} rows={3} />
           <Text variant="microcopy">Linked to the current {recordLabel}. For decisions, risks and follow-ups, use the full Siloy Notes workspace.</Text>
           {saveIssue ? <Text>{saveIssue}</Text> : null}
