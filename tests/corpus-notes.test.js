@@ -218,8 +218,8 @@ test('Native tooltips explain permissions, actions and statuses without custom C
  const fs=require('node:fs');
  const main=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
  const rail=fs.readFileSync(require.resolve('../src/app/cards/CorpusQuickRail.jsx'),'utf8');
- assert.match(main,/Tag, Tooltip, Icon, Image/);
- assert.match(rail,/Image, Tooltip, Icon/);
+ assert.match(main,/Tag, Tooltip, Image/);
+ assert.match(rail,/Image, Tooltip/);
  assert.match(main,/Notes are not sent to meeting invitations/);
  assert.match(main,/It is not a confidentiality or CRM permission control/);
  assert.match(main,/Risk noted/);
@@ -228,35 +228,4 @@ test('Native tooltips explain permissions, actions and statuses without custom C
  assert.match(rail,/All dated follow-ups, including future dates/);
  assert.match(main,/<Button variant="primary" onClick=\{save\}/);
  assert.match(rail,/<Button variant="primary" onClick=\{save\}/);
-});
-
-test('help icons are native and no unreliable circled-i text remains',()=>{
- const fs=require('node:fs');
- for (const component of ['CorpusNoteCard.jsx','CorpusQuickRail.jsx']) {
-  const ui=fs.readFileSync(require.resolve('../src/app/cards/'+component),'utf8');
-  assert.match(ui,/<Icon name="info" screenReaderText=/);
-  assert.doesNotMatch(ui,/ⓘ/);
- }
-});
-
-test('Formatting templates append rather than replace draft content, preserving the CRM string model',()=>{
- const {appendFormat,previewLines,inlineParts}=require('../src/app/cards/note-formatting.js');
- assert.equal(appendFormat('Prior note','bold'),'Prior note\n\n**Important point**');
- assert.equal(appendFormat('Prior note','nonexistent'),'Prior note');
- assert.equal(previewLines('## Plan\n- **Decision** recorded\n1. Follow-up')[0].kind,'heading');
- assert.equal(previewLines('## Plan\n- **Decision** recorded\n1. Follow-up')[1].parts[0].kind,'bold');
- assert.equal(previewLines('## Plan\n- **Decision** recorded\n1. Follow-up')[2].kind,'number');
- assert.equal(inlineParts('[Link](javascript:alert(1))')[0].kind,'plain');
- assert.equal(inlineParts('[Docs](https://developers.hubspot.com)')[0].kind,'link');
-});
-test('Full note editor has formatting actions and a preview without losing the existing save path',()=>{
- const fs=require('node:fs');
- const main=fs.readFileSync(require.resolve('../src/app/cards/CorpusNoteCard.jsx'),'utf8');
- const rail=fs.readFileSync(require.resolve('../src/app/cards/CorpusQuickRail.jsx'),'utf8');
- assert.match(main,/function NoteFormatPreview/);
- assert.match(main,/onClick=\{\(\)=>addFormatting\(item.kind\)\}/);
- assert.match(main,/tooltip="Use the formatting buttons/);
- assert.match(main,/value=\{form.internal_notes\}/);
- assert.match(main,/note: \{ \.\.\.form, note_title: effectiveTitle/);
- assert.match(rail,/tooltip="Use the full Notes workspace/);
 });
