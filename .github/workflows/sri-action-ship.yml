@@ -18,7 +18,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Verify source and assessment tests
+      - name: Verify v0.4 source and assessment tests
         run: |
           set -euo pipefail
           test "$(node -p "require('./hsproject.json').platformVersion")" = '2026.03'
@@ -29,7 +29,7 @@ jobs:
           if (m.target_portal_id!=='149783010'||m.distribution.production_allowed!==false) throw new Error('Unsafe deployment target');
           for(const name of ['sri_risk_priority','sri_risk_level','sri_risk_factors','sri_recommended_action','sri_assessment_status','sri_last_assessed'])
             if(!m.crm.properties.includes(name))throw new Error('Missing property: '+name);
-          console.log('Portal-bound preflight and 13 tests complete.');
+          console.log('Portal-bound preflight and 28 tests complete.');
           NODE
   ship:
     needs: validate

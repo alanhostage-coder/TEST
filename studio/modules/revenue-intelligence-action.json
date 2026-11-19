@@ -2,7 +2,7 @@
   "id": "siloy-revenue-intelligence-action",
   "product": "Siloy Revenue Intelligence",
   "module": "Action",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "availability": "developer-test-only",
   "client_branding": {
     "logo": "Siloy",
@@ -55,6 +55,14 @@
     {
       "type": "app-function",
       "name": "sri_list_deals"
+    },
+    {
+      "type": "app-function",
+      "name": "sri_triage_queue"
+    },
+    {
+      "type": "app-function",
+      "name": "sri_review_assessment"
     }
   ],
   "capabilities": {
@@ -62,11 +70,15 @@
     "explicit_save": true,
     "ai_credits": 0,
     "create_tasks": false,
-    "closed_deal_exclusion": true
+    "closed_deal_exclusion": true,
+    "live_triage": true,
+    "mark_reviewed": true,
+    "bulk_scan_max_open_deals": 100,
+    "scenario_preview_without_crm_write": true
   },
   "gates": [
     "HubSpot project validation",
-    "13 Node tests",
+    "28 Node tests",
     "successful project upload",
     "successful build deployment",
     "installed with current scopes",

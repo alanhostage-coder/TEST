@@ -1,0 +1,8 @@
+{
+  "uid": "sri_triage_queue",
+  "type": "app-function",
+  "config": {
+    "entrypoint": "/app/functions/TriageQueue.js",
+    "secretKeys": []
+  }
+}

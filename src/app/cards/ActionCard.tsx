@@ -7,8 +7,8 @@ function ActionCard({dealId}:{dealId:string}){
   const [assessment,setAssessment]=useState<Assessment|null>(null);
   const [loading,setLoading]=useState(false),[saving,setSaving]=useState(false);
   const [message,setMessage]=useState(''),[error,setError]=useState('');
-  async function refresh(){
-    if(!dealId)return;setLoading(true);setError('');setMessage('');
+  async function refresh(preserveMessage=false){
+    if(!dealId)return;setLoading(true);setError('');if(!preserveMessage)setMessage('');
     try{setAssessment(await hubspot.serverless('sri_score_deal',{parameters:{dealId}}) as Assessment);}
     catch(e){setError('Could not assess deal: '+String(e));}
     finally{setLoading(false);}

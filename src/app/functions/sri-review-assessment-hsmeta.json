@@ -1,0 +1,8 @@
+{
+  "uid": "sri_review_assessment",
+  "type": "app-function",
+  "config": {
+    "entrypoint": "/app/functions/ReviewAssessment.js",
+    "secretKeys": []
+  }
+}

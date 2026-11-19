@@ -1,18 +1,20 @@
-# Siloy Revenue Intelligence - Action v0.3
+# Siloy Revenue Intelligence | Action v0.4
 
-Target: **Siloy UKI Apps**, HubSpot developer test portal **149783010**.
+**Target:** Siloy UKI Apps, HubSpot developer test portal **149783010**. Isolated release from Notes and Time.
 
-## Shipped source
-HubSpot 2026.03 project, Deal sidebar card, app page, three app functions, pure deterministic scoring and thirteen automated tests. Six existing SRI Deal properties capture assessments only on explicit human Save. No AI credits, background CRM writes or production deployments.
+## Real capabilities
+- **Live Triage:** On-demand ranked queue from the 100 most recently modified open Deals. Includes rule reasons, proposed next steps and total value of high-attention Deals (not a revenue-loss forecast). If the portal has more than 100 open Deals, ranking is explicitly labelled a partial scan.
+- **Bulk safety:** Search does not provide trustworthy contact association counts. The queue skips the 15-point missing-contact penalty and communicates that difference. Individual Deal cards can assess associations.
+- **Human review:** In-record Deal card calculates and previews the assessment; saving updates only the existing six SRI Deal properties. Once saved, a reviewer can explicitly mark it Reviewed, protected by last-assessed timestamp matching. No tasks or emails are sent.
+- **Scenario preview:** When the portal has no open Deals, an opt-in example queue is clearly labelled as not real CRM data, and cannot be saved.
+- **Credits:** Routine triage and assessment use zero AI credits.
 
-## Build and deploy
-On push to `codex/sri-action-hubspot`, `.github/workflows/sri-action-ship.yml` runs Node tests, validates the project and attempts upload/deploy/install using the existing SUKI HubSpot personal access key GitHub secret. The workflow targets **149783010** and does not change Notes or Time. Run `node --test tests/*.test.cjs` locally.
+## Build & release
+Pushing `codex/sri-action-hubspot` runs `.github/workflows/sri-action-ship.yml` with the existing portal 149783010-bound HubSpot developer credential secret. It tests, validates, uploads, deploys and verifies app installation. Source-only UAT is not equivalent to record-layout UAT. Tests: `node --test tests/*.test.cjs`.
 
-## Verification gates
-Check GitHub Actions logs. Installation and current scopes are checked via HubSpot CLI. Verify the app card appears in a Deal sidebar, that the App Page loads, and that it handles an approved test Deal before treating end-to-end UAT as complete. If the key is not configured or CLI validation fails, the workflow must be treated as unsuccessful. No test Deal is seeded automatically.
-
-## Deployment Studio
-`studio/modules/revenue-intelligence-action.json` is a reusable module definition to incorporate into the standalone Deployment Studio pack generator. The existing 207 KB Studio HTML is not overwritten by this repository branch. Find and Insight remain roadmap modules, not enabled features.
-
-## Security
-Static private test app only. No secrets committed. Commercial rollouts need separate OAuth distribution, tenant configuration and install approval. Assessment does not create a task or send email.
+## Remaining UAT gates
+1. Verify live App Page appears and its explicit scenario preview works in an empty portal.
+2. Verify card placement in the Deal right sidebar (installation does not prove layout activation).
+3. On an authorised Deal, verify the full score, manual Save, Mark Reviewed, stale assessment behaviour and absence of other CRM writes.
+4. Reconfirm no change to Siloy Notes or Siloy Time. No Deals are auto-created.
+5. Find and Insight remain roadmap modules. Client / production distribution remains disabled.

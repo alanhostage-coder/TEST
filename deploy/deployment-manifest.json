@@ -1,7 +1,7 @@
 {
-  "schema_version": "0.3.0",
+  "schema_version": "0.4.0",
   "product": "Siloy Revenue Intelligence",
-  "product_version": "0.3.0",
+  "product_version": "0.4.0",
   "environment": "developer-test",
   "target_portal_id": "149783010",
   "target_portal_name": "Siloy UKI Apps",
@@ -49,6 +49,12 @@
       "missingContacts": 15,
       "missingNextStep": 10,
       "staleStage30d": 15
+    },
+    "live_triage": {
+      "on_demand": true,
+      "max_recent_open_deals": 100,
+      "contact_penalty_excluded": true,
+      "credit_cost": 0
     }
   },
   "writes": {
@@ -57,7 +63,8 @@
     "save_requires_user_click": true,
     "creates_tasks": false,
     "sends_emails": false,
-    "writes_only_sri_properties": true
+    "writes_only_sri_properties": true,
+    "mark_reviewed_requires_human_click": true
   },
   "distribution": {
     "current": "private-static-test",
@@ -70,8 +77,9 @@
     "portal_binding": "hard-coded to 149783010"
   },
   "uat": {
-    "automated_tests": 13,
+    "automated_tests": 28,
     "portal_card_render": "needs post-deploy verification",
-    "app_install": "needs post-deploy verification"
+    "app_install": "needs post-deploy verification",
+    "real_deal_end_to_end": "pending"
   }
 }
