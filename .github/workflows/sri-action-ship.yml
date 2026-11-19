@@ -69,6 +69,10 @@ jobs:
       - name: Install and verify app scopes
         run: |
           set -euo pipefail
+          # HubSpot/hubspot-project-actions@v1.1.0 pins CLI 8.0.0, which lacks install-app.
+          # Restore a current CLI before calling 8.10+ commands.
+          npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund
+          hs --version
           for attempt in 1 2 3; do
             if printf 'y\n' | timeout 70s script -q -e -c "hs project install-app --use-env" /dev/null; then break; fi
             if [ "$attempt" -eq 3 ]; then echo "::error::App installation failed"; exit 1; fi
