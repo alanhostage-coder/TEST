@@ -43,15 +43,15 @@ jobs:
           if(!current||current.status!=='SUCCESS')throw new Error('No successful deployed SRI build');
           if(inst.accountId!==149783010||inst.isInstalled!==true||inst.isInstalledWithCurrentScopes!==true)
             throw new Error('Revenue Intelligence install or scopes not current in portal 149783010');
-          const names=['sri_deal_action_card','sri_app_pages','sri_score_deal','sri_save_assessment','sri_list_deals'];
+          const names=['sri_deal_action_card','sri_app_pages','sri_score_deal','sri_save_assessment','sri_list_deals','sri_triage_queue','sri_review_assessment'];
           for(const name of names){
             const status=(current.subbuildStatuses||[]).find(s=>s.buildName===name);
             if(!status)throw new Error('Deployed build missing '+name);
             if(status.status!=='SUCCESS')throw new Error('Component '+name+' status '+status.status);
           }
-          console.log('SRI HEALTH PASS: all five components, build, app install and scopes');
+          console.log('SRI HEALTH PASS: all seven components, build, app install and scopes');
           fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
             '## Siloy Revenue Intelligence - scheduled health PASS\n\n' +
-            '- Portal: 149783010\n- Build: '+current.buildId+'\n- Component checks: 5/5\n- App installed/current scopes: yes\n' +
+            '- Portal: 149783010\n- Build: '+current.buildId+'\n- Component checks: 7/7\n- App installed/current scopes: yes\n' +
             '- Node tests: passed\n\nCRM layout UI and real Deal assessment require separate UAT.\n');
           NODE
