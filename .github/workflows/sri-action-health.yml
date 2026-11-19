@@ -1,0 +1,57 @@
+name: SUKI Revenue Intelligence scheduled health
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sri-action-health.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '35 */6 * * *'
+permissions:
+  contents: read
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      HUBSPOT_ACCOUNT_ID: '149783010'
+      HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/sri-action-hubspot
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify non-production portal and credential
+        run: |
+          set -euo pipefail
+          test "$HUBSPOT_ACCOUNT_ID" = '149783010'
+          test -n "$HUBSPOT_PERSONAL_ACCESS_KEY"
+          node --test tests/*.test.cjs
+      - name: Read deployed build and app installation
+        run: |
+          set -euo pipefail
+          npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund >/dev/null
+          hs project list-builds --use-env --json > "$RUNNER_TEMP/sri-builds.json"
+          hs project app-install-status --use-env --json > "$RUNNER_TEMP/sri-install.json"
+          node - "$RUNNER_TEMP/sri-builds.json" "$RUNNER_TEMP/sri-install.json" <<'NODE'
+          const fs=require('fs');
+          const builds=JSON.parse(fs.readFileSync(process.argv[2],'utf8')).results||[];
+          const inst=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));
+          const current=builds.find(x=>x.isDeployed===true);
+          if(!current||current.status!=='SUCCESS')throw new Error('No successful deployed SRI build');
+          if(inst.accountId!==149783010||inst.isInstalled!==true||inst.isInstalledWithCurrentScopes!==true)
+            throw new Error('Revenue Intelligence install or scopes not current in portal 149783010');
+          const names=['sri_deal_action_card','sri_app_pages','sri_score_deal','sri_save_assessment','sri_list_deals'];
+          for(const name of names){
+            const status=(current.subbuildStatuses||[]).find(s=>s.buildName===name);
+            if(!status)throw new Error('Deployed build missing '+name);
+            if(status.status!=='SUCCESS')throw new Error('Component '+name+' status '+status.status);
+          }
+          console.log('SRI HEALTH PASS: all five components, build, app install and scopes');
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+            '## Siloy Revenue Intelligence - scheduled health PASS\n\n' +
+            '- Portal: 149783010\n- Build: '+current.buildId+'\n- Component checks: 5/5\n- App installed/current scopes: yes\n' +
+            '- Node tests: passed\n\nCRM layout UI and real Deal assessment require separate UAT.\n');
+          NODE
