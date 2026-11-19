@@ -1,0 +1,27 @@
+{
+  "uid": "siloy_revenue_intelligence_app",
+  "type": "app",
+  "config": {
+    "name": "Siloy Revenue Intelligence",
+    "description": "Explainable deal attention and commercial intelligence",
+    "distribution": "private",
+    "auth": {
+      "type": "static",
+      "requiredScopes": [
+        "oauth",
+        "crm.objects.deals.read",
+        "crm.objects.deals.write",
+        "crm.objects.contacts.read"
+      ],
+      "optionalScopes": [],
+      "conditionallyRequiredScopes": []
+    },
+    "permittedUrls": {
+      "fetch": [
+        "https://api.hubapi.com"
+      ],
+      "iframe": [],
+      "img": []
+    }
+  }
+}

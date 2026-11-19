@@ -1,0 +1,87 @@
+name: SUKI Revenue Intelligence Action build and ship
+on:
+  push:
+    branches:
+      - codex/sri-action-hubspot
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: suki-sri-action-149783010
+  cancel-in-progress: false
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify source and assessment tests
+        run: |
+          set -euo pipefail
+          test "$(node -p "require('./hsproject.json').platformVersion")" = '2026.03'
+          node --test tests/*.test.cjs
+          for file in src/app/functions/*.js src/app/functions/lib/*.cjs; do node --check "$file"; done
+          node - <<'NODE'
+          const m=require('./deploy/deployment-manifest.json');
+          if (m.target_portal_id!=='149783010'||m.distribution.production_allowed!==false) throw new Error('Unsafe deployment target');
+          for(const name of ['sri_risk_priority','sri_risk_level','sri_risk_factors','sri_recommended_action','sri_assessment_status','sri_last_assessed'])
+            if(!m.crm.properties.includes(name))throw new Error('Missing property: '+name);
+          console.log('Portal-bound preflight and 13 tests complete.');
+          NODE
+  ship:
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      HUBSPOT_ACCOUNT_ID: '149783010'
+      HUBSPOT_PERSONAL_ACCESS_KEY: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Assert test portal and developer credential
+        run: |
+          set -euo pipefail
+          test "$HUBSPOT_ACCOUNT_ID" = '149783010'
+          if [ -z "$HUBSPOT_PERSONAL_ACCESS_KEY" ]; then echo "::error::Missing HubSpot developer personal access key secret"; exit 1; fi
+      - name: Validate project with HubSpot CLI
+        run: |
+          set -euo pipefail
+          npm install -g @hubspot/cli@8.18.0 --no-audit --no-fund
+          hs project validate --use-env --no-color
+      - name: Upload Revenue Intelligence project only
+        uses: HubSpot/hubspot-project-actions/project-upload@v1.1.0
+        with:
+          project_dir: './'
+          account_id: '149783010'
+          personal_access_key: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+      - name: Deploy latest Revenue Intelligence build
+        uses: HubSpot/hubspot-project-actions/project-deploy@v1.1.0
+        with:
+          project_dir: './'
+          deploy_latest_build: true
+          account_id: '149783010'
+          personal_access_key: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+      - name: Install and verify app scopes
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3; do
+            if printf 'y\n' | timeout 70s script -q -e -c "hs project install-app --use-env" /dev/null; then break; fi
+            if [ "$attempt" -eq 3 ]; then echo "::error::App installation failed"; exit 1; fi
+            sleep 20
+          done
+          hs project list-builds --use-env --json > "$RUNNER_TEMP/sri-builds.json"
+          hs project app-install-status --use-env --json > "$RUNNER_TEMP/sri-install.json"
+          node - "$RUNNER_TEMP/sri-builds.json" "$RUNNER_TEMP/sri-install.json" <<'NODE'
+          const fs=require('fs');
+          const builds=JSON.parse(fs.readFileSync(process.argv[2],'utf8')).results||[];
+          const install=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));
+          const deployed=builds.find(b=>b.isDeployed===true);
+          if(!deployed||deployed.status!=='SUCCESS')throw new Error('No successful deployed Revenue Intelligence build');
+          if(install.accountId!==149783010||install.isInstalled!==true||install.isInstalledWithCurrentScopes!==true)throw new Error('SRI is not installed with current scopes in SUKI');
+          console.log('SRI deployed and installed with current scopes in 149783010. UI layout UAT still required.');
+          NODE

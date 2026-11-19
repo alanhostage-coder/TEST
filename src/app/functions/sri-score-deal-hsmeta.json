@@ -1,0 +1,8 @@
+{
+  "uid": "sri_score_deal",
+  "type": "app-function",
+  "config": {
+    "entrypoint": "/app/functions/ScoreDeal.js",
+    "secretKeys": []
+  }
+}

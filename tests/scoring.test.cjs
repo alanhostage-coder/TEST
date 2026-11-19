@@ -1,0 +1,12 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),{scoreDeal}=require('../src/app/functions/lib/scoring.cjs');
+const now='2026-11-19T12:00:00.000Z';
+const healthy=()=>({properties:{createdate:'2026-11-01',notes_last_contacted:'2026-11-18',notes_next_activity_date:'2026-11-21',closedate:'2026-12-20',hs_next_step:'Send proposal',hs_v2_date_entered_current_stage:'2026-11-10',hs_is_closed:'false'},contactCount:2});
+test('healthy deal scored zero',()=>{const x=scoreDeal(healthy(),{now});assert.equal(x.score,0);assert.equal(x.level,'low');});
+test('overdue and missing activity create 55 points',()=>{const d=healthy();d.properties.closedate='2026-11-17';d.properties.notes_next_activity_date=null;assert.equal(scoreDeal(d,{now}).score,55);});
+test('all flags cap at 100',()=>{const d=healthy();Object.assign(d.properties,{closedate:'2026-10-01',notes_last_contacted:'2026-09-01',notes_next_activity_date:'2026-09-01',hs_next_step:'',hs_v2_date_entered_current_stage:'2026-08-01'});d.contactCount=0;const x=scoreDeal(d,{now});assert.equal(x.score,100);assert.equal(x.flags.length,6);});
+test('unknown contact count not penalised',()=>{const d=healthy();d.contactCount=null;const x=scoreDeal(d,{now});assert.equal(x.score,0);assert.ok(x.dataQuality.length);});
+test('closed deals are excluded',()=>{const d=healthy();d.properties.hs_is_closed='true';assert.equal(scoreDeal(d,{now}).status,'excluded');});
+test('past activity today needs follow-up',()=>{const d=healthy();d.properties.notes_next_activity_date='2026-11-19T09:00:00Z';assert.equal(scoreDeal(d,{now}).score,25);});
+test('invalid dates cannot imply stale',()=>{const d=healthy();d.properties.notes_last_contacted='nope';d.properties.createdate=null;d.properties.hs_v2_date_entered_current_stage='nope';const x=scoreDeal(d,{now});assert.equal(x.score,0);assert.equal(x.dataQuality.length,2);});
+test('no contact for 14 days is flagged',()=>{const d=healthy();d.properties.notes_last_contacted=null;d.properties.createdate='2026-11-01';assert.equal(scoreDeal(d,{now}).score,20);});

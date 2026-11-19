@@ -1,0 +1,8 @@
+{
+  "uid": "sri_save_assessment",
+  "type": "app-function",
+  "config": {
+    "entrypoint": "/app/functions/SaveAssessment.js",
+    "secretKeys": []
+  }
+}

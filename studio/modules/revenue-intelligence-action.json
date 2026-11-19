@@ -1,0 +1,76 @@
+{
+  "id": "siloy-revenue-intelligence-action",
+  "product": "Siloy Revenue Intelligence",
+  "module": "Action",
+  "version": "0.3.0",
+  "availability": "developer-test-only",
+  "client_branding": {
+    "logo": "Siloy",
+    "background": "#010103",
+    "primary": "#DAEAFF",
+    "accent": "#FEF5AC",
+    "surface": "#2B2B2B",
+    "use_client_overrides_in_future": true
+  },
+  "install": {
+    "type": "hubspot-developer-project",
+    "project": "siloy-revenue-intelligence",
+    "source_branch": "codex/sri-action-hubspot",
+    "portal_id": "149783010",
+    "scope": "test"
+  },
+  "preflight": {
+    "required_deal_properties": [
+      "sri_risk_priority",
+      "sri_risk_level",
+      "sri_risk_factors",
+      "sri_recommended_action",
+      "sri_assessment_status",
+      "sri_last_assessed"
+    ],
+    "requires_deals_read": true,
+    "requires_deals_write": true,
+    "requires_contacts_read": true,
+    "creates_new_custom_objects": false
+  },
+  "components": [
+    {
+      "type": "crm-card",
+      "name": "Siloy Action",
+      "location": "crm.record.sidebar",
+      "object": "deals"
+    },
+    {
+      "type": "app-page",
+      "name": "Siloy Revenue Intelligence"
+    },
+    {
+      "type": "app-function",
+      "name": "sri_score_deal"
+    },
+    {
+      "type": "app-function",
+      "name": "sri_save_assessment"
+    },
+    {
+      "type": "app-function",
+      "name": "sri_list_deals"
+    }
+  ],
+  "capabilities": {
+    "read_only_assessment": true,
+    "explicit_save": true,
+    "ai_credits": 0,
+    "create_tasks": false,
+    "closed_deal_exclusion": true
+  },
+  "gates": [
+    "HubSpot project validation",
+    "13 Node tests",
+    "successful project upload",
+    "successful build deployment",
+    "installed with current scopes",
+    "CRM sidebar placement verified",
+    "real UAT record required before end-to-end writes"
+  ]
+}

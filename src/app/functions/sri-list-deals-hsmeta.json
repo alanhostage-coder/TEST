@@ -1,0 +1,8 @@
+{
+  "uid": "sri_list_deals",
+  "type": "app-function",
+  "config": {
+    "entrypoint": "/app/functions/ListDeals.js",
+    "secretKeys": []
+  }
+}

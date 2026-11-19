@@ -1,0 +1,77 @@
+{
+  "schema_version": "0.3.0",
+  "product": "Siloy Revenue Intelligence",
+  "product_version": "0.3.0",
+  "environment": "developer-test",
+  "target_portal_id": "149783010",
+  "target_portal_name": "Siloy UKI Apps",
+  "hubspot_project_version": "2026.03",
+  "project_uid": "siloy_revenue_intelligence_app",
+  "modules": {
+    "action": {
+      "enabled": true,
+      "status": "deployment-candidate"
+    },
+    "find": {
+      "enabled": false,
+      "status": "roadmap"
+    },
+    "insight": {
+      "enabled": false,
+      "status": "roadmap"
+    }
+  },
+  "crm": {
+    "object": "deals",
+    "properties": [
+      "sri_risk_priority",
+      "sri_risk_level",
+      "sri_risk_factors",
+      "sri_recommended_action",
+      "sri_assessment_status",
+      "sri_last_assessed"
+    ],
+    "existing_properties_confirmed": true,
+    "requires_new_custom_object": false,
+    "create_demo_records": false
+  },
+  "scoring": {
+    "ai_credits_per_assessment": 0,
+    "attention_bands": {
+      "low": "0-29",
+      "medium": "30-59",
+      "high": "60-100"
+    },
+    "weights": {
+      "missingFutureActivity": 25,
+      "inactivity14d": 20,
+      "overdueCloseDate": 30,
+      "missingContacts": 15,
+      "missingNextStep": 10,
+      "staleStage30d": 15
+    }
+  },
+  "writes": {
+    "on_open": false,
+    "on_score": false,
+    "save_requires_user_click": true,
+    "creates_tasks": false,
+    "sends_emails": false,
+    "writes_only_sri_properties": true
+  },
+  "distribution": {
+    "current": "private-static-test",
+    "production_allowed": false
+  },
+  "deployment": {
+    "source_repository": "alanhostage-coder/TEST",
+    "source_branch": "codex/sri-action-hubspot",
+    "method": "GitHub Actions + HubSpot Projects",
+    "portal_binding": "hard-coded to 149783010"
+  },
+  "uat": {
+    "automated_tests": 13,
+    "portal_card_render": "needs post-deploy verification",
+    "app_install": "needs post-deploy verification"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "uid": "sri_deal_action_card",
+  "type": "card",
+  "config": {
+    "name": "Siloy Action",
+    "description": "Explainable deal priority and next action",
+    "location": "crm.record.sidebar",
+    "entrypoint": "/app/cards/ActionCard.tsx",
+    "objectTypes": [
+      "deals"
+    ]
+  }
+}

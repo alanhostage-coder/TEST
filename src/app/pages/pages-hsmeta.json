@@ -1,0 +1,7 @@
+{
+  "uid": "sri_app_pages",
+  "type": "page",
+  "config": {
+    "entrypoint": "/app/pages/Pages.tsx"
+  }
+}
