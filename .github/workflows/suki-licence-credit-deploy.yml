@@ -42,9 +42,8 @@ jobs:
         run: npm install -g @hubspot/cli@8.19.0 --no-audit --no-fund
       - name: Deploy uploaded build if required
         working-directory: suki-projects/${{ matrix.app }}
-        env:
-          UPLOADED_BUILD: ${{ steps.upload.outputs.build_id }}
         run: |
+          UPLOADED_BUILD="$(hs project list-builds --use-env --json | jq -r '.results[0] | select(.status == "SUCCESS") | .buildId')"
           test -n "$UPLOADED_BUILD"
           current="$(hs project info --use-env --json | jq -r '.deployedBuildId // empty')"
           if [ "$current" != "$UPLOADED_BUILD" ]; then
