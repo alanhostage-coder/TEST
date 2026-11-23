@@ -32,23 +32,26 @@ jobs:
         working-directory: suki-projects/${{ matrix.app }}
         run: hs project validate --use-env --no-color
       - name: Upload project
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+        id: upload
         uses: HubSpot/hubspot-project-actions/project-upload@v1.1.0
         with:
           project_dir: suki-projects/${{ matrix.app }}
           account_id: '149783010'
           personal_access_key: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
-      - name: Deploy successful build
-        if: ${{ github.event_name == 'workflow_dispatch' }}
-        uses: HubSpot/hubspot-project-actions/project-deploy@v1.1.0
-        with:
-          project_dir: suki-projects/${{ matrix.app }}
-          deploy_latest_build: true
-          account_id: '149783010'
-          personal_access_key: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
-      - name: Restore current HubSpot CLI after deploy action
-        if: ${{ github.event_name == 'workflow_dispatch' }}
+      - name: Restore current HubSpot CLI
         run: npm install -g @hubspot/cli@8.19.0 --no-audit --no-fund
+      - name: Deploy uploaded build if required
+        working-directory: suki-projects/${{ matrix.app }}
+        env:
+          UPLOADED_BUILD: ${{ steps.upload.outputs.build_id }}
+        run: |
+          test -n "$UPLOADED_BUILD"
+          current="$(hs project info --use-env --json | jq -r '.deployedBuildId // empty')"
+          if [ "$current" != "$UPLOADED_BUILD" ]; then
+            hs project deploy --use-env --build "$UPLOADED_BUILD" --json
+          fi
+          current="$(hs project info --use-env --json | jq -r '.deployedBuildId // empty')"
+          test "$current" = "$UPLOADED_BUILD"
       - name: Check project deployment
         working-directory: suki-projects/${{ matrix.app }}
         run: |
