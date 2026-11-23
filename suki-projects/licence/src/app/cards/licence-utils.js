@@ -22,13 +22,24 @@ export const uk = value => /^\d{4}-\d{2}-\d{2}$/.test(value||'')
   ? value.split('-').reverse().join('/') : 'Not set';
 export const gbp = value => '£'+Number(value||0).toLocaleString('en-GB',{
   minimumFractionDigits:0,maximumFractionDigits:2});
+export const dateKey = value => {
+  if (value === null || value === undefined || value === '') return '';
+  const raw = String(value);
+  if (/^\d{4}-\d{2}-\d{2}(?:T.*)?$/.test(raw)) return raw.slice(0, 10);
+  if (/^\d{10,13}$/.test(raw)) {
+    const n = Number(raw);
+    const d = new Date(raw.length === 10 ? n * 1000 : n);
+    return Number.isNaN(d.getTime()) ? '' : d.toISOString().slice(0, 10);
+  }
+  return '';
+};
 export const rowsFromAssociations = results => (results||[]).map(a=>({
   id:String(a.toObjectId||''), reference:String(a.properties?.entitlement_reference||`Record ${a.toObjectId}`),
   status:String(a.properties?.sl_status||'unspecified'),
   type:String(a.properties?.entitlement_type||'unspecified'),
   resource:String(a.properties?.sl_resource_code||'Unassigned'),
-  start:String(a.properties?.sl_start_date||''),end:String(a.properties?.sl_end_date||''),
-  notice:String(a.properties?.sl_notice_date||''),
+  start:dateKey(a.properties?.sl_start_date),end:dateKey(a.properties?.sl_end_date),
+  notice:dateKey(a.properties?.sl_notice_date),
   quantity:Number(a.properties?.sl_quantity||0),
   fee:Number(a.properties?.sl_monthly_fee||0),rights:String(a.properties?.sl_rights||'')
 }));
