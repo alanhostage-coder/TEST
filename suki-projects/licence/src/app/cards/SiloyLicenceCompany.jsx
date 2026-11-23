@@ -51,7 +51,7 @@ function CompanyLicence({context}) {
     {error&&<Text>Could not load associated entitlements: {String(error)}</Text>}
     {!isLoading&&!error&&selected.length===0&&<Tile>
       <Text>{rows.length===0?'No entitlements are associated with this Company yet.':'No licences match these filters.'}</Text>
-      <Text>Use the Licence object association to link an approved entitlement. A company with no rights must not inherit unrelated demo licences.</Text>
+      <Text>Use the entitlement association to link an approved right to this company.</Text>
     </Tile>}
     {selected.map(row=><Tile key={row.id}>
       <Flex direction="row" justify="between" align="center">
@@ -65,6 +65,6 @@ function CompanyLicence({context}) {
     </Tile>)}
     {pagination?.nextCursor&&<Text>More associated licences may exist. Review the native association list before making decisions.</Text>}
     <Divider />
-    <Text>Only Company-associated entitlements appear here. Licence grant, revoke, booking and signature actions remain disabled until transactional controls and UAT are complete.</Text>
+    <Text>Only entitlements linked to this company appear here. Review and manage rights in the entitlement record.</Text>
   </>;
 }
