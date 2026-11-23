@@ -10,7 +10,7 @@ const FIELDS = [
   'usage_name', 'credits_used', 'credit_limit', 'feature_code',
   'comparator_type', 'data_method', 'heat_level', 'cost_drivers',
   'enrolments', 'billable_actions', 'email_actions', 'credit_rate',
-  'estimated_credits_reconciled', 'hs_createdate'
+  'estimated_credits_reconciled', 'hs_createdate', 'period_key', 'period_start', 'period_end', 'is_sample'
 ];
 
 function fail(statusCode, error) { return { statusCode, body: { success: false, error } }; }
@@ -31,9 +31,10 @@ function normalize(row) {
     method: String(p.data_method || 'unknown'),
     heat: String(p.heat_level || 'unknown'),
     costDrivers: String(p.cost_drivers || ''),
-    periodKey: String(p.sl_period_key || ''),
-    periodStart: String(p.sl_period_start || ''),
-    periodEnd: String(p.sl_period_end || '')
+    periodKey: String(p.period_key || ''),
+    periodStart: String(p.period_start || ''),
+    periodEnd: String(p.period_end || ''),
+    illustrative: String(p.is_sample).toLowerCase() === 'true'
   };
 }
 function analyze(rows, truncated = false) {
@@ -53,6 +54,7 @@ function analyze(rows, truncated = false) {
     records: items.length,
     methods,
     unperiodised,
+    illustrativeCount: items.filter(x => x.illustrative).length,
     periodised,
     truncated,
     canDisplayBillingTotal: false,
