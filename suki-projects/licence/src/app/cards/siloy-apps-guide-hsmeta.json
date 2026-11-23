@@ -1,0 +1,13 @@
+{
+  "uid": "siloy_apps_quick_guide",
+  "type": "card",
+  "config": {
+    "name": "Siloy Apps | Quick guide",
+    "description": "An in-record guide to using the Siloy app suite",
+    "location": "crm.record.tab",
+    "entrypoint": "/app/cards/SiloyAppsGuide.jsx",
+    "objectTypes": [
+      "companies"
+    ]
+  }
+}
