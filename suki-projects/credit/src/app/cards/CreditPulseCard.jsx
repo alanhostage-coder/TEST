@@ -26,9 +26,10 @@ function CreditPulseCard() {
       {loading ? <LoadingSpinner label="Reading account snapshots" showLabel={true} size="sm" /> : null}
       {error ? <Text>{error}</Text> : null}
       {snapshot ? <>
+        {snapshot.illustrativeCount > 0 ? <Text>Illustrative usage model; figures are not actual billing.</Text> : null}
         <Tile>
           <Text>{snapshot.records} Credit Usage entries</Text>
-          <Text>{snapshot.unperiodised} missing period identifiers</Text>
+          <Text>{snapshot.unperiodised ? `${snapshot.unperiodised} entries need period details` : 'Reporting periods recorded'}</Text>
           <Text>{snapshot.hotspots.length} hot or critical entries</Text>
         </Tile>
         {snapshot.hotspots.slice(0, 4).map(x => <Flex key={x.id} direction="row" gap="small" align="center" wrap="wrap">
