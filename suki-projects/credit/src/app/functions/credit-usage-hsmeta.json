@@ -1,0 +1,8 @@
+{
+  "uid": "siloy_credit_usage_api",
+  "type": "app-function",
+  "config": {
+    "entrypoint": "/app/functions/CreditUsage.js",
+    "secretKeys": []
+  }
+}

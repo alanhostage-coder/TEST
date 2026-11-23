@@ -1,0 +1,11 @@
+{
+  "uid": "siloy_credit_heatmap_record_card",
+  "type": "card",
+  "config": {
+    "name": "Siloy Credit Heatmap | Account Pulse",
+    "description": "Account-wide credit watch, with source and period confidence checks. This is not company-attributed billing.",
+    "location": "crm.record.sidebar",
+    "entrypoint": "/app/cards/CreditPulseCard.jsx",
+    "objectTypes": ["companies", "deals"]
+  }
+}

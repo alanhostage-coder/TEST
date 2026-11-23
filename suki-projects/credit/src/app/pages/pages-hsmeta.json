@@ -1,0 +1,5 @@
+{
+  "uid": "siloy_credit_heatmap_pages",
+  "type": "page",
+  "config": { "entrypoint": "/app/pages/Pages.jsx" }
+}

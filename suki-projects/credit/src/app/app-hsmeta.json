@@ -1,0 +1,30 @@
+{
+  "uid": "siloy_credit_heatmap_app",
+  "type": "app",
+  "config": {
+    "name": "Siloy Credit Heatmap",
+    "description": "Internal credit-usage intelligence for HubSpot with guarded source provenance. Developed by Siloy UKI.",
+    "distribution": "private",
+    "auth": {
+      "type": "static",
+      "requiredScopes": [
+        "oauth",
+        "crm.objects.custom.read",
+        "crm.objects.companies.read",
+        "crm.objects.deals.read"
+      ],
+      "optionalScopes": [],
+      "conditionallyRequiredScopes": []
+    },
+    "permittedUrls": {
+      "fetch": [],
+      "iframe": [],
+      "img": []
+    },
+    "support": {
+      "supportEmail": "support@prosperohub.com",
+      "documentationUrl": "https://developers.hubspot.com/docs/apps/developer-platform/add-features/ui-extensions/overview",
+      "supportUrl": "https://siloy.com/companies/uk-i"
+    }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "uid": "siloy-licence",
+  "type": "app",
+  "config": {
+    "description": "HubSpot-first customer entitlements, resource allocation and lifecycle management.",
+    "name": "Siloy Licence",
+    "distribution": "private",
+    "auth": {
+      "type": "static",
+      "requiredScopes": [
+        "oauth",
+        "crm.objects.custom.read",
+        "crm.objects.companies.read"
+      ],
+      "optionalScopes": [],
+      "conditionallyRequiredScopes": []
+    },
+    "permittedUrls": {
+      "fetch": [],
+      "iframe": [],
+      "img": []
+    }
+  }
+}

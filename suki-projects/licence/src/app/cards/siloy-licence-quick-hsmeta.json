@@ -1,0 +1,11 @@
+{
+  "uid": "siloy_licence_company_quick_view",
+  "type": "card",
+  "config": {
+    "name": "Siloy Licence | Quick View",
+    "description": "Company-specific rights and next licence review in the record sidebar",
+    "location": "crm.record.sidebar",
+    "entrypoint": "/app/cards/SiloyLicenceQuick.jsx",
+    "objectTypes": ["companies"]
+  }
+}

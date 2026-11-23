@@ -1,0 +1,8 @@
+{
+  "uid": "siloy_register_read",
+  "type": "app-function",
+  "config": {
+    "entrypoint": "/app/functions/RegisterRead.js",
+    "secretKeys": []
+  }
+}

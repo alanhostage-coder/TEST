@@ -1,0 +1,11 @@
+{
+  "uid": "siloy_licence_company_workspace",
+  "type": "card",
+  "config": {
+    "name": "Siloy Licence | Customer entitlements",
+    "description": "Record-context entitlement register for the existing Siloy Apps tab",
+    "location": "crm.record.tab",
+    "entrypoint": "/app/cards/SiloyLicenceCompany.jsx",
+    "objectTypes": ["companies"]
+  }
+}
