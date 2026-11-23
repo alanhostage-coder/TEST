@@ -44,6 +44,8 @@ jobs:
           deploy_latest_build: true
           account_id: '149783010'
           personal_access_key: ${{ secrets.HUBSPOT_149783010_PERSONAL_ACCESS_KEY || secrets.HUBSPOT_PERSONAL_ACCESS_KEY }}
+      - name: Restore current HubSpot CLI
+        run: npm install -g @hubspot/cli@8.19.0 --no-audit --no-fund
       - name: Install and check status
         working-directory: suki-projects/${{ matrix.app }}
         run: |
