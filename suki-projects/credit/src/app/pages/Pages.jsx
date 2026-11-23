@@ -48,6 +48,7 @@ function AppHomePage() {
       {busy ? <LoadingSpinner label="Reading Siloy Credit Usage records" showLabel={true} size="md" /> : null}
       {error ? <Tile><Heading>Error loading data</Heading><Text>{error}</Text><Button onClick={load}>Try again</Button></Tile> : null}
       {snapshot ? <>
+        {snapshot.illustrativeCount > 0 ? <Text>Illustrative usage model; figures are not actual billing.</Text> : null}
         <Flex direction="row" wrap="wrap" gap="medium">
           <Tile><Text>Credit usage records</Text><Heading>{fmt(snapshot.records)}</Heading><Text>Fetched from custom object</Text></Tile>
           <Tile><Text>Source-labelled actual</Text><Heading>{fmt(snapshot.methods.actual || 0)}</Heading><Text>Not billing-verified</Text></Tile>
@@ -78,7 +79,7 @@ function AppHomePage() {
                 <TableCell>{fmt(x.credits)}</TableCell>
                 <TableCell>{x.limit ? fmt(x.limit) : 'None'}</TableCell>
                 <TableCell>{pct(x) === null ? 'N/A' : pct(x) + '%'}</TableCell>
-                <TableCell>{typeName(x.method)}</TableCell>
+                <TableCell>{x.illustrative ? 'Illustrative model' : typeName(x.method)}</TableCell>
               </TableRow>
             )) : <TableRow><TableCell colSpan={5}>No matching records.</TableCell></TableRow>}
           </TableBody>
