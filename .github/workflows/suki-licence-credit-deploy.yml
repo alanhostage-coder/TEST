@@ -56,10 +56,10 @@ jobs:
           hs project list-builds --use-env --json
       - name: Check installation status
         working-directory: suki-projects/${{ matrix.app }}
-        run: hs project app-install-status --use-env --json
+        run: hs project app-install-status --use-env --json || test "$?" -eq 2
       - name: Install and check status
-        if: ${{ github.event_name == 'workflow_dispatch' }}
         working-directory: suki-projects/${{ matrix.app }}
         run: |
-          printf 'y\n' | timeout 90s script -q -e -c 'hs project install-app --use-env' /dev/null
+          if hs project app-install-status --use-env --json; then exit 0; fi
+          printf 'y\n' | timeout 90s script -q -e -c 'hs project install-app --use-env' /dev/null || true
           hs project app-install-status --use-env --json
