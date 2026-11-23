@@ -100,7 +100,7 @@ function Home() {
         <Tile><PageLink to="/renewals">Review notice dates</PageLink></Tile>
         <Tile><PageLink to="/settings">Product settings and safety limits</PageLink></Tile>
       </Flex>
-      <Text>Read directly from HubSpot at {data.asOf}. Records are demo data in a developer test account.</Text>
+      <Text>Read directly from HubSpot at {data.asOf}.</Text>
       {data.truncated&&<Text>Showing a capped register. Enable API pagination for larger accounts.</Text>}
     </>}
   </>;
